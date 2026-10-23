@@ -1,0 +1,11 @@
+# Build output
+/target
+
+.env
+
+# Devenv
+.devenv*
+devenv.local.nix
+
+# direnv
+.direnv

@@ -1,0 +1,21 @@
+[package]
+name = "template"
+version = "0.1.0"
+edition = "2024"
+license = "CC0-1.0"
+
+[dependencies]
+
+[lints.rust]
+unsafe_code = "forbid"
+
+[lints.clippy]
+all = { level = "warn", priority = -1 }
+pedantic = { level = "warn", priority = -1 }
+
+[profile.release]
+lto = true
+strip = true
+
+[profile.dev]
+opt-level = 1
