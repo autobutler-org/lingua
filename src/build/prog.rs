@@ -33,6 +33,11 @@ pub enum Addr {
     None,
     Reg(Reg),
     Imm(i64),
+    /// The 8-byte word at `base + off`.
+    Mem {
+        base: Reg,
+        off: i32,
+    },
     /// PC-relative reference to `name + off`.
     Sym {
         name: SymName,
@@ -82,6 +87,7 @@ impl Prog {
             Addr::None => None,
             Addr::Reg(reg) => Some(reg_name(*reg).to_owned()),
             Addr::Imm(value) => Some(format!("${value}")),
+            Addr::Mem { base, off } => Some(format!("{off}({})", reg_name(*base))),
             Addr::Sym { name, off: 0 } => Some(format!("{name}(SB)")),
             Addr::Sym { name, off } => Some(format!("{name}{off:+}(SB)")),
         };
@@ -156,11 +162,13 @@ mod tests {
                 },
                 Addr::Reg(1),
             ),
+            Prog::new(MOVQ, Addr::Mem { base: 1, off: -8 }, Addr::Reg(0)),
+            Prog::new(MOVQ, Addr::Reg(0), Addr::Mem { base: 1, off: 0 }),
             Prog::new(RET, Addr::None, Addr::None),
         ];
         assert_eq!(
             dump(&progs, op_name, reg_name),
-            "TEXT f(SB)\n  MOVQ  $-2, AX\n  MOVQ  CX, AX, CX\n  MOVQ  msg+8(SB), CX\n  MOVQ  msg-8(SB), CX\n  RET\n"
+            "TEXT f(SB)\n  MOVQ  $-2, AX\n  MOVQ  CX, AX, CX\n  MOVQ  msg+8(SB), CX\n  MOVQ  msg-8(SB), CX\n  MOVQ  -8(CX), AX\n  MOVQ  AX, 0(CX)\n  RET\n"
         );
     }
 }

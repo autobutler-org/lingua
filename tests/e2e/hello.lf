@@ -1,0 +1,6 @@
+fn main() -> Nothing
+  pure
+
+  log("hello, world")
+  return nothing
+end fn main

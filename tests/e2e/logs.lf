@@ -1,0 +1,13 @@
+fn main() -> Nothing
+  pure
+  example "logs are discarded in examples"
+    -> nothing
+  end
+
+  log("first")
+  log("")
+  log("tab\there, quote \" and backslash \\")
+  log("héllo, 世界")
+  log("first")
+  return nothing
+end fn main

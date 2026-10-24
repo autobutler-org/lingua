@@ -1,0 +1,6 @@
+fn hello.main params=0 vregs=3
+b0:
+  v0 = addr str.0
+  v1 = call rt.log(v0)
+  v2 = const 0
+  ret v2
