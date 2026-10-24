@@ -395,7 +395,7 @@ Primitive `percent` does not use this 64-bit `*`; it uses a wide intermediate an
 
 ### Types
 
-User code is monomorphic and checked bidirectionally.
+User code is monomorphic and checked bidirectionally. [type-system.md](type-system.md) is an informative overview of the rules below.
 
 - `check(e, T)` — `e` is allowed to be `T`.
 - `synth(e)` — `e` produces a type without an expected type.
