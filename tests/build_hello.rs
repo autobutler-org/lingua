@@ -1,45 +1,20 @@
-//! Hand-builds the `Prog` list that `fn main() -> Nothing pure; log("hello, world")` will
-//! select to, links it into a static linux/amd64 ELF, and checks the file.
+//! Links the hand-built hello program into a static linux/amd64 ELF and checks the file.
+//! Running it is the end-to-end harness's job (`tests/e2e.rs`).
 //!
 //! `cargo test --test build_hello` leaves the executable at `target/tmp/hello`.
 
+mod programs;
+
 use std::path::PathBuf;
 
-use lingua::build::arch::amd64::{self, AX, DI, DX, LEAQ, MOVQ, SI, SYSCALL};
-use lingua::build::link::elf::{self, RoData};
-use lingua::build::prog::{Addr, Prog, TEXT};
+use lingua::build::link::elf;
+use programs::{MESSAGE, hello_image};
 
-const MESSAGE: &[u8] = b"hello, world\n";
 const BASE: u64 = 0x40_0000;
 const PT_LOAD: u32 = 1;
 const PT_DYNAMIC: u32 = 2;
 const PT_INTERP: u32 = 3;
 const PT_GNU_STACK: u32 = 0x6474_e551;
-
-// rt0 with `log` inlined: write(2, msg, len), then exit_group(0)
-fn hello_progs() -> Vec<Prog> {
-    let len = i64::try_from(MESSAGE.len()).unwrap();
-    vec![
-        Prog::new(TEXT, Addr::sym("_rt0_linux_amd64"), Addr::None),
-        Prog::new(MOVQ, Addr::Imm(2), Addr::Reg(DI)),
-        Prog::new(LEAQ, Addr::sym("hello"), Addr::Reg(SI)),
-        Prog::new(MOVQ, Addr::Imm(len), Addr::Reg(DX)),
-        Prog::new(MOVQ, Addr::Imm(1), Addr::Reg(AX)),
-        Prog::new(SYSCALL, Addr::None, Addr::None),
-        Prog::new(MOVQ, Addr::Imm(0), Addr::Reg(DI)),
-        Prog::new(MOVQ, Addr::Imm(231), Addr::Reg(AX)),
-        Prog::new(SYSCALL, Addr::None, Addr::None),
-    ]
-}
-
-fn hello_image() -> Vec<u8> {
-    let rt0 = amd64::encode(&hello_progs()).unwrap();
-    let rodata = RoData {
-        name: "hello".to_owned(),
-        bytes: MESSAGE.to_vec(),
-    };
-    elf::link(&[rt0], &[rodata]).unwrap()
-}
 
 fn write_hello(name: &str) -> PathBuf {
     let path = PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join(name);
@@ -142,15 +117,4 @@ fn hello_is_a_static_amd64_exec() {
 #[test]
 fn linking_is_reproducible() {
     assert_eq!(hello_image(), hello_image());
-}
-
-#[cfg(all(target_os = "linux", target_arch = "x86_64"))]
-#[test]
-fn hello_runs() {
-    let output = std::process::Command::new(write_hello("hello-run"))
-        .output()
-        .unwrap();
-    assert_eq!(String::from_utf8_lossy(&output.stderr), "hello, world\n");
-    assert_eq!(String::from_utf8_lossy(&output.stdout), "");
-    assert_eq!(output.status.code(), Some(0));
 }

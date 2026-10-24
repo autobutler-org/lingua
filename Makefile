@@ -49,6 +49,21 @@ run: build ## Build and run the application
 test: ## Run tests
 	$(CARGO) test --locked
 
+RUST_IMAGE := $(shell sed -n 's/^FROM \(rust:[^ ]*\).*/\1/p' Dockerfile)
+
+.PHONY: e2e
+e2e: ## Build and run the end-to-end programs (in Docker unless on linux/amd64)
+	if [ "$$(uname -s)/$$(uname -m)" = "Linux/x86_64" ]; then
+		$(CARGO) test --locked --test e2e
+	elif ! docker info >/dev/null 2>&1; then
+		echo "error: e2e programs are linux/amd64 executables; start Docker to run them here" >&2
+		exit 1
+	else
+		docker run --rm --platform linux/amd64 -v "$$PWD":/src -w /src \
+			-e CARGO_TARGET_DIR=/src/target/linux-amd64 $(RUST_IMAGE) \
+			cargo test --locked --test e2e
+	fi
+
 .PHONY: euler
 euler: build ## Check the Project Euler solutions in euler/
 	for file in euler/*.lf; do
