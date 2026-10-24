@@ -43,7 +43,7 @@ Today there is no Lingua grammar, checker, or toolchain. The pain this design re
 - Bounded integer subtypes with static rejection of bad literals, implicit elimination to a wider bound or to `Int`, and explicit checking conversions that return `Result`.
 - Nominal types, including unbounded `type CustomerId = Text`, so same-representation values do not interchange.
 - Expected failures as `Result<T, E>`. Unrecoverable bugs as `assert` / `fail`, with no `catch`. No null. No implicit truthiness.
-- An interpreter inside the compiler for comptime values, const initializers, generative types, macro splices, and examples. `lingua build` then emits the runtime residue as one static executable.
+- An interpreter inside the compiler for comptime values, const initializers, generative types, macro splices, and examples. `lingua build` then emits the runtime residue as one executable, static by default where the OS allows it.
 - Diagnostics with a stable code, one issue each, a source span, a one-line summary, and `help:` on `L002`, `L003`, `L010`, `L011`, `L016`, `L021`, `L028`, `L031`, `L032`, and `L069`. `L016` help prints the source root. Exceptions use one span-and-message shape in the interpreter and in the native binary.
 - A formatter, a context packer, and `lingua expand` (`lingua fmt`, `lingua pack`, `lingua expand`) with the CLI in [API](#api--interface).
 
@@ -60,7 +60,7 @@ Today there is no Lingua grammar, checker, or toolchain. The pain this design re
 - Shadowing. Private visibility. Mutual recursion across modules (intra-module recursion is allowed).
 - Exceptions, panics, or null as the response to a bounds failure. `Cents(n)` does not throw. Silent two's-complement wrap. `catch`, `throw`, and `raises`. Using `assert` for a missing row or a down network that the program is designed to handle.
 - A separate `comptime fn` form, or inferring comptime because a runtime `let` happens to be foldable. Demoting a comptime context to runtime.
-- `lingua build --dynamic` (the flag is rejected, not implemented). Foreign shared libraries. A conformance mode that re-runs examples as native code. Baking the link mode into the grammar.
+- Foreign shared libraries and FFI. Dynamic linking in lingua1 means the system C library only. A conformance mode that re-runs examples as native code. Baking the link mode into the grammar.
 - A second compiler implementation beside this Rust crate.
 
 ---
@@ -115,7 +115,7 @@ Today there is no Lingua grammar, checker, or toolchain. The pain this design re
 
 **Comptime is a use-site marker, not a function subset.** Every ordinary function is callable at compile time and at runtime. There is no `comptime fn`. `comptime next_pow2(100)` evaluates on the interpreter and yields a constant. A call without `comptime` is runtime. The compiler does not infer comptime from a runtime `let`. Type bounds, generative type bodies, `const` initializers, both kinds of `example`, package `comptime` blocks, and the body of a function that returns `Expr` or `Type` are comptime contexts. `comptime` written there is redundant, not an error. A comptime context never demotes to runtime: `const n = next_pow2(input)` is `L060` when `input` is runtime. `let` is the runtime immutable binding. Inside an ordinary function, `const folded = next_pow2(100)` or `let folded = comptime next_pow2(100)`. `const` is legal at file level and inside functions. A file-level `const` is exported. `const` does not bypass effects. A function that returns `Expr` or `Type` is not callable at runtime (`L063`) and is not copied into the residue except as the spliced tree.
 
-**Interpreter, then a separate native driver.** `lingua check` parses one AST per package and interleaves bind, typecheck, comptime evaluation, and splice until a fixed point, then runs examples. Fuel is 100_000 steps for each comptime root, provider, and example. `lingua build` runs that check, then the native backend emits the runtime residue as one static executable with the Lingua runtime linked in. No shared Lingua library and no dynamic linker. `lingua build --dynamic` is `L070`. The process starts at file-level `fn main() -> Nothing` or `fn main(process: Process) -> Nothing` (`pure` or `reads clock`). Any other parameter list, or any other return type, is `L075`. Zero mains, or more than one, in the link set is `L074` and no binary is written. A `main` with the wrong signature still counts toward `L074`. Code generation is a hand-written assembler: the compiler emits one generic instruction form, and a Rust table per architecture encodes it, in the style of the [Go assembler](https://go.dev/talks/2016/asm.slide). There is no LLVM and no system assembler on the core path. v1 does not re-execute examples on the native binary. Exceptions still use one span-and-message shape so a later backend cannot invent a second report.
+**Interpreter, then a separate native driver.** `lingua check` parses one AST per package and interleaves bind, typecheck, comptime evaluation, and splice until a fixed point, then runs examples. Fuel is 100_000 steps for each comptime root, provider, and example. `lingua build` runs that check, then the native backend emits the runtime residue as one executable with the Lingua runtime linked in. Like Go, the default is static where the OS allows it (Linux). `lingua build --dynamic` links against the system C library instead of making raw system calls. darwin binaries always link `libSystem`, because macOS supports nothing else. There is never a shared Lingua library. The process starts at file-level `fn main() -> Nothing` or `fn main(process: Process) -> Nothing` (`pure` or `reads clock`). Any other parameter list, or any other return type, is `L075`. Zero mains, or more than one, in the link set is `L074` and no binary is written. A `main` with the wrong signature still counts toward `L074`. Code generation is a hand-written assembler: the compiler emits one generic instruction form, and a Rust table per architecture encodes it, in the style of the [Go assembler](https://go.dev/talks/2016/asm.slide). There is no LLVM and no system assembler on the core path. v1 does not re-execute examples on the native binary. Exceptions still use one span-and-message shape so a later backend cannot invent a second report.
 
 **Type providers.** A type body may be fields, variants, or a comptime program that returns `Type`. `reads net`, `reads catalog`, and `reads fs` are legal on that body and on a file-level `const`, and the interpreter performs them during `lingua check`, `lingua expand`, `lingua pack`, and the check inside `lingua build`. They are not legal on ordinary functions. `reads db` remains the user-resource effect. Function examples still inject scripts and do not call production. The expansion is real AST. `lingua expand` prints it and `lingua pack` includes it. `check`, `expand`, `pack`, and the check inside `build` share one cache policy and write `{source_root}/provided/<module>.lf` when they run an effect. `--refresh` reruns effects. `--offline` fails with one `L071` per generated declaration that has no cache entry.
 
@@ -144,7 +144,7 @@ flowchart TD
   cyc[L061 comptime cycle]
   ex[Run function and package examples]
   cache[Write or reuse provided/module.lf]
-  build[lingua build static executable]
+  build[lingua build executable]
   diag[Diagnostics]
   fmt[lingua fmt]
   pack[lingua pack and expand]
@@ -180,7 +180,7 @@ flowchart TD
 
 If parse or the fixed point emits any diagnostic for a module, examples in that module do not run. Other modules still check. Example failures are diagnostics and do not suppress other examples in the package.
 
-`lingua pack` and `lingua expand` branch from the fixed point. They do not require example success. A broken body still packs. `lingua build` runs only when `check` exits 0, and that exit includes the examples. It compiles the runtime residue: function bodies, with comptime calls and generative types already replaced by constants and ordinary types. It does not re-run examples. The v1 backend emits one static executable. The Lingua runtime (value representation, `assert` / `fail` printing, overflow faults) is linked in. The binary does not need a shared Lingua library or a dynamic linker. Static versus dynamic is not syntax. `lingua build --dynamic` is `L070` and does not link anything.
+`lingua pack` and `lingua expand` branch from the fixed point. They do not require example success. A broken body still packs. `lingua build` runs only when `check` exits 0, and that exit includes the examples. It compiles the runtime residue: function bodies, with comptime calls and generative types already replaced by constants and ordinary types. It does not re-run examples. The v1 backend emits one executable. The Lingua runtime (value representation, `assert` / `fail` printing, overflow faults) is linked in. The binary never needs a shared Lingua library. It is static by default on Linux. `--dynamic` links the system C library, and darwin always links `libSystem`. Static versus dynamic is not syntax. The backend is specified in [build.md](build.md).
 
 **Provider cache flags.** `check`, `expand`, `pack`, and the check inside `build` use the same policy. Default: reuse a cache entry when the file already contains that declaration; otherwise run the declared effect and write the cache. `--offline` never runs an effect; each missing declaration is `L071`. `--refresh` reruns effects and replaces the cache. `--refresh` together with `--offline` is exit 2. `pack` writes the cache when it runs an effect. It does not default to offline.
 
@@ -1283,7 +1283,6 @@ L031: match on Discount is missing a variant
 | `L067` | `provide` parsed outside a package-level `comptime` block. The statement is in the grammar; this code rejects the placement |
 | `L068` | A string that must be a literal without holes is not: `assert` / `fail` / `or fail` message, an example label, or `-> exception` |
 | `L069` | Ambiguous package-level name; help lists the defining files |
-| `L070` | `lingua build --dynamic` is not in lingua1 |
 | `L071` | `--offline` and one generated declaration has no entry in `provided/<module>.lf`. One diagnostic per missing name |
 | `L072` | A declared provider effect cannot be performed by the host at all, or `lingua build` sees a runtime resource operation with no backend (`open_orders`). A missing `[db] url` is `Err(NotConfigured)`. A timeout is `Err(NetUnavailable("timeout"))` or `Err(DbUnavailable("timeout"))`. Neither is this code |
 | `L073` | `types_from_openapi` returned a module `Type` where one record or sum is required |
@@ -1291,7 +1290,7 @@ L031: match on Discount is missing a variant
 | `L075` | A file-level `main` has a parameter list other than empty or one `Process`, or its return type is not `Nothing`. No binary is written. The effect rule stays `L025`. Zero or duplicate `main` stays `L074` |
 | `L076` | Division by zero: the divisor of `/` or `%` is `0`. Compile-time if the divisor is the literal `0`, otherwise a fault in an example, a comptime root, or the native binary. Fault header, not an exception. Still sorted and counted toward the cap |
 
-`L019`, `L036`–`L039`, `L048`, and `L051`–`L054` are unused and reserved.
+`L019`, `L036`–`L039`, `L048`, `L051`–`L054`, and `L070` are unused and reserved. `L070` formerly rejected `lingua build --dynamic`, which is now implemented.
 
 `L040`, `L042`, and a runtime `L076` use the fault header (`fault L040: ...`) and are still sorted with every other diagnostic by file, span, and code. They count toward the cap of 100. An exception report from a built binary is not a compiler diagnostic and does not use that cap.
 
@@ -1366,7 +1365,7 @@ No `help:` line. Rendering is decimal for integers, double-quoted for text, `Nam
 | `provided/<module>.lf` is edited by hand and diverges from a later `--refresh` | Medium | The cache is the reviewable diff. A check without `--refresh` uses the cache and does not silently re-query. `--refresh` is the explicit update |
 | A comptime value depends on itself and the work queue waits | Medium | Re-entering the evaluation stack is `L061` and lists the stack. It is not a retry and not a hang. Fuel inside one item is still `L042` |
 | Models treat `assert` / `fail` as the way to report a bad quantity or a missing row | Medium | Those stay `Result`. `-> Err(...)` does not match an exception (`L057`). `-> exception "..."` is exact. There is no `catch` |
-| `lingua build --dynamic` is ignored and a dynamic binary ships | Low | The flag is `L070` and links nothing. Static versus dynamic is not syntax |
+| A dynamic binary loads a library other than the system C library | Low | The only `DT_NEEDED` or `LC_LOAD_DYLIB` entry is `libc.so.6` or `libSystem`. There is no FFI, so source cannot add one. Static versus dynamic is not syntax |
 | A splice captures a caller local | Medium | Binders introduced by the splice are fresh. `unquote` is the only insertion of caller AST. A splice that is not a grammar node is `L064` |
 | `catalog.columns` is mistaken for a second operation of `resource db` | Medium | One operation per resource. `open_orders` stays the scripted operation and is `L072` in a built binary. `catalog.columns` is prelude and only under `reads catalog` |
 
@@ -1985,7 +1984,7 @@ The lingua1 toolchain is `check`, `fmt`, `pack`, `expand`, and `build`. There is
 | Exit | When |
 |---|---|
 | 0 | The command succeeded. `--explain` of a known code also exits 0. A built binary is not this table: its own `assert` / `fail` exits 1, and its own overflow exits 1, using the shapes in [Value errors and exceptions](#value-errors-and-exceptions). |
-| 1 | One or more Lingua diagnostics, `fmt --check` would change a file, or `lingua build --dynamic` (`L070`). |
+| 1 | One or more Lingua diagnostics, or `fmt --check` would change a file. |
 | 2 | Usage error: unknown flag, `--explain` of an unknown code, path does not exist, `pack` given a directory, `--refresh` together with `--offline`. This is not a Lingua diagnostic and has no `L` code. |
 
 ```text
@@ -2006,7 +2005,7 @@ lingua build [--source-root PATH] [--dynamic] [--refresh | --offline] [PATH ...]
 
 `check`, `expand`, `pack`, and the check inside `build` share one cache policy. Default: reuse a declaration already present in `{source_root}/provided/<module>.lf`; otherwise run the effect and write that declaration. `--offline` runs no provider effect and emits one `L071` per generated declaration that is absent, including a `pure` generative type. `--refresh` runs the effects again and replaces the cache. `--refresh` and `--offline` together are exit 2. `check` does not rewrite source `.lf` files.
 
-`expand` runs the same fixed point as `check`, including that cache policy, and does not require examples to succeed. It then prints the expanded type text to stdout. `build` runs `check` and emits a binary only when `check` exits 0. The v1 default is one static executable: the Lingua runtime is linked in, and the result does not need a shared Lingua library or a dynamic linker. The output path is `./lingua-out`. `lingua build --dynamic` is `L070`, links nothing, and is not ignored. Static versus dynamic is a flag, not syntax. A runtime residue that calls a resource operation (`open_orders`) is `L072` and produces no binary. Foreign shared libraries are out of scope. `build` does not re-run examples as native code.
+`expand` runs the same fixed point as `check`, including that cache policy, and does not require examples to succeed. It then prints the expanded type text to stdout. `build` runs `check` and emits a binary only when `check` exits 0. The Lingua runtime is linked in, and the result never needs a shared Lingua library. On Linux the default is a static executable with no dynamic linker. `--dynamic` makes a Linux binary that loads `libc.so.6` through the system dynamic linker and calls it instead of making raw system calls. darwin binaries always load `libSystem`, so `--dynamic` there changes nothing. The output path is `./lingua-out`. Static versus dynamic is a flag, not syntax. A runtime residue that calls a resource operation (`open_orders`) is `L072` and produces no binary. Foreign shared libraries are out of scope. `build` does not re-run examples as native code.
 
 **Entry.** The process starts at a file-level function:
 
@@ -2370,7 +2369,7 @@ What it cannot do:
 - Observe `log` output through any Lingua value. Logs are not a channel back into `Result`.
 - Use `--offline` to skip a provider effect and still invent a type. Each missing declaration is `L071`.
 
-`lingua build` runs provider effects only as part of its check, under the same flags, and does not re-run examples as native code. The binary contains the runtime residue. A call to `open_orders` in that residue is `L072` and no binary is written. `lingua build --dynamic` is `L070` and links nothing. The link mode is not syntax, so a source file cannot request a dynamic linker. Native `log` writes stderr. Native `clock.now` reads the Unix clock. Neither is `L072`.
+`lingua build` runs provider effects only as part of its check, under the same flags, and does not re-run examples as native code. The binary contains the runtime residue. A call to `open_orders` in that residue is `L072` and no binary is written. A dynamic binary loads only the system C library (`libc.so.6` with `--dynamic` on Linux, `libSystem` on darwin). The link mode is not syntax, so a source file cannot request a library. Native `log` writes stderr. Native `clock.now` reads the Unix clock. Neither is `L072`.
 
 Defense in depth, not a language rule: lingua1 does not require a specific sandbox technology. It does require that comptime and examples are interpreted in-process from TIR and are not passed to a shell. When the sources declare no provider effect, the process needs no network and no database. When they do, `--offline` on `check`, `expand`, `pack`, or `build` against a reviewed `provided/` cache is the way to avoid repeating the effect. The packer prints signatures and expanded types to stdout and does not print `[db] url`. That URL is a connection string in local config. It is read only by `catalog.columns`.
 
@@ -2411,7 +2410,7 @@ A change is **non-breaking** when it:
 
 `.lf`, package examples, `const`, use-site `comptime`, generative types, `assert` / `fail`, `quote` / `unquote`, and the static `lingua build` driver are lingua1. They are not a later language version. The prelude names added for them (`Expr`, `Type`, `http_get`, `fs.read`, `catalog.columns`, and the error sums beside them) are part of this initial prelude. lingua1 has not shipped, so those names are not a compatibility break against an older lingua1.
 
-A release that calls itself lingua1 includes `check`, `fmt`, `pack`, `expand`, and `build`. The PR plan lands `check` before `build`. A partial PR is not a release. `lingua check` without examples running is not lingua1. Do not gate `example` execution, nominal types, the closer check, comptime evaluation, or `assert` behind flags: those are the language. Do not implement `--dynamic` behind a flag. Reject it.
+A release that calls itself lingua1 includes `check`, `fmt`, `pack`, `expand`, and `build`. The PR plan lands `check` before `build`. A partial PR is not a release. `lingua check` without examples running is not lingua1. Do not gate `example` execution, nominal types, the closer check, comptime evaluation, or `assert` behind flags: those are the language. `--dynamic` is a link mode, not a language feature, and it ships in the same release.
 
 The compiler rollout is this Rust crate. The language sources it checks are `.lf` files, not the Rust sources.
 
@@ -2441,13 +2440,13 @@ Rollback of a bad checker build is reverting the toolchain binary. `provided/*.l
 
 **A separate `comptime fn`, or folding every runtime `let`.** A restricted function subset would split the language the model has to learn, and folding a `let` because the compiler can see a literal would make runtime and compile time depend on inference. The marker stays on the use site. Type bounds, const initializers, examples, and generative bodies are comptime contexts and never demote. The cost is that `const n = next_pow2(input)` is `L060` instead of a quiet runtime binding, which is the point of the rule.
 
-**Dynamic linking as a language mode.** A `dynamic` keyword or a second output type would bake the link mode into source. It is a flag. lingua1 implements the static default only and rejects `lingua build --dynamic` with `L070`. Foreign shared libraries stay out of scope. The static executable is produced by the hand-written assembler, not by a codegen library.
+**Dynamic linking as a language mode.** A `dynamic` keyword or a second output type would bake the link mode into source. It is a flag. Static is the default where the OS allows it, and `--dynamic` links the system C library. Foreign shared libraries stay out of scope. The executable is produced by the hand-written assembler, not by a codegen library.
 
 ---
 
 ## Open Questions
 
-**Host ABI for a runtime resource call.** This is the calling convention for a call that leaves Lingua, which is the FFI problem, limited here to a resource operation such as `open_orders`. An `example` injects pages while checking. `catalog.columns` runs in the checker. A built binary that calls `open_orders` needs a real implementation and a layout for the arguments and for `Result`: who owns the connection, and how `Err` crosses the boundary. Dynamic loading is already out of lingua1. The two static options are to compile the operation into the runtime, or to link a static archive at `lingua build`. Neither layout is specified. Until one is, `lingua build` rejects the runtime call with `L072` and writes no binary. Do not invent that boundary while implementing the assembler.
+**Host ABI for a runtime resource call.** This is the calling convention for a call that leaves Lingua, which is the FFI problem, limited here to a resource operation such as `open_orders`. An `example` injects pages while checking. `catalog.columns` runs in the checker. A built binary that calls `open_orders` needs a real implementation and a layout for the arguments and for `Result`: who owns the connection, and how `Err` crosses the boundary. Loading a foreign library is out of lingua1. A later FFI could add a `DT_NEEDED` entry through the same import mechanism `--dynamic` uses. The two static options are to compile the operation into the runtime, or to link a static archive at `lingua build`. Neither layout is specified. Until one is, `lingua build` rejects the runtime call with `L072` and writes no binary. Do not invent that boundary while implementing the assembler.
 
 ---
 
@@ -2472,7 +2471,7 @@ Each PR compiles, is reviewable on its own, and leaves `lingua check` (or the su
 
 - **Files/components:** `src/` project manifest, `lingua` CLI entry, version string, argument parser, exit codes 0/1/2, empty diagnostic type (`code`, `span`, `summary`, `help`).
 - **Depends on:** nothing. This is the first PR in this crate.
-- **Changes:** `lingua --version` prints `lingua1`. `lingua check`, `lingua fmt`, `lingua pack`, `lingua expand`, and `lingua build` exist, reject unknown flags with exit 2, and otherwise print a one-line "not implemented" and exit 2. No parsing. README for the compiler is not required; the CLI help text is enough. `lingua build --dynamic` stays an unknown flag until PR 18, which rejects it with `L070` instead.
+- **Changes:** `lingua --version` prints `lingua1`. `lingua check`, `lingua fmt`, `lingua pack`, `lingua expand`, and `lingua build` exist, reject unknown flags with exit 2, and otherwise print a one-line "not implemented" and exit 2. No parsing. README for the compiler is not required; the CLI help text is enough. `lingua build --dynamic` stays an unknown flag until PR 18 implements it.
 
 ### PR 2 — Lexer
 
@@ -2570,8 +2569,8 @@ Each PR compiles, is reviewable on its own, and leaves `lingua check` (or the su
 - **Depends on:** PR 14 and PR 15.
 - **Changes:** A function that returns `Expr` or `Type` is a comptime context, `L063` at a runtime call, and is not emitted except as the splice. `Expr` arguments at a `comptime` call are AST, not values. Splice before typechecking the parent. Hygiene: fresh binders, and a free name in `quote` resolves on the macro's scope stack. Comptime TIR keeps `Quote` and `Unquote` until splice. A spliced span is the call site. `L063`, `L064`, `L065`, `L066`. `assert.lf` exits 0: the function example's trees match, and the package example expects exception `"nonzero"`. A statement splice in expression position is `L065`. `lingua check` is still the command that runs this. No new syntax beyond the grammar PR 3 already parsed.
 
-### PR 18 — `lingua build`, static link
+### PR 18 — `lingua build`
 
 - **Files/components:** `src/build`, runtime residue for values, `assert` / `fail` printing, overflow faults.
 - **Depends on:** PR 14 and PR 15 (and PR 9 through them). Does not block `lingua check`. Providers and `assert.lf` are not required.
-- **Changes:** `lingua build` runs `check` and, on exit 0, writes `./lingua-out` as one static executable with the Lingua runtime linked in. No shared Lingua library and no dynamic linker. The entry is `fn main() -> Nothing` or `fn main(process: Process) -> Nothing` with effect `pure` or `reads clock`. Zero mains or more than one is `L074` and writes no binary. `lingua build FILE` links that file and its import closure. `lingua build DIR` links every module directly in the source root. argv fills `Process` (program, args, os, arch, pid, main thread, parallelism). stdin is ignored. Native `log` writes stderr. Native `clock.now` is Unix seconds. `lingua build --dynamic` is `L070` and links nothing. The binary's exception, `fault L040`, and `fault L076` shapes match the interpreter. Fuel is not applied to the binary. A runtime call to `open_orders` is `L072` and writes no binary. The smoke program is `main.lf` in the API section: it imports `order_total` and `NoDiscount`, calls `order_total([], NoDiscount)`, logs `"ok"`, and returns `nothing`. `lingua build main.lf` succeeds. Its closure is `order.lf` and `money.lf`. `lingua build` of the directory that contains `fulfillment.lf` is `L072`. No native re-run of examples. The object code comes from the hand-written assembler in this crate, not from LLVM. The entry's parameter list is empty or one `Process`, and the return type is `Nothing` (`L075` otherwise).
+- **Changes:** `lingua build` runs `check` and, on exit 0, writes `./lingua-out` as one executable with the Lingua runtime linked in, static by default on Linux. No shared Lingua library. The entry is `fn main() -> Nothing` or `fn main(process: Process) -> Nothing` with effect `pure` or `reads clock`. Zero mains or more than one is `L074` and writes no binary. `lingua build FILE` links that file and its import closure. `lingua build DIR` links every module directly in the source root. argv fills `Process` (program, args, os, arch, pid, main thread, parallelism). stdin is ignored. Native `log` writes stderr. Native `clock.now` is Unix seconds. `lingua build --dynamic` links the system C library on Linux and changes nothing on darwin. The binary's exception, `fault L040`, and `fault L076` shapes match the interpreter. Fuel is not applied to the binary. A runtime call to `open_orders` is `L072` and writes no binary. The smoke program is `main.lf` in the API section: it imports `order_total` and `NoDiscount`, calls `order_total([], NoDiscount)`, logs `"ok"`, and returns `nothing`. `lingua build main.lf` succeeds. Its closure is `order.lf` and `money.lf`. `lingua build` of the directory that contains `fulfillment.lf` is `L072`. No native re-run of examples. The object code comes from the hand-written assembler in this crate, not from LLVM. The entry's parameter list is empty or one `Process`, and the return type is `Nothing` (`L075` otherwise). [build.md](build.md) is the backend design and splits this PR into PRs 18.1 through 18.7.
