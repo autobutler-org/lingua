@@ -9,3 +9,6 @@ devenv.local.nix
 
 # direnv
 .direnv
+
+# Claude Code local state (agent worktrees)
+/.claude/
