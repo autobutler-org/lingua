@@ -1,0 +1,6 @@
+# Ship the compiler as a static executable on Linux, like Go. macOS has no
+# static executables; libSystem is always linked there.
+# ponytail: static glibc warns on getaddrinfo (NSS); move to the musl target
+# when http_get / catalog.columns need DNS.
+[target.'cfg(target_os = "linux")']
+rustflags = ["-C", "target-feature=+crt-static"]
