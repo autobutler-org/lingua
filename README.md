@@ -1,10 +1,8 @@
-# Template Rust Repo
+# Lingua
 
-Template for new Rust projects.
+A programming language for code that a language model writes and a checker accepts or rejects.
 
-## How to rename
-
-`grep` for `template`, you will find every string to change for your project.
+The normative design, grammar, and sample programs are in [docs/lingua1.md](docs/lingua1.md). The compiler is this Rust crate. It is not implemented yet. The binary is still the placeholder greeting.
 
 ## Usage
 

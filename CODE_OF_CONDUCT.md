@@ -1,3 +1,3 @@
 # Code of Conduct
 
-template
+lingua

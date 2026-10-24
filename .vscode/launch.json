@@ -6,7 +6,7 @@
       "type": "lldb",
       "request": "launch",
       "cargo": {
-        "args": ["build", "--bin=template", "--package=template"]
+        "args": ["build", "--bin=lingua", "--package=lingua"]
       },
       "args": []
     }

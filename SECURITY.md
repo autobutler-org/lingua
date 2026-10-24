@@ -2,8 +2,8 @@
 
 ## Supported Versions
 
-template
+lingua
 
 ## Reporting a Vulnerability
 
-template
+lingua

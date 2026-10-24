@@ -19,7 +19,7 @@ CARGO ?= cargo
 # release (default) or debug
 PROFILE ?= release
 CARGO_FLAGS = $(if $(filter release,$(PROFILE)),--release,)
-EXE ?= ./target/$(PROFILE)/template
+EXE ?= ./target/$(PROFILE)/lingua
 
 ##@ Setup
 
