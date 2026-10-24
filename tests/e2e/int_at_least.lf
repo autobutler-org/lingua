@@ -1,0 +1,70 @@
+fn bounds_name(problem: BoundsError) -> Text
+  pure
+  example "out of range"
+    problem: OutOfRange
+    -> "out of range"
+  end
+
+  return match problem
+    OutOfRange -> "out of range"
+    NotAnInteger -> "not an integer"
+  end
+end fn bounds_name
+
+type Cents = Int at least 0
+
+fn at_least_zero(n: Int) -> Text
+  pure
+  example "zero"
+    n: 0
+    -> "0 ok 0"
+  end
+  example "negative"
+    n: -1
+    -> "-1 out of range"
+  end
+
+  return match int_at_least(n, 0)
+    Ok(value) -> "{n} ok {value}"
+    Err(problem) -> "{n} {bounds_name(problem)}"
+  end
+end fn at_least_zero
+
+fn to_cents(n: Int) -> Result<Cents, BoundsError>
+  pure
+  example "five"
+    n: 5
+    -> Ok(5)
+  end
+
+  let amount: Cents = int_at_least(n, 0) or return
+  return Ok(amount)
+end fn to_cents
+
+fn main() -> Nothing
+  pure
+
+  let top: Int = 9223372036854775807
+  let bottom: Int = -9223372036854775807 - 1
+  let samples: List<Int> = [5, 0, -1, top, bottom]
+  for sample in samples
+    log(at_least_zero(sample))
+  end
+  let hundred: Int = 100
+  let ninety_nine: Int = 99
+  let high = int_at_least(hundred, 100) or fail "hundred is at least 100"
+  log("high {high}")
+  let low = match int_at_least(ninety_nine, 100)
+    Ok(_) -> "unexpected"
+    Err(problem) -> bounds_name(problem)
+  end
+  log("99 {low}")
+  let cents = to_cents(250) or fail "250 is cents"
+  log("cents {cents}")
+  let refused = match to_cents(-250)
+    Ok(_) -> "unexpected"
+    Err(problem) -> bounds_name(problem)
+  end
+  log("-250 {refused}")
+  return nothing
+end fn main

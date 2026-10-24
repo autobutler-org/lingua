@@ -1,0 +1,32 @@
+fn shape_of(items: List<Text>) -> Text
+  pure
+  example "empty"
+    items: []
+    -> "empty"
+  end
+  example "command"
+    items: ["cmd", "run"]
+    -> "command run"
+  end
+
+  return match items
+    [] -> "empty"
+    [only] -> "one: {only}"
+    ["cmd", arg] -> "command {arg}"
+    [first, second] -> "pair {first} {second}"
+    _ -> "many"
+  end
+end fn shape_of
+
+fn main() -> Nothing
+  pure
+
+  log(shape_of([]))
+  log(shape_of(["solo"]))
+  log(shape_of(["cmd", "run"]))
+  log(shape_of(["a", "b"]))
+  log(shape_of(["cmd", "a", "b"]))
+  log(shape_of(split(text: "cmd:build", separator: ":")))
+  log(shape_of(split(text: "none", separator: ":")))
+  return nothing
+end fn main

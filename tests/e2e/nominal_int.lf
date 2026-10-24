@@ -1,0 +1,45 @@
+type Cents = Int at least 0
+
+type Quantity = Int in 1 through 99
+
+fn subtotal(price: Cents, quantity: Quantity) -> Cents
+  pure
+  example "three at 250"
+    price: 250
+    quantity: 3
+    -> 750
+  end
+
+  return price * quantity
+end fn subtotal
+
+fn change(paid: Cents, owed: Cents) -> Int
+  pure
+  example "overpaid"
+    paid: 1000
+    owed: 750
+    -> 250
+  end
+
+  return paid - owed
+end fn change
+
+fn main() -> Nothing
+  pure
+
+  let price: Cents = 250
+  let qty: Quantity = 3
+  let line = subtotal(price, qty)
+  log("subtotal {line}")
+  let tendered: Cents = 1000
+  log("change {change(paid: tendered, owed: line)}")
+  log("short {change(owed: line, paid: price)}")
+  var total: Cents = 0
+  set total += line
+  set total += price
+  log("total {total}")
+  let widened: Int = total
+  log("widened {widened + -2000}")
+  log("quantity {qty}")
+  return nothing
+end fn main

@@ -1,0 +1,50 @@
+fn describe(n: Int) -> Text
+  pure
+  example "zero"
+    n: 0
+    -> "zero"
+  end
+  example "other"
+    n: 7
+    -> "many"
+  end
+
+  return match n
+    0 -> "zero"
+    1 -> "one"
+    -1 -> "minus one"
+    _ -> "many"
+  end
+end fn describe
+
+fn command(word: Text) -> Text
+  pure
+  example "go"
+    word: "go"
+    -> "moving"
+  end
+  example "unknown"
+    word: "jump"
+    -> "unknown jump"
+  end
+
+  return match word
+    "go" -> "moving"
+    "stop" -> "halted"
+    _ -> "unknown {word}"
+  end
+end fn command
+
+fn main() -> Nothing
+  pure
+
+  let numbers: List<Int> = [0, 1, -1, 7]
+  for number in numbers
+    log("{number} {describe(number)}")
+  end
+  let words: List<Text> = ["go", "stop", "jump", ""]
+  for word in words
+    log(command(word))
+  end
+  return nothing
+end fn main

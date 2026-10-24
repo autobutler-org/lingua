@@ -1,5 +1,5 @@
-//! The native backend (docs/build.md). The driver below runs the stages in order: TIR (from
-//! the subset check until the typechecker exists), lowering to LIR, the runtime, amd64
+//! The native backend (docs/build.md). The driver below runs the stages in order: TIR from
+//! the checker, lowering to LIR, the runtime, amd64
 //! selection, encoding, and the ELF linker. The only target so far is static linux/amd64.
 
 pub mod arch;
@@ -10,15 +10,13 @@ mod lir_eval;
 pub mod lower;
 pub mod prog;
 pub mod runtime;
-pub mod subset;
 pub mod target {
     pub mod linux_amd64;
 }
 
 use std::path::{Path, PathBuf};
 
-use crate::ast::Module;
-use crate::parse::Diagnostic;
+use crate::check::{self, Diagnostic};
 use crate::tir::TirProgram;
 use arch::amd64;
 use link::elf;
@@ -28,47 +26,49 @@ use target::linux_amd64;
 /// Why a build wrote nothing.
 #[derive(Debug, PartialEq)]
 pub enum Error {
-    /// The source is outside what `lingua build` accepts.
+    /// Exit 2: a usage error, not a Lingua diagnostic.
+    Usage(String),
+    /// The source does not check, or breaks a link-set rule (`L072`, `L074`, `L075`).
     Diagnostics(Vec<Diagnostic>),
     /// A bug in the backend.
     Internal(String),
 }
 
-/// Checks `module` (read from `path` with text `source`) into TIR.
-///
-/// # Errors
-/// The diagnostics from `subset::check`.
-pub fn check(module: &Module, path: &str, source: &str) -> Result<TirProgram, Error> {
-    subset::check(module, path, source).map_err(Error::Diagnostics)
+impl From<check::Error> for Error {
+    fn from(err: check::Error) -> Self {
+        match err {
+            check::Error::Usage(message) => Error::Usage(message),
+            check::Error::Diagnostics(diagnostics) => Error::Diagnostics(diagnostics),
+        }
+    }
 }
 
-/// Checks `module` and lowers it to LIR. This is what `lingua lir` prints.
+/// Checks `paths` and their import closure into the link set's TIR.
 ///
 /// # Errors
-/// The diagnostics from the check, or an internal lowering error.
-pub fn lower(module: &Module, path: &str, source: &str) -> Result<LirProgram, Error> {
-    lower::lower(&check(module, path, source)?).map_err(Error::Internal)
+/// The check's usage error or diagnostics, or the link-set diagnostics.
+pub fn check(paths: &[PathBuf], options: &check::Options) -> Result<TirProgram, Error> {
+    Ok(check::link(paths, options)?)
+}
+
+/// Lowers a checked program to LIR. This is what `lingua lir` prints.
+///
+/// # Errors
+/// An internal lowering error.
+pub fn lower(program: &TirProgram) -> Result<LirProgram, Error> {
+    lower::lower(program).map_err(Error::Internal)
 }
 
 /// Selects amd64 `Prog`s for each user function. This is what `lingua asm` prints.
 ///
 /// # Errors
 /// As [`lower`].
-pub fn select(module: &Module, path: &str, source: &str) -> Result<Vec<Vec<prog::Prog>>, Error> {
-    Ok(lower(module, path, source)?
+pub fn select(program: &TirProgram) -> Result<Vec<Vec<prog::Prog>>, Error> {
+    Ok(lower(program)?
         .functions
         .iter()
         .map(amd64::select)
         .collect())
-}
-
-/// Builds `module` into a static linux/amd64 executable image.
-///
-/// # Errors
-/// `Error::Diagnostics` when the source is outside the supported subset, or
-/// `Error::Internal` when lowering, encoding, or linking fails.
-pub fn build(module: &Module, path: &str, source: &str) -> Result<Vec<u8>, Error> {
-    build_tir(&check(module, path, source)?)
 }
 
 /// Builds a checked TIR program into a static linux/amd64 executable image. This is the

@@ -1,0 +1,11 @@
+fn main() -> Nothing
+  pure
+
+  let bottom: Int = -9223372036854775807 - 1
+  let one: Int = 1
+  let minus_one: Int = -1
+  log("before {bottom / one}")
+  let quotient = bottom / minus_one
+  log("after {quotient}")
+  return nothing
+end fn main

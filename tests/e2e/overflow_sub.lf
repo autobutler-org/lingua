@@ -1,0 +1,10 @@
+fn main() -> Nothing
+  pure
+
+  let bottom: Int = -9223372036854775807 - 1
+  let one: Int = 1
+  log("before {bottom + one - one}")
+  let below = bottom - one
+  log("after {below}")
+  return nothing
+end fn main

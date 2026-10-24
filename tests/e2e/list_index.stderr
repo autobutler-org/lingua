@@ -1,0 +1,9 @@
+[0] = 2
+[3] = 7
+[4] out of range
+[-1] out of range
+[0] out of range
+[9223372036854775807] out of range
+static 30
+checked 3
+names[5] out of range

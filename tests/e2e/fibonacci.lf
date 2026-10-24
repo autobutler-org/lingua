@@ -1,0 +1,48 @@
+fn fib(n: Int) -> Int
+  pure
+  example "zero"
+    n: 0
+    -> 0
+  end
+  example "ten"
+    n: 10
+    -> 55
+  end
+
+  if n < 2
+    return n
+  end
+  return fib(n - 1) + fib(n - 2)
+end fn fib
+
+fn fib_loop(n: Int at least 0) -> Int
+  pure
+  example "zero"
+    n: 0
+    -> 0
+  end
+  example "ten"
+    n: 10
+    -> 55
+  end
+
+  var prev: Int = 0
+  var curr: Int = 1
+  for step in 0 until n
+    let following = prev + curr
+    set prev = curr
+    set curr = following
+  end
+  return prev
+end fn fib_loop
+
+fn main() -> Nothing
+  pure
+
+  for i in 0 until 11
+    log("fib({i}) = {fib(i)}")
+  end
+  log("fib(25) = {fib(25)}")
+  log("fib_loop(90) = {fib_loop(90)}")
+  return nothing
+end fn main

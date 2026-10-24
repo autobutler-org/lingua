@@ -1,0 +1,38 @@
+import Line, order_total, parse_discount, NoDiscount, Percent, CentsOff from "order"
+import percent, half_up from "money"
+
+fn apply_code(lines: List<Line>, code: Text) -> Text
+  pure
+  example "no discount"
+    lines: [Line("pen", 200, 1)]
+    code: "none"
+    -> "[none] -> 200"
+  end
+
+  return match parse_discount(code)
+    Ok(discount) -> "[{code}] -> {order_total(lines, discount)}"
+    Err(_) -> "[{code}] -> rejected"
+  end
+end fn apply_code
+
+fn main() -> Nothing
+  pure
+
+  let cart = [Line("pen", 200, 1), Line("cup", 500, 2)]
+  log("no discount {order_total(cart, NoDiscount)}")
+  log("ten percent {order_total(cart, Percent(10))}")
+  log("150 off {order_total(cart, CentsOff(150))}")
+  log("too much off {order_total([Line("pen", 200, 1)], CentsOff(500))}")
+  log("empty {order_total([], NoDiscount)}")
+  log("percent 10 of 1200 {percent(10, 1200, half_up)}")
+  log("percent 1 of 150 {percent(1, 150, half_up)}")
+  log("percent 49 of 1 {percent(49, 1, half_up)}")
+  log("percent 50 of 1 {percent(50, 1, half_up)}")
+  log("percent 33 of 1000 {percent(33, 1000, half_up)}")
+  log("percent 100 of max {percent(100, 9223372036854775807, half_up)}")
+  let codes: List<Text> = ["none", "percent:10", " OFF:300 ", "percent:0", "percent:101", "bogof", ""]
+  for code in codes
+    log(apply_code(cart, code))
+  end
+  return nothing
+end fn main

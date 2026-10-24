@@ -1,0 +1,25 @@
+type Phase
+  Warmup
+  Working(Int)
+  Cooldown
+end type Phase
+
+fn main() -> Nothing
+  pure
+
+  var phase: Phase = Warmup
+  while phase is Warmup
+    log("warming up")
+    set phase = Working(2)
+  end
+  while phase is Working(left)
+    log("working {left}")
+    if left > 1
+      set phase = Working(left - 1)
+    else
+      set phase = Cooldown
+    end
+  end
+  log("cooled down")
+  return nothing
+end fn main

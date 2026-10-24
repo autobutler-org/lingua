@@ -1,0 +1,44 @@
+type Light
+  Red
+  Yellow
+  Green
+end type Light
+
+fn next_light(light: Light) -> Light
+  pure
+  example "red to green"
+    light: Red
+    -> Green
+  end
+
+  return match light
+    Red -> Green
+    Green -> Yellow
+    Yellow -> Red
+  end
+end fn next_light
+
+fn light_name(light: Light) -> Text
+  pure
+  example "red"
+    light: Red
+    -> "red"
+  end
+
+  return match light
+    Red -> "red"
+    Yellow -> "yellow"
+    Green -> "green"
+  end
+end fn light_name
+
+fn main() -> Nothing
+  pure
+
+  var current: Light = Red
+  for step in 0 until 4
+    log(light_name(current))
+    set current = next_light(current)
+  end
+  return nothing
+end fn main

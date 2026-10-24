@@ -1,0 +1,8 @@
+floor -5 0
+floor 42 42
+discounted 200 by 500 0
+discounted 1200 by 120 1080
+max 3 9 9
+max -3 -9 -3
+max top 9223372036854775807
+max bottom -9223372036854775808

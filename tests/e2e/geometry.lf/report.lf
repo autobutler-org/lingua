@@ -1,0 +1,11 @@
+import Shape, area, shape_name from "shapes"
+
+fn describe(shape: Shape) -> Text
+  pure
+  example "circle"
+    shape: Circle(2)
+    -> "circle with area 12"
+  end
+
+  return "{shape_name(shape)} with area {area(shape)}"
+end fn describe

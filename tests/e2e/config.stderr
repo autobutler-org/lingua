@@ -1,0 +1,9 @@
+localhost port 8080
+example.org port 443
+db port 65535
+bad port [0]
+bad port [70000]
+bad port [ 80]
+missing host
+missing port
+missing port

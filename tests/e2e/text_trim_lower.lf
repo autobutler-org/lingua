@@ -1,0 +1,20 @@
+fn main() -> Nothing
+  pure
+
+  let padded: Text = " \t spaced out \n"
+  log("[{trim(padded)}]")
+  let inner: Text = "a  b"
+  log("[{trim(inner)}]")
+  let blank: Text = " \t\n "
+  log("[{trim(blank)}]")
+  // U+00A0 (no-break space) is not one of the four trimmed scalars
+  let nbsp: Text = " x "
+  log("[{trim(nbsp)}]")
+  let shout: Text = "HeLLo, World 123"
+  log(lower(shout))
+  let accented: Text = "ÉCOLE Ünïcode"
+  log(lower(accented))
+  log("[{lower(trim("  MiXeD  "))}]")
+  log("[{lower("")}]")
+  return nothing
+end fn main

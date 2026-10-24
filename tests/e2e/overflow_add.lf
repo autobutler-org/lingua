@@ -1,0 +1,10 @@
+fn main() -> Nothing
+  pure
+
+  let top: Int = 9223372036854775807
+  let one: Int = 1
+  log("before {top - one + one}")
+  let total = top + one
+  log("after {total}")
+  return nothing
+end fn main

@@ -28,14 +28,19 @@ fn if_(cond: TirExpr, then: Vec<TirStmt>, otherwise: Vec<TirStmt>) -> TirStmt {
     TirStmt::If(cond, then, otherwise)
 }
 
-fn fault(code: &str, summary: &str, line: usize, column: usize) -> String {
-    format!("fault {code}: {summary}\n  --> m.lf:{line}:{column}\n")
+// A fault on an empty source line: the span block with `len` carets
+fn fault(code: &str, summary: &str, line: usize, column: usize, len: usize) -> String {
+    format!(
+        "fault {code}: {summary}\n  --> m.lf:{line}:{column}\n   |\n{line:>2} | \n   | {}{}\n",
+        " ".repeat(column - 1),
+        "^".repeat(len)
+    )
 }
 
 // main whose body faults at line 4, column 10, through `e`
 fn faulting(name: &'static str, e: TirExpr, code: &str, summary: &str) -> Case {
     let program = main_program("", vec![log_int(at(e, 4, 10, 1)), log(text("unreachable"))]);
-    case(name, program, &fault(code, summary, 4, 10), 1)
+    case(name, program, &fault(code, summary, 4, 10, 1), 1)
 }
 
 fn arithmetic() -> Case {
@@ -113,9 +118,9 @@ fn assert_fails() -> Case {
         "passed
 exception: one is not two
   --> m.lf:5:3
-  |
-5 |   assert 1 == 2, \"one is not two\"
-  |   ^^^^^^
+   |
+ 5 |   assert 1 == 2, \"one is not two\"
+   |   ^^^^^^
 ",
         1,
     )
@@ -133,7 +138,7 @@ fn fail_raises() -> Case {
     case(
         "fail_raises",
         program,
-        "exception: schema unavailable\n  --> m.lf:4:3\n  |\n4 |   fail \"schema unavailable\"\n  |   ^^^^\n",
+        "exception: schema unavailable\n  --> m.lf:4:3\n   |\n 4 |   fail \"schema unavailable\"\n   |   ^^^^\n",
         1,
     )
 }
@@ -167,7 +172,7 @@ fn or_fail_raises() -> Case {
     case(
         "or_fail_raises",
         p.finish(main),
-        "7\nexception: negative\n  --> m.lf:4:33\n  |\n4 |   let n = int_at_least(\"-3\", 0) or fail \"negative\"\n  |                                 ^^^^^^^\n",
+        "7\nexception: negative\n  --> m.lf:4:33\n   |\n 4 |   let n = int_at_least(\"-3\", 0) or fail \"negative\"\n   |                                 ^^^^^^^\n",
         1,
     )
 }
@@ -340,6 +345,7 @@ fn loops() -> Case {
         p.local("i", Type::Int),
         p.local("j", Type::Int),
     );
+    let (high, step) = (p.local("high", Type::Int), p.local("step", Type::Int));
     let ints = |ns: &[i64]| list(Type::Int, ns.iter().map(|&n| int(n)).collect());
     let body = vec![
         let_(sum, int(0)),
@@ -355,9 +361,17 @@ fn loops() -> Case {
         log_int(call(pow2, vec![int(1)], Type::Int)),
         log_int(call(pow2, vec![int(3)], Type::Int)),
         log_int(call(pow2, vec![int(100)], Type::Int)),
+        // Bounds are fixed on entry: setting the `var` `high` does not extend the loop
+        let_(high, int(2)),
+        TirStmt::ForRange(
+            step,
+            int(0),
+            local(high, Type::Int),
+            vec![set(high, int(10)), log_int(local(step, Type::Int))],
+        ),
     ];
     p.define(main, 2, vec![], stmts(body));
-    case("loops", p.finish(main), "10\n2\n3\n4\n1\n4\n128\n", 0)
+    case("loops", p.finish(main), "10\n2\n3\n4\n1\n4\n128\n0\n1\n", 0)
 }
 
 fn lists() -> Case {
@@ -703,7 +717,7 @@ fn deep_recursion() -> Case {
     case(
         "deep_recursion",
         p.finish(main),
-        "fault L077: stack overflow\n  --> m.lf:3:1\n",
+        &fault("L077", "stack overflow", 3, 1, 2),
         1,
     )
 }
@@ -739,7 +753,7 @@ fn split_empty_separator() -> Case {
     case(
         "split_empty_separator",
         program,
-        &fault("L046", "split on an empty separator", 4, 10),
+        &fault("L046", "split on an empty separator", 4, 10, 5),
         1,
     )
 }

@@ -2,7 +2,6 @@
 //! Running it is the end-to-end harness's job (`tests/e2e.rs`).
 
 use lingua::build::{self, lir::text_block};
-use lingua::parse::parse_source;
 
 const BASE: u64 = 0x40_0000;
 const PT_LOAD: u32 = 1;
@@ -11,9 +10,9 @@ const PT_INTERP: u32 = 3;
 const PT_GNU_STACK: u32 = 0x6474_e551;
 
 fn hello_image() -> Vec<u8> {
-    let source = include_str!("e2e/hello.lf");
-    let module = parse_source(source.as_bytes(), "hello").unwrap();
-    build::build(&module, "hello.lf", source).unwrap()
+    let hello = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/e2e/hello.lf");
+    let program = build::check(&[hello], &lingua::check::Options::default()).unwrap();
+    build::build_tir(&program).unwrap()
 }
 
 fn u16_at(image: &[u8], at: usize) -> u16 {

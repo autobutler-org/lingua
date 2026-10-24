@@ -1,0 +1,6 @@
+half of 10 is 5
+exception: n must be even
+  --> assert_in_helper.lf:12:3
+   |
+12 |   assert n % 2 == 0, "n must be even"
+   |   ^^^^^^

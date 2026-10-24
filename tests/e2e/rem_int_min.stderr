@@ -1,0 +1,6 @@
+before 0
+fault L040: arithmetic overflow
+  --> rem_int_min.lf:8:19
+   |
+ 8 |   let remainder = bottom % minus_one
+   |                   ^^^^^^^^^^^^^^^^^^

@@ -1,0 +1,23 @@
+fn main() -> Nothing
+  pure
+
+  let names: List<Text> = ["ada", "grace", "edsger"]
+  for name in names
+    log("hello {name}")
+  end
+  var total: Int = 0
+  let nums: List<Int> = [4, 8, 15, 16, 23, 42]
+  for value in nums
+    set total += value
+  end
+  log("total {total}")
+  let empty: List<Int> = []
+  for item in empty
+    log("never {item}")
+  end
+  for word in ["x", "y"]
+    log("literal {word}")
+  end
+  log("done")
+  return nothing
+end fn main

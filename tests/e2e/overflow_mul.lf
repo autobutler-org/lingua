@@ -1,0 +1,12 @@
+fn main() -> Nothing
+  pure
+
+  let half: Int = 4611686018427387904
+  let two: Int = 2
+  let neg_two: Int = -2
+  // -2^63 fits, 2^63 does not
+  log("before {half * neg_two}")
+  let doubled = half * two
+  log("after {doubled}")
+  return nothing
+end fn main

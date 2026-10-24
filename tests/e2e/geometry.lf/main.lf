@@ -1,0 +1,12 @@
+import Point, Shape from "shapes"
+import describe from "report"
+
+fn main() -> Nothing
+  pure
+
+  let shapes: List<Shape> = [Circle(3), Box(Point(x: 3, y: 4)), Box(Point(x: -2, y: 5))]
+  for shape in shapes
+    log(describe(shape))
+  end
+  return nothing
+end fn main

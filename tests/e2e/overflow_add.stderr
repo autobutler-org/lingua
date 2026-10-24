@@ -1,0 +1,6 @@
+before 9223372036854775807
+fault L040: arithmetic overflow
+  --> overflow_add.lf:7:15
+   |
+ 7 |   let total = top + one
+   |               ^^^^^^^^^

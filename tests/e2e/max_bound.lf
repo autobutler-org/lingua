@@ -1,0 +1,47 @@
+type Cents = Int at least 0
+
+fn floor_zero(amount: Int) -> Cents
+  pure
+  example "negative"
+    amount: -5
+    -> 0
+  end
+  example "positive"
+    amount: 12
+    -> 12
+  end
+
+  return max(a: 0, b: amount)
+end fn floor_zero
+
+fn discounted(price: Cents, off: Cents) -> Cents
+  pure
+  example "cannot go negative"
+    price: 200
+    off: 500
+    -> 0
+  end
+  example "ten percent"
+    price: 1200
+    off: 120
+    -> 1080
+  end
+
+  return max(a: price - off, b: 0)
+end fn discounted
+
+fn main() -> Nothing
+  pure
+
+  log("floor -5 {floor_zero(-5)}")
+  log("floor 42 {floor_zero(42)}")
+  log("discounted 200 by 500 {discounted(price: 200, off: 500)}")
+  log("discounted 1200 by 120 {discounted(off: 120, price: 1200)}")
+  log("max 3 9 {max(a: 3, b: 9)}")
+  log("max -3 -9 {max(a: -3, b: -9)}")
+  let top: Int = 9223372036854775807
+  let bottom: Int = -9223372036854775807 - 1
+  log("max top {max(a: top, b: 0)}")
+  log("max bottom {max(b: bottom, a: bottom)}")
+  return nothing
+end fn main

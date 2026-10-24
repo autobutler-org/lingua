@@ -1,0 +1,10 @@
+fn main() -> Nothing
+  pure
+
+  let ten: Int = 10
+  let zero: Int = 0
+  log("before {zero / ten}")
+  let quotient = ten / zero
+  log("after {quotient}")
+  return nothing
+end fn main

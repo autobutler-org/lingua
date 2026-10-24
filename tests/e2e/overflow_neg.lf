@@ -1,0 +1,10 @@
+fn main() -> Nothing
+  pure
+
+  let bottom: Int = -9223372036854775807 - 1
+  let top: Int = 9223372036854775807
+  log("before {-top}")
+  let flipped = -bottom
+  log("after {flipped}")
+  return nothing
+end fn main

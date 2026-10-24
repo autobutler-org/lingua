@@ -1,0 +1,42 @@
+fn pick(items: List<Int>, position: Int) -> Text
+  pure
+  example "hit"
+    items: [2, 3]
+    position: 1
+    -> "[1] = 3"
+  end
+  example "miss"
+    items: [2, 3]
+    position: 2
+    -> "[2] out of range"
+  end
+
+  return match items[position]
+    Ok(value) -> "[{position}] = {value}"
+    Err(_) -> "[{position}] out of range"
+  end
+end fn pick
+
+fn main() -> Nothing
+  pure
+
+  let primes: List<Int> = [2, 3, 5, 7]
+  log(pick(primes, 0))
+  log(pick(primes, 3))
+  log(pick(primes, 4))
+  log(pick(primes, -1))
+  log(pick([], 0))
+  let top: Int = 9223372036854775807
+  log(pick(primes, top))
+  let static_pick = [10, 20, 30][2]
+  log("static {static_pick}")
+  let checked = primes[1] or fail "index 1 missing"
+  log("checked {checked}")
+  let names: List<Text> = ["ada", "grace"]
+  let missing = match names[5]
+    Ok(found) -> found
+    Err(_) -> "out of range"
+  end
+  log("names[5] {missing}")
+  return nothing
+end fn main

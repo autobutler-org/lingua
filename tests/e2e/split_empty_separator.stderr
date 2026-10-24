@@ -1,0 +1,6 @@
+before 2
+fault L046: split on an empty separator
+  --> split_empty_separator.lf:6:15
+   |
+ 6 |   let parts = split(text: "abc", separator: sep)
+   |               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

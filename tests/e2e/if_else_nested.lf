@@ -1,0 +1,57 @@
+fn classify(n: Int) -> Text
+  pure
+  example "negative"
+    n: -5
+    -> "negative"
+  end
+  example "zero"
+    n: 0
+    -> "zero"
+  end
+  example "small"
+    n: 7
+    -> "small"
+  end
+  example "large"
+    n: 10
+    -> "large"
+  end
+
+  if n < 0
+    return "negative"
+  else
+    if n == 0
+      return "zero"
+    else
+      if n < 10
+        return "small"
+      end
+    end
+  end
+  return "large"
+end fn classify
+
+fn main() -> Nothing
+  pure
+
+  let samples: List<Int> = [-5, 0, 7, 10, 1000]
+  for sample in samples
+    log("{sample} is {classify(sample)}")
+  end
+  let limit: Int = 2
+  if limit > 1
+    log("outer then")
+    if limit > 5
+      log("inner then")
+    else
+      log("inner else")
+    end
+  else
+    log("outer else")
+  end
+  if limit < 0
+    log("never")
+  end
+  log("done")
+  return nothing
+end fn main

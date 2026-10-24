@@ -1,0 +1,27 @@
+fn main() -> Nothing
+  pure
+
+  let seven: Int = 7
+  let neg_seven: Int = -7
+  let two: Int = 2
+  let neg_two: Int = -2
+  // `/` truncates toward zero
+  log("{seven / two}")
+  log("{neg_seven / two}")
+  log("{seven / neg_two}")
+  log("{neg_seven / neg_two}")
+  // `%` has the sign of the dividend
+  log("{seven % two}")
+  log("{neg_seven % two}")
+  log("{seven % neg_two}")
+  log("{neg_seven % neg_two}")
+  // a == (a / b) * b + a % b
+  log("{(neg_seven / two) * two + neg_seven % two}")
+  log("{0 / seven}")
+  log("{1 / seven}")
+  // `*`, `/`, and `%` share one left-associative level, tighter than `+`
+  log("{100 / seven * seven}")
+  log("{100 % seven % 4}")
+  log("{2 + 100 / seven}")
+  return nothing
+end fn main

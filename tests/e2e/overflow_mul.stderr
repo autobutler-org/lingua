@@ -1,0 +1,6 @@
+before -9223372036854775808
+fault L040: arithmetic overflow
+  --> overflow_mul.lf:9:17
+   |
+ 9 |   let doubled = half * two
+   |                 ^^^^^^^^^^

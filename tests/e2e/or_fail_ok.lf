@@ -1,0 +1,11 @@
+fn main() -> Nothing
+  pure
+
+  let digits = int_at_least("12", 0) or fail "not a count"
+  log("digits {digits}")
+  let items: List<Text> = ["a", "b"]
+  let second = items[1] or fail "no second item"
+  log("second {second}")
+  log("done")
+  return nothing
+end fn main

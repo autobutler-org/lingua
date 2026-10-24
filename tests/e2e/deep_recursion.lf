@@ -1,0 +1,20 @@
+fn depth(n: Int) -> Int
+  pure
+  example "three levels"
+    n: 3
+    -> 3
+  end
+
+  if n == 0
+    return 0
+  end
+  return 1 + depth(n - 1)
+end fn depth
+
+fn main() -> Nothing
+  pure
+
+  log("shallow {depth(1000)}")
+  log("deep {depth(100000000)}")
+  return nothing
+end fn main

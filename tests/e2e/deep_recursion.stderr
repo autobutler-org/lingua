@@ -1,0 +1,6 @@
+shallow 1000
+fault L077: stack overflow
+  --> deep_recursion.lf:1:1
+   |
+ 1 | fn depth(n: Int) -> Int
+   | ^^^^^^^^^^^^^^^^^^^^^^^
