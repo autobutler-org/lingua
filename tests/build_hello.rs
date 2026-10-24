@@ -1,14 +1,8 @@
-//! Links the hand-built hello program into a static linux/amd64 ELF and checks the file.
+//! Builds `tests/e2e/hello.lf` into a static linux/amd64 ELF and checks the container fields.
 //! Running it is the end-to-end harness's job (`tests/e2e.rs`).
-//!
-//! `cargo test --test build_hello` leaves the executable at `target/tmp/hello`.
 
-mod programs;
-
-use std::path::PathBuf;
-
-use lingua::build::link::elf;
-use programs::{MESSAGE, hello_image};
+use lingua::build::{self, lir::text_block};
+use lingua::parse::parse_source;
 
 const BASE: u64 = 0x40_0000;
 const PT_LOAD: u32 = 1;
@@ -16,10 +10,9 @@ const PT_DYNAMIC: u32 = 2;
 const PT_INTERP: u32 = 3;
 const PT_GNU_STACK: u32 = 0x6474_e551;
 
-fn write_hello(name: &str) -> PathBuf {
-    let path = PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join(name);
-    elf::write_executable(&path, &hello_image()).unwrap();
-    path
+fn hello_image() -> Vec<u8> {
+    let source = include_bytes!("e2e/hello.lf");
+    build::build(&parse_source(source, "hello").unwrap()).unwrap()
 }
 
 fn u16_at(image: &[u8], at: usize) -> u16 {
@@ -63,8 +56,7 @@ fn phdrs(image: &[u8]) -> Vec<Phdr> {
 
 #[test]
 fn hello_is_a_static_amd64_exec() {
-    let path = write_hello("hello");
-    let image = std::fs::read(&path).unwrap();
+    let image = hello_image();
 
     assert_eq!(&image[..4], b"\x7fELF");
     assert_eq!(image[4], 2, "ELFCLASS64");
@@ -95,23 +87,16 @@ fn hello_is_a_static_amd64_exec() {
     assert!((text.vaddr..text.vaddr + text.filesz).contains(&entry));
     assert_eq!(entry % 16, 0, "functions are 16-byte aligned");
 
-    // The LEAQ after `MOVQ $2, DI` (7 bytes) must point at the message in rodata
-    let to_file =
-        |vaddr: u64, phdr: &Phdr| usize::try_from(vaddr - phdr.vaddr + phdr.offset).unwrap();
-    let lea = to_file(entry + 7, text);
-    assert_eq!(image[lea..lea + 3], [0x48, 0x8d, 0x35]);
-    let disp = i32::from_le_bytes(image[lea + 3..lea + 7].try_into().unwrap());
-    let target = (entry + 14).checked_add_signed(i64::from(disp)).unwrap();
-    assert!((rodata.vaddr..rodata.vaddr + rodata.filesz).contains(&target));
-    let message = to_file(target, rodata);
-    assert_eq!(&image[message..message + MESSAGE.len()], MESSAGE);
-
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        let mode = std::fs::metadata(&path).unwrap().permissions().mode();
-        assert_eq!(mode & 0o777, 0o755);
-    }
+    // The message is a Text block (length, then bytes) in rodata
+    let rodata_bytes = &image[usize::try_from(rodata.offset).unwrap()..]
+        [..usize::try_from(rodata.filesz).unwrap()];
+    let block = text_block("str.0", "hello, world").bytes;
+    assert!(
+        rodata_bytes
+            .windows(block.len())
+            .any(|window| window == block),
+        "rodata holds the hello Text block"
+    );
 }
 
 #[test]

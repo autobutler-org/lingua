@@ -4,3 +4,4 @@ pub mod ast;
 pub mod build;
 pub mod lex;
 pub mod parse;
+pub mod tir;

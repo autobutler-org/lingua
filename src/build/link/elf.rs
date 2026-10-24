@@ -7,14 +7,7 @@
 use std::collections::HashMap;
 
 use crate::build::arch::{Encoded, Reloc};
-use crate::build::prog::SymName;
-
-/// A read-only data symbol.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct RoData {
-    pub name: SymName,
-    pub bytes: Vec<u8>,
-}
+use crate::build::lir::RoData;
 
 const BASE: u64 = 0x40_0000;
 const PAGE: u64 = 0x1000;
