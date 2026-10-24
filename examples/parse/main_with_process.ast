@@ -1,0 +1,34 @@
+(module "main_with_process"
+  (imports)
+  (decls
+    (fn "main"
+      (params (param "process" (named "Process")))
+      (named "Nothing")
+      pure
+      (examples)
+      (statements
+        (let "count" nil
+          (call
+            (name "length")
+            (args (arg nil (field (name "process") "args")))
+            false))
+        (expr-stmt
+          (call
+            (name "log")
+            (args
+              (arg nil
+                (text
+                  (hole (name "count"))
+                  (literal " args on thread ")
+                  (hole (field (field (name "process") "thread") "name")))))
+            false))
+        (expr-stmt
+          (call
+            (name "log")
+            (args
+              (arg nil
+                (text
+                  (literal "parallelism ")
+                  (hole (field (name "process") "parallelism")))))
+            false))
+        (return (nothing))))))
