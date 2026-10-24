@@ -2,7 +2,8 @@
 //!
 //! File layout: ELF header, program headers, code (the text segment, R+X, mapped from file
 //! offset 0 at the base), rodata on the next page (R), then `.shstrtab` and the section
-//! headers, which are not loaded and exist for `objdump` and `readelf`.
+//! headers, which are not loaded and exist for `objdump` and `readelf`. The data segment
+//! (R+W, `.bss` only) follows rodata in memory and has no file bytes.
 
 use std::collections::HashMap;
 
@@ -14,7 +15,7 @@ const PAGE: u64 = 0x1000;
 const EHDR_SIZE: u64 = 64;
 const PHDR_SIZE: u64 = 56;
 const SHDR_SIZE: u64 = 64;
-const PHNUM: u64 = 3;
+const PHNUM: u64 = 4;
 const FUNCTION_ALIGN: u64 = 16;
 const RODATA_ALIGN: u64 = 8;
 const INT3: u8 = 0xcc;
@@ -28,9 +29,12 @@ const PF_W: u32 = 2;
 const PF_R: u32 = 4;
 const SHT_PROGBITS: u32 = 1;
 const SHT_STRTAB: u32 = 3;
+const SHT_NOBITS: u32 = 8;
+const SHF_WRITE: u64 = 1;
 const SHF_ALLOC: u64 = 2;
 const SHF_EXECINSTR: u64 = 4;
-const SHSTRTAB: &[u8] = b"\0.text\0.rodata\0.shstrtab\0";
+const SHSTRTAB: &[u8] = b"\0.text\0.rodata\0.shstrtab\0.bss\0";
+const BSS_WORD: u64 = 8;
 
 fn align(value: u64, to: u64) -> u64 {
     value.next_multiple_of(to)
@@ -62,6 +66,9 @@ struct Layout {
     text_end: u64,
     rodata_start: u64,
     rodata_end: u64,
+    /// The `.bss` start (page-aligned, past the file's loaded bytes) and size.
+    bss_start: u64,
+    bss_size: u64,
     shoff: u64,
 }
 
@@ -78,36 +85,46 @@ impl Layout {
         }
         out.extend(0u32.to_le_bytes()); // e_flags
         // e_ehsize, e_phentsize, e_phnum, e_shentsize, e_shnum, e_shstrndx
-        for half in [EHDR_SIZE, PHDR_SIZE, PHNUM, SHDR_SIZE, 4, 3] {
+        for half in [EHDR_SIZE, PHDR_SIZE, PHNUM, SHDR_SIZE, 5, 3] {
             out.extend(u16::try_from(half).unwrap_or(u16::MAX).to_le_bytes());
         }
         let rodata_size = self.rodata_end - self.rodata_start;
         let segments = [
-            (PT_LOAD, PF_R | PF_X, 0, BASE, self.text_end, PAGE),
+            (PT_LOAD, PF_R | PF_X, 0, BASE, self.text_end, self.text_end),
             (
                 PT_LOAD,
                 PF_R,
                 self.rodata_start,
                 BASE + self.rodata_start,
                 rodata_size,
-                PAGE,
+                rodata_size,
             ),
-            (PT_GNU_STACK, PF_R | PF_W, 0, 0, 0, 16),
+            (
+                PT_LOAD,
+                PF_R | PF_W,
+                self.bss_start,
+                BASE + self.bss_start,
+                0,
+                self.bss_size,
+            ),
+            (PT_GNU_STACK, PF_R | PF_W, 0, 0, 0, 0),
         ];
-        for (kind, flags, offset, addr, size, align) in segments {
+        for (kind, flags, offset, addr, filesz, memsz) in segments {
             out.extend(kind.to_le_bytes());
             out.extend(flags.to_le_bytes());
-            for word in [offset, addr, addr, size, size, align] {
-                out.extend(word.to_le_bytes()); // p_paddr = p_vaddr, p_memsz = p_filesz
+            let align = if kind == PT_LOAD { PAGE } else { 16 };
+            for word in [offset, addr, addr, filesz, memsz, align] {
+                out.extend(word.to_le_bytes()); // p_paddr = p_vaddr
             }
         }
         out
     }
 
-    // null, .text, .rodata, .shstrtab
+    // null, .text, .rodata, .shstrtab, .bss
     fn section_headers(&self) -> Vec<u8> {
         let text = (self.text_start, self.text_end - self.text_start);
         let rodata = (self.rodata_start, self.rodata_end - self.rodata_start);
+        let bss = (self.bss_start, self.bss_size);
         let sections = [
             (0, 0, 0, (0, 0), 0),
             (
@@ -119,6 +136,7 @@ impl Layout {
             ),
             (7, SHT_PROGBITS, SHF_ALLOC, rodata, RODATA_ALIGN),
             (15, SHT_STRTAB, 0, (self.rodata_end, len(SHSTRTAB)), 1),
+            (25, SHT_NOBITS, SHF_ALLOC | SHF_WRITE, bss, BSS_WORD),
         ];
         let mut out = Vec::new();
         for (name, kind, flags, (offset, size), align) in sections {
@@ -166,13 +184,13 @@ fn relocate(function: &Encoded, at: u64, symbols: &HashMap<&str, u64>) -> Result
     Ok(bytes)
 }
 
-/// Lays out `functions` (the first is rt0, the entry) and `rodata`, resolves every
-/// relocation, and returns the file image.
+/// Lays out `functions` (the first is rt0, the entry), `rodata`, and the zeroed 8-byte `bss`
+/// words, resolves every relocation, and returns the file image.
 ///
 /// # Errors
 /// An internal error for no functions, an undefined or duplicate symbol, or a displacement
 /// that does not fit its field.
-pub fn link(functions: &[Encoded], rodata: &[RoData]) -> Result<Vec<u8>, String> {
+pub fn link(functions: &[Encoded], rodata: &[RoData], bss: &[String]) -> Result<Vec<u8>, String> {
     let mut symbols: HashMap<&str, u64> = HashMap::new();
     let text_start = align(EHDR_SIZE + PHNUM * PHDR_SIZE, FUNCTION_ALIGN);
     let mut function_offsets = Vec::new();
@@ -193,6 +211,11 @@ pub fn link(functions: &[Encoded], rodata: &[RoData]) -> Result<Vec<u8>, String>
         rodata_offsets.push(at);
         at += len(&block.bytes);
     }
+    let rodata_end = at;
+    let bss_start = align(rodata_end, PAGE);
+    for (i, name) in bss.iter().enumerate() {
+        define(&mut symbols, name, bss_start + BSS_WORD * i as u64)?;
+    }
     let layout = Layout {
         entry: *function_offsets
             .first()
@@ -200,8 +223,10 @@ pub fn link(functions: &[Encoded], rodata: &[RoData]) -> Result<Vec<u8>, String>
         text_start,
         text_end,
         rodata_start,
-        rodata_end: at,
-        shoff: align(at + len(SHSTRTAB), 8),
+        rodata_end,
+        bss_start,
+        bss_size: BSS_WORD * bss.len() as u64,
+        shoff: align(rodata_end + len(SHSTRTAB), 8),
     };
 
     let mut image = layout.headers();
@@ -257,7 +282,7 @@ mod tests {
     #[test]
     fn an_undefined_symbol_is_an_internal_error() {
         assert_eq!(
-            link(&[function("rt0", "missing")], &[]),
+            link(&[function("rt0", "missing")], &[], &[]),
             Err("internal error: `rt0` refers to undefined symbol `missing`".to_owned())
         );
     }
@@ -269,16 +294,35 @@ mod tests {
             bytes: vec![1],
         };
         assert_eq!(
-            link(&[function("rt0", "rt0")], &[block]),
+            link(&[function("rt0", "rt0")], &[block], &[]),
             Err("internal error: symbol `rt0` is defined twice".to_owned())
         );
     }
 
     #[test]
     fn a_pcrel32_is_measured_from_the_end_of_its_field() {
-        let image = link(&[function("rt0", "rt0")], &[]).unwrap();
+        let image = link(&[function("rt0", "rt0")], &[], &[]).unwrap();
         // rt0 refers to its own start: -(3 + 4)
         let at = usize::try_from(align(EHDR_SIZE + PHNUM * PHDR_SIZE, FUNCTION_ALIGN)).unwrap() + 3;
         assert_eq!(image[at..at + 4], (-7i32).to_le_bytes());
+    }
+
+    #[test]
+    fn bss_words_follow_rodata_on_a_new_page() {
+        let block = RoData {
+            name: "r".to_owned(),
+            bytes: vec![1; 8],
+        };
+        let image = link(
+            &[function("rt0", "w1")],
+            &[block],
+            &["w0".to_owned(), "w1".to_owned()],
+        )
+        .unwrap();
+        // rodata is at 0x1000, so .bss is at 0x2000 and w1 at 0x2008
+        let at = usize::try_from(align(EHDR_SIZE + PHNUM * PHDR_SIZE, FUNCTION_ALIGN)).unwrap();
+        let disp = i32::from_le_bytes(image[at + 3..at + 7].try_into().unwrap());
+        let end = BASE + u64::try_from(at + 7).unwrap();
+        assert_eq!(end.wrapping_add_signed(disp.into()), BASE + 0x2008);
     }
 }

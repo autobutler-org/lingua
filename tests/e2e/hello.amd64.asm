@@ -1,4 +1,7 @@
 TEXT hello.main(SB)
+  LEAQ  -64(SP), R11
+  CMPQ  R11, rt.stack_limit(SB)
+  JCS   L1
   PUSHQ BP
   MOVQ  SP, BP
   SUBQ  $48, SP
@@ -16,3 +19,6 @@ TEXT hello.main(SB)
   MOVQ  BP, SP
   POPQ  BP
   RET
+LABEL L1
+  LEAQ  site.0(SB), AX
+  JMP   rt.fault(SB)
