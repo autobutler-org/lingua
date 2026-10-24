@@ -131,7 +131,7 @@ pub enum FnBody {
     Statements(Vec<Stmt>),
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Effect {
     Pure,
     ReadsClock,

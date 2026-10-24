@@ -65,14 +65,14 @@ fn an_unsupported_program_is_a_diagnostic_and_leaves_no_output() {
     let dir = workdir("unsupported");
     std::fs::write(
         dir.join("count.lf"),
-        "fn main() -> Nothing\n  pure\n\n  let n = 1\n  return nothing\nend fn main\n",
+        "fn main() -> Nothing\n  pure\n\n  let n: Text = 1\n  return nothing\nend fn main\n",
     )
     .unwrap();
     let output = lingua(&dir, &["build", "count.lf"]);
     assert_eq!(output.status.code(), Some(1));
     assert_eq!(
         stderr(&output),
-        "error: lingua build supports only `log(\"...\")` and `return nothing` statements in main so far\n  --> count.lf:4:3\n"
+        "L020: expected `Text`, found an integer literal\n  --> count.lf:4:17\n   |\n 4 |   let n: Text = 1\n   |                 ^\n"
     );
     assert!(!dir.join("lingua-out").exists());
     assert!(!dir.join("lingua-out.tmp").exists());
@@ -86,7 +86,7 @@ fn no_main_is_l074() {
     assert_eq!(output.status.code(), Some(1));
     assert_eq!(
         stderr(&output),
-        "L074: no `main` function to build\n  --> empty.lf:1:1\n   = help: add `fn main() -> Nothing`\n"
+        "L074: no `main` function to build\n  --> empty.lf:1:1\n   |\n 1 | \n   | ^\n   |\n   = help: add `fn main() -> Nothing`\n"
     );
     assert!(!dir.join("lingua-out").exists());
 }
@@ -104,12 +104,12 @@ fn usage_errors_say_what_to_do() {
             "error: unknown flag `--target` for build\n",
         ),
         (
-            &["build"][..],
-            "error: build needs a file, e.g. `lingua build hello.lf`\n",
+            &["build", "a.lf", "b.lf"][..],
+            "error: path `a.lf` does not exist; check the path and try again\n",
         ),
         (
-            &["build", "a.lf", "b.lf"][..],
-            "error: build takes one file so far, e.g. `lingua build hello.lf`\n",
+            &["build", "--refresh", "--offline"][..],
+            "error: --refresh and --offline cannot be used together; pick one\n",
         ),
     ] {
         let output = lingua(&dir, args);

@@ -1,0 +1,57 @@
+fn bounds_name(problem: BoundsError) -> Text
+  pure
+  example "out of range"
+    problem: OutOfRange
+    -> "out of range"
+  end
+
+  return match problem
+    OutOfRange -> "out of range"
+    NotAnInteger -> "not an integer"
+  end
+end fn bounds_name
+
+fn probe(raw: Text) -> Text
+  pure
+  example "in range"
+    raw: "7"
+    -> "[7] -> 7"
+  end
+  example "not a number"
+    raw: "x"
+    -> "[x] -> not an integer"
+  end
+
+  return match int_in(raw, -10 through 10)
+    Ok(value) -> "[{raw}] -> {value}"
+    Err(problem) -> "[{raw}] -> {bounds_name(problem)}"
+  end
+end fn probe
+
+fn main() -> Nothing
+  pure
+
+  let inputs: List<Text> = [
+    "7",
+    "-10",
+    "10",
+    "11",
+    "-11",
+    "007",
+    "-0",
+    "",
+    " 5",
+    "5 ",
+    "+5",
+    "1.5",
+    "abc",
+    "-",
+    "--5",
+    "9223372036854775807",
+    "99999999999999999999",
+  ]
+  for raw in inputs
+    log(probe(raw))
+  end
+  return nothing
+end fn main

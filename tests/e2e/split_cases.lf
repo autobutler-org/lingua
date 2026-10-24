@@ -1,0 +1,27 @@
+fn show_parts(parts: List<Text>) -> Text
+  pure
+  example "two parts"
+    parts: ["a", ""]
+    -> "2 [a][]"
+  end
+
+  var shown: Text = "{length(parts)} "
+  for part in parts
+    set shown = "{shown}[{part}]"
+  end
+  return shown
+end fn show_parts
+
+fn main() -> Nothing
+  pure
+
+  log(show_parts(split(text: "percent:10", separator: ":")))
+  log(show_parts(split(text: "bogof", separator: ":")))
+  log(show_parts(split(text: "a::b", separator: ":")))
+  log(show_parts(split(text: ":a:", separator: ":")))
+  log(show_parts(split(text: ":", separator: ":")))
+  log(show_parts(split(separator: ",", text: "x,y")))
+  let sep: Text = ";"
+  log(show_parts(split(text: "1;2;3", separator: sep)))
+  return nothing
+end fn main

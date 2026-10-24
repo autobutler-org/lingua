@@ -49,7 +49,7 @@ site.1 fault L040 order.lf:21:10
         Some(
             text_block(
                 "site.1",
-                "fault L040: arithmetic overflow\n  --> order.lf:21:10\n"
+                "fault L040: arithmetic overflow\n  --> order.lf:21:10\n   |\n21 | \n   |          ^\n"
             )
             .bytes
         )

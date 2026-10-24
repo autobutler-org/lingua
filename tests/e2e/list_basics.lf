@@ -1,0 +1,32 @@
+fn main() -> Nothing
+  pure
+
+  let first: List<Int> = [1, 2, 3]
+  let second: List<Int> = [4, 5]
+  let both = join(left: first, right: second)
+  log("length {length(both)}")
+  for n in both
+    log("{n}")
+  end
+  let none: List<Int> = []
+  log("empty {length(none)}")
+  let same = join(left: none, right: first)
+  log("joined empty {length(same)}")
+  let literal_empty = join(left: [], right: second)
+  log("literal empty {length(literal_empty)}")
+  let reversed = join(right: first, left: second)
+  for r in reversed
+    log("reversed {r}")
+  end
+  log("trailing comma {length([7, 8, 9,])}")
+  let words: List<Text> = [
+    "alpha",
+    "beta",
+  ]
+  log("words {length(words)}")
+  let grid: List<List<Int>> = [[1, 2], [3], []]
+  for row in grid
+    log("row {length(row)}")
+  end
+  return nothing
+end fn main

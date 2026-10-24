@@ -1,0 +1,24 @@
+fn factorial(n: Int) -> Int
+  pure
+  example "zero"
+    n: 0
+    -> 1
+  end
+  example "five"
+    n: 5
+    -> 120
+  end
+
+  if n <= 1
+    return 1
+  end
+  return n * factorial(n - 1)
+end fn factorial
+
+fn main() -> Nothing
+  pure
+
+  log("20! = {factorial(20)}")
+  log("21! = {factorial(21)}")
+  return nothing
+end fn main

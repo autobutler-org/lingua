@@ -1,0 +1,66 @@
+type NameError
+  Empty
+  TooLong(Int)
+end type NameError
+
+fn check_name(raw: Text) -> Result<Text, NameError>
+  pure
+  example "trimmed"
+    raw: "  ada  "
+    -> Ok("ada")
+  end
+  example "empty"
+    raw: ""
+    -> Err(Empty)
+  end
+  example "too long"
+    raw: "a b c"
+    -> Err(TooLong(3))
+  end
+
+  let cleaned = trim(raw)
+  if cleaned == ""
+    return Err(Empty)
+  end
+  let words = split(text: cleaned, separator: " ")
+  if length(words) > 2
+    return Err(TooLong(length(words)))
+  end
+  return Ok(cleaned)
+end fn check_name
+
+fn explain(problem: NameError) -> Text
+  pure
+  example "empty"
+    problem: Empty
+    -> "error: empty"
+  end
+
+  return match problem
+    Empty -> "error: empty"
+    TooLong(count) -> "error: {count} words"
+  end
+end fn explain
+
+fn report(raw: Text) -> Text
+  pure
+  example "ok"
+    raw: " ada "
+    -> "ok ada"
+  end
+
+  return match check_name(raw)
+    Ok(name) -> "ok {name}"
+    Err(problem) -> explain(problem)
+  end
+end fn report
+
+fn main() -> Nothing
+  pure
+
+  log(report("  ada  "))
+  log(report("grace hopper"))
+  log(report("   "))
+  log(report("a b c d"))
+  return nothing
+end fn main

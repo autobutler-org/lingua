@@ -1,0 +1,29 @@
+fn main() -> Nothing
+  pure
+
+  for i in 0 until 3
+    log("i={i}")
+  end
+  for j in 5 until 5
+    log("never {j}")
+  end
+  let lo: Int = -2
+  let hi: Int = 1
+  for m in lo until hi
+    log("m={m}")
+  end
+  for k in hi until lo
+    log("never {k}")
+  end
+  let neg: Int = -3
+  for q in 0 until neg
+    log("never {q}")
+  end
+  var limit: Int = 2
+  for p in 0 until limit
+    set limit += 10
+    log("p={p}")
+  end
+  log("limit {limit}")
+  return nothing
+end fn main

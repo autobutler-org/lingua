@@ -1,0 +1,22 @@
+fn safe_half(n: Int) -> Int
+  pure
+  example "even"
+    n: 10
+    -> 5
+  end
+  example "odd is a bug"
+    n: 3
+    -> exception "n must be even"
+  end
+
+  assert n % 2 == 0, "n must be even"
+  return n / 2
+end fn safe_half
+
+fn main() -> Nothing
+  pure
+
+  log("half of 10 is {safe_half(10)}")
+  log("half of 7 is {safe_half(7)}")
+  return nothing
+end fn main

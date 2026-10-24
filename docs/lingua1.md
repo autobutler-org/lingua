@@ -590,7 +590,7 @@ Statement-arm blocks end at the next arm or at the match's `end`, not at an inne
 
 The scrutinee is evaluated once. Arms are tried in order. First success wins. No fallthrough. A binding in a pattern is immutable and scoped to that arm. Two bindings of the same name in one pattern are `L013`. A later arm that cannot match because a previous arm is `_` or covers the same constructor and the same literals is `L033`.
 
-**Closed scrutinees.** Sum types declared in any module, plus `Result` and `BoundsError`. Every variant appears exactly once as the outermost pattern of some arm. `_` is `L032` and the diagnostic lists the variants, even if every variant is also listed. Missing variants are `L031` and the diagnostic lists the missing ones. Payload patterns are required in the sense that a one-payload variant is written `Name(inner)` or, if the payload is ignored, `Name(_)`. A zero-payload variant is written bare. `Name(_)` on a zero-payload variant is `L020`.
+**Closed scrutinees.** Sum types declared in any module, plus `Result` and `BoundsError`. Every variant appears as the outermost pattern of some arm. A variant may appear in several arms when their payload patterns split it (`Err(OutOfRange)` and `Err(NotAnInteger)`). Exhaustiveness is checked through nested closed sums: the arms for one variant together must cover its payload, by `_`, a binding, or every variant of a closed payload type. An open payload needs `_` or a binding. `_` at the outermost level is `L032` and the diagnostic lists the variants, even if every variant is also listed. Missing variants are `L031` and the diagnostic lists the missing ones, nested where the payload is what is missing (`Err(NotAnInteger)`). Payload patterns are required in the sense that a one-payload variant is written `Name(inner)` or, if the payload is ignored, `Name(_)`. A zero-payload variant is written bare. `Name(_)` on a zero-payload variant is `L020`.
 
 **Open scrutinees.** `Text`, `Int`, anonymous and nominal integer types, `List<T>`. `_` is legal. A match without `_` is `L031`, because lingua1 has no range patterns and list patterns do not cover every length. Help text: add `_`.
 
@@ -866,14 +866,17 @@ exception: factor must be non-zero
    |   ^^^^^^
 ```
 
-A fault is a different header, same span style:
+A fault is a different header, same span block. The caret covers the faulting expression:
 
 ```text
 fault L040: arithmetic overflow
-  --> money.lf:40:12
+  --> order.lf:21:10
+   |
+21 |   return line.price * line.quantity
+   |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 ```
 
-A zero divisor uses the same header: `fault L076: division by zero`.
+A zero divisor uses the same block with the header `fault L076: division by zero`.
 
 `L042` is interpreter-only. The native binary does not apply the 100_000 fuel cap. Overflow, a zero divisor, and exceptions do apply to the binary.
 
@@ -1156,7 +1159,7 @@ Ambient in every module. Not imported. Not exported by user modules.
 | `BoundsError` | `OutOfRange`, `NotAnInteger` | | closed; constructors are prelude names |
 | `trim` | `(text: Text) -> Text` | `pure` | remove leading and trailing U+0020, U+0009, U+000A, U+000D only |
 | `lower` | `(text: Text) -> Text` | `pure` | `A`–`Z` to `a`–`z`; every other scalar unchanged |
-| `split` | `(text: Text, separator: Text) -> List<Text>` | `pure` | both parameters are `Text`, so **named**. Empty separator is `L046` (compile-time if the argument is the literal `""`, otherwise at run time). `split(text: "percent:10", separator: ":")` is `["percent", "10"]`. `split(text: "bogof", separator: ":")` is `["bogof"]`. `split(text: "a::b", separator: ":")` is `["a", "", "b"]`. Leading and trailing separators produce empty strings |
+| `split` | `(text: Text, separator: Text) -> List<Text>` | `pure` | both parameters are `Text`, so **named**. Empty separator is `L046` (compile-time if the argument is the literal `""`, otherwise at run time). `split(text: "percent:10", separator: ":")` is `["percent", "10"]`. `split(text: "bogof", separator: ":")` is `["bogof"]`. `split(text: "a::b", separator: ":")` is `["a", "", "b"]`. `split(text: "", separator: ":")` is `[""]`. Leading and trailing separators produce empty strings |
 | `join` | `(left: List<T>, right: List<T>) -> List<T>` | `pure` | list concatenation, **not** text join. Same element type. Named arguments |
 | `max` | `(a: Int, b: Int) -> Int` | `pure` | plus the bound rule. Named arguments |
 | `length` | `(list: List<T>) -> Int at least 0` | `pure` | function, not a method |
@@ -1217,7 +1220,7 @@ L031: match on Discount is missing a variant
 
 - Code: `L` and three digits. Stable. Reusing a code for a different meaning is a breaking change. New codes in a later lingua1 patch are not breaking if old codes keep their meaning.
 - Summary: one line, no period required, no newline.
-- Span: `path:line:column`, 1-based, column counted in Unicode scalars. The caret covers the span on its first line only. Multi-line spans do not draw a multi-line box in lingua1.
+- Span: `path:line:column`, 1-based, column counted in Unicode scalars. The path is relative to the source root (`money.lf`), whatever path was passed on the command line. The caret covers the span on its first line only. Multi-line spans do not draw a multi-line box in lingua1.
 - `help:` is required for `L002`, `L003`, `L010`, `L011`, `L016`, `L021`, `L028`, `L031`, `L032`, and `L069`. `L016` help prints the source root. The others list legal alternatives, comma-separated, in source order (declaration order for variants and fields, signature order for parameters, export list order for modules, defining-file order for `L069`). Resource names are not exports and are omitted from an `L010` list.
 - Sort: file path, span start, code. Cap 100 diagnostics per file; the 100th is `L047` meaning "diagnostic limit."
 - Syntax errors: report `L001`, skip tokens until after the next `end fn`, `end type`, or `end resource`, and resume at the next top-level declaration. Cap still applies. Cascades are possible and are not suppressed.
@@ -1292,7 +1295,7 @@ L031: match on Discount is missing a variant
 
 `L019`, `L036`–`L039`, `L048`, `L051`–`L054`, and `L070` are unused and reserved. `L070` formerly rejected `lingua build --dynamic`, which is now implemented.
 
-`L040`, `L042`, and a runtime `L076` use the fault header (`fault L040: ...`) and are still sorted with every other diagnostic by file, span, and code. They count toward the cap of 100. An exception report from a built binary is not a compiler diagnostic and does not use that cap.
+`L040`, `L042`, and a runtime `L076` use the fault header (`fault L040: ...`) with the same span block as an exception, and are still sorted with every other diagnostic by file, span, and code. They count toward the cap of 100. An exception report from a built binary is not a compiler diagnostic and does not use that cap.
 
 **Missing variant (`L031`).** Sketch, not a normative program:
 

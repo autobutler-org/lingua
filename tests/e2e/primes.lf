@@ -1,0 +1,39 @@
+fn is_prime(n: Int) -> Bool
+  pure
+  example "seven"
+    n: 7
+    -> true
+  end
+  example "nine"
+    n: 9
+    -> false
+  end
+  example "one"
+    n: 1
+    -> false
+  end
+
+  if n < 2
+    return false
+  end
+  for divisor in 2 until n
+    if n % divisor == 0
+      return false
+    end
+  end
+  return true
+end fn is_prime
+
+fn main() -> Nothing
+  pure
+
+  var found: Int = 0
+  for candidate in 2 until 50
+    if is_prime(candidate)
+      log("{candidate}")
+      set found += 1
+    end
+  end
+  log("count {found}")
+  return nothing
+end fn main

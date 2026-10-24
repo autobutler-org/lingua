@@ -1,0 +1,6 @@
+20! = 2432902008176640000
+fault L040: arithmetic overflow
+  --> factorial_overflow.lf:15:10
+   |
+15 |   return n * factorial(n - 1)
+   |          ^^^^^^^^^^^^^^^^^^^^

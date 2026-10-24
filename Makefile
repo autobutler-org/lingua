@@ -66,10 +66,11 @@ e2e: ## Build and run the end-to-end programs (in Docker unless on linux/amd64)
 
 .PHONY: euler
 euler: build ## Check the Project Euler solutions in euler/
+	status=0
 	for file in euler/*.lf; do
-		printf '%s: ' "$$file"
-		$(EXE) check "$$file"
+		if $(EXE) check "$$file"; then echo "$$file: ok"; else echo "$$file: failed"; status=1; fi
 	done
+	exit $$status
 
 ##@ Dependencies
 

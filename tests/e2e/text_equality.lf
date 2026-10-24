@@ -1,0 +1,31 @@
+fn main() -> Nothing
+  pure
+
+  let a: Text = "lingua"
+  let b: Text = "lin"
+  let joined = "{b}gua"
+  if a == joined
+    log("equal after interpolation")
+  end
+  if a != "Lingua"
+    log("case matters")
+  end
+  if lower("LINGUA") == a
+    log("lower matches")
+  end
+  if "" == trim("   ")
+    log("trimmed to empty")
+  end
+  if a == b
+    log("never")
+  else
+    log("prefix is not equal")
+  end
+  // precomposed U+00E9 versus e followed by U+0301: no normalization
+  let composed: Text = "café"
+  let decomposed: Text = "café"
+  if composed != decomposed
+    log("no normalization")
+  end
+  return nothing
+end fn main

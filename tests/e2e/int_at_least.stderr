@@ -1,0 +1,9 @@
+5 ok 5
+0 ok 0
+-1 out of range
+9223372036854775807 ok 9223372036854775807
+-9223372036854775808 out of range
+high 100
+99 out of range
+cents 250
+-250 out of range

@@ -1,0 +1,42 @@
+type Dims
+  width: Int
+  height: Int
+end type Dims
+
+type Shape
+  Square(Int)
+  Rect(Dims)
+  Dot
+end type Shape
+
+fn area(shape: Shape) -> Int
+  pure
+  example "square"
+    shape: Square(3)
+    -> 9
+  end
+  example "rect"
+    shape: Rect(Dims(width: 2, height: 5))
+    -> 10
+  end
+  example "dot"
+    shape: Dot
+    -> 0
+  end
+
+  match shape
+    Square(side) -> return side * side
+    Rect(dims) -> return dims.width * dims.height
+    Dot -> return 0
+  end
+end fn area
+
+fn main() -> Nothing
+  pure
+
+  let shapes: List<Shape> = [Square(4), Rect(Dims(width: 3, height: 7)), Dot]
+  for shape in shapes
+    log("area {area(shape)}")
+  end
+  return nothing
+end fn main

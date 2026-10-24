@@ -1,0 +1,34 @@
+type CustomerId = Text
+
+type Cursor = Text
+
+fn greet(customer: CustomerId) -> Text
+  pure
+  example "greets by id"
+    customer: "c1"
+    -> "hello c1"
+  end
+
+  return "hello {customer}"
+end fn greet
+
+fn main() -> Nothing
+  pure
+
+  let id: CustomerId = "c-42"
+  log(greet(id))
+  log("id is {id}")
+  let raw: Text = "  c-7  "
+  let wrapped = CustomerId(trim(raw))
+  log(greet(wrapped))
+  if wrapped == "c-7"
+    log("wrapped matches literal")
+  end
+  let cursor: Cursor = "page-2"
+  let rewrapped = CustomerId(cursor)
+  log(greet(rewrapped))
+  log(greet("literal"))
+  let plain: Text = id
+  log("eliminated {plain}")
+  return nothing
+end fn main

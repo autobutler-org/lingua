@@ -1,0 +1,76 @@
+type AppError
+  Missing
+  Invalid(Text)
+end type AppError
+
+fn lookup(key: Text) -> Result<Int, AppError>
+  pure
+  example "width"
+    key: "width"
+    -> Ok(4)
+  end
+  example "missing"
+    key: "color"
+    -> Err(Missing)
+  end
+
+  log("lookup {key}")
+  if key == "width"
+    return Ok(4)
+  end
+  if key == "height"
+    return Ok(5)
+  end
+  if key == "depth"
+    return Err(Invalid("depth"))
+  end
+  return Err(Missing)
+end fn lookup
+
+fn area_of(first: Text, second: Text) -> Result<Int, AppError>
+  pure
+  example "width by height"
+    first: "width"
+    second: "height"
+    -> Ok(20)
+  end
+
+  let a = lookup(first) or return
+  let b = lookup(second) or return
+  return Ok(a * b)
+end fn area_of
+
+fn explain(problem: AppError) -> Text
+  pure
+  example "missing"
+    problem: Missing
+    -> "missing"
+  end
+
+  return match problem
+    Missing -> "missing"
+    Invalid(name) -> "invalid {name}"
+  end
+end fn explain
+
+fn render(outcome: Result<Int, AppError>) -> Text
+  pure
+  example "ok"
+    outcome: Ok(20)
+    -> "ok 20"
+  end
+
+  return match outcome
+    Ok(value) -> "ok {value}"
+    Err(problem) -> explain(problem)
+  end
+end fn render
+
+fn main() -> Nothing
+  pure
+
+  log(render(area_of(first: "width", second: "height")))
+  log(render(area_of(first: "width", second: "color")))
+  log(render(area_of(second: "width", first: "depth")))
+  return nothing
+end fn main

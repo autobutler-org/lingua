@@ -1,0 +1,23 @@
+type Cents = Int at least 0
+
+type Rounding
+  half_up
+end type Rounding
+
+fn percent(part: Int in 1 through 100, of: Cents, round: Rounding) -> Cents
+  pure
+  example "ten percent of 1200 half up"
+    part: 10
+    of: 1200
+    round: half_up
+    -> 120
+  end
+  example "one percent of 150 rounds half up"
+    part: 1
+    of: 150
+    round: half_up
+    -> 2
+  end
+
+  primitive
+end fn percent

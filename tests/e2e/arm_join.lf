@@ -1,0 +1,48 @@
+type Cents = Int at least 0
+
+type Coupon
+  NoCoupon
+  Flat(Cents)
+  Bonus(Int)
+end type Coupon
+
+fn coupon_value(coupon: Coupon) -> Cents
+  pure
+  example "none"
+    coupon: NoCoupon
+    -> 0
+  end
+  example "flat"
+    coupon: Flat(250)
+    -> 250
+  end
+
+  let off = match coupon
+    NoCoupon -> 0
+    Flat(amount) -> amount
+    Bonus(_) -> 5
+  end
+  return off
+end fn coupon_value
+
+fn main() -> Nothing
+  pure
+
+  log("none {coupon_value(NoCoupon)}")
+  log("flat {coupon_value(Flat(250))}")
+  log("bonus {coupon_value(Bonus(-9))}")
+  let coupon: Coupon = Bonus(3)
+  let code = match coupon
+    NoCoupon -> 0
+    Flat(_) -> 1
+    Bonus(_) -> -1
+  end
+  log("code {code}")
+  let label = match coupon
+    NoCoupon -> "none"
+    Flat(_) -> "flat"
+    Bonus(points) -> "bonus {points}"
+  end
+  log(label)
+  return nothing
+end fn main

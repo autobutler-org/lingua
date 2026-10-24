@@ -1,0 +1,26 @@
+type Countdown
+  Tick(Int)
+  Liftoff
+end type Countdown
+
+fn main() -> Nothing
+  pure
+
+  var state: Countdown = Tick(3)
+  while state is Tick(remaining)
+    log("tick {remaining}")
+    if remaining == 1
+      set state = Liftoff
+    else
+      set state = Tick(remaining - 1)
+    end
+  end
+  log("liftoff")
+  var idle: Countdown = Liftoff
+  while idle is Tick(never)
+    log("never {never}")
+    set idle = Liftoff
+  end
+  log("done")
+  return nothing
+end fn main

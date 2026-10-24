@@ -1,0 +1,10 @@
+fn main() -> Nothing
+  pure
+
+  let count: Int = 3
+  assert count > 0, "count must be positive"
+  log("count ok")
+  assert count > 5, "count must exceed five"
+  log("unreachable")
+  return nothing
+end fn main

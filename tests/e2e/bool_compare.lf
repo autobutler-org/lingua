@@ -1,0 +1,36 @@
+fn show(flag: Bool) -> Text
+  pure
+  example "true"
+    flag: true
+    -> "true"
+  end
+  example "false"
+    flag: false
+    -> "false"
+  end
+
+  if flag
+    return "true"
+  end
+  return "false"
+end fn show
+
+fn main() -> Nothing
+  pure
+
+  let a: Int = 3
+  let b: Int = 5
+  let word: Text = "lingua"
+  log("a < b {show(a < b)}")
+  log("a > b {show(a > b)}")
+  log("a <= 3 {show(a <= 3)}")
+  log("a >= 4 {show(a >= 4)}")
+  log("a == 3 {show(a == 3)}")
+  log("a != 3 {show(a != 3)}")
+  log("-a < -b {show(-a < -b)}")
+  log("a + 2 == b {show(a + 2 == b)}")
+  log("word == lingua {show(word == "lingua")}")
+  log("word != Lingua {show(word != "Lingua")}")
+  log("bool == bool {show((a < b) == true)}")
+  return nothing
+end fn main

@@ -1,0 +1,6 @@
+count ok
+exception: count must exceed five
+  --> assert_fail.lf:7:3
+   |
+ 7 |   assert count > 5, "count must exceed five"
+   |   ^^^^^^

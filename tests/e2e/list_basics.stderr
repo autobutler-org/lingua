@@ -1,0 +1,19 @@
+length 5
+1
+2
+3
+4
+5
+empty 0
+joined empty 3
+literal empty 2
+reversed 4
+reversed 5
+reversed 1
+reversed 2
+reversed 3
+trailing comma 3
+words 2
+row 2
+row 1
+row 0

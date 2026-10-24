@@ -1,0 +1,30 @@
+type Collatz
+  Running(Int)
+  Finished
+end type Collatz
+
+fn main() -> Nothing
+  pure
+
+  var state: Collatz = Running(27)
+  var steps: Int = 0
+  var peak: Int = 27
+  while state is Running(n)
+    if n > peak
+      set peak = n
+    end
+    if n == 1
+      set state = Finished
+    else
+      set steps += 1
+      if n % 2 == 0
+        set state = Running(n / 2)
+      else
+        set state = Running(3 * n + 1)
+      end
+    end
+  end
+  log("steps {steps}")
+  log("peak {peak}")
+  return nothing
+end fn main

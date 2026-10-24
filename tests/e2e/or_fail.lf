@@ -1,0 +1,9 @@
+fn main() -> Nothing
+  pure
+
+  let good = int_in("42", 1 through 100) or fail "not a percent"
+  log("good {good}")
+  let bad = int_in("420", 1 through 100) or fail "not a percent"
+  log("bad {bad}")
+  return nothing
+end fn main

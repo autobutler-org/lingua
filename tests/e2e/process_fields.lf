@@ -1,0 +1,37 @@
+fn base_name(path: Text) -> Text
+  pure
+  example "strips directories"
+    path: "/tmp/run/lingua-out"
+    -> "lingua-out"
+  end
+  example "bare name"
+    path: "lingua-out"
+    -> "lingua-out"
+  end
+
+  let pieces = split(text: path, separator: "/")
+  return match pieces[length(pieces) - 1]
+    Ok(last) -> last
+    Err(_) -> path
+  end
+end fn base_name
+
+fn main(process: Process) -> Nothing
+  pure
+
+  log("os {process.os}")
+  log("arch {process.arch}")
+  log("args {length(process.args)}")
+  log("program {base_name(process.program)}")
+  log("thread {process.thread.name}")
+  if process.pid > 0
+    log("pid positive")
+  end
+  if process.thread.id > 0
+    log("thread id positive")
+  end
+  if process.parallelism > 0
+    log("parallelism positive")
+  end
+  return nothing
+end fn main

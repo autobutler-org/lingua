@@ -1,0 +1,6 @@
+before -9223372036854775808
+fault L040: arithmetic overflow
+  --> div_int_min.lf:8:18
+   |
+ 8 |   let quotient = bottom / minus_one
+   |                  ^^^^^^^^^^^^^^^^^^

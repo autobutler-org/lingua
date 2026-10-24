@@ -1,0 +1,72 @@
+import Host, Port, ConfigError, parse_port, parse_host from "settings"
+
+type Endpoint
+  host: Host
+  port: Port
+end type Endpoint
+
+fn parse_endpoint(raw: Text) -> Result<Endpoint, ConfigError>
+  pure
+  example "host and port"
+    raw: "h:1"
+    -> Ok(Endpoint("h", 1))
+  end
+  example "no port"
+    raw: "h"
+    -> Err(MissingValue("port"))
+  end
+
+  match split(text: raw, separator: ":")
+    [host_part, port_part] ->
+      let host = parse_host(host_part) or return
+      let port = parse_port(port_part) or return
+      return Ok(Endpoint(host, port))
+    _ -> return Err(MissingValue("port"))
+  end
+end fn parse_endpoint
+
+fn explain(problem: ConfigError) -> Text
+  pure
+  example "missing"
+    problem: MissingValue("host")
+    -> "missing host"
+  end
+
+  return match problem
+    MissingValue(field) -> "missing {field}"
+    BadPort(given) -> "bad port [{given}]"
+  end
+end fn explain
+
+fn render(raw: Text) -> Text
+  pure
+  example "ok"
+    raw: "h:1"
+    -> "h port 1"
+  end
+
+  return match parse_endpoint(raw)
+    Ok(endpoint) -> "{endpoint.host} port {endpoint.port}"
+    Err(problem) -> explain(problem)
+  end
+end fn render
+
+fn main() -> Nothing
+  pure
+
+  let inputs: List<Text> = [
+    "localhost:8080",
+    " example.org :443",
+    "db:65535",
+    "db:0",
+    "db:70000",
+    "web: 80",
+    ":80",
+    "nohost",
+    "a:b:c",
+  ]
+  for raw in inputs
+    log(render(raw))
+  end
+  return nothing
+end fn main

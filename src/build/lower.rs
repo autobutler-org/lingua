@@ -56,7 +56,7 @@ impl<'a> Lowerer<'a> {
             .iter()
             .map(|code| Report {
                 kind: ReportKind::Fault(code),
-                text: report::fault(code, &module.path, Some(span)),
+                text: report::fault(code, &module.path, &module.source, Some(span)),
             })
             .collect();
         self.site(module, Some(span), reports)
@@ -495,7 +495,13 @@ impl<'a> FnLowerer<'a, '_> {
                 self.b.switch(join);
             }
             TirStmt::ForList(id, list, body) => {
+                // A copy: the list may be a `var` the body sets
                 let list = self.expr(list)?;
+                let list = {
+                    let copy = self.b.fresh();
+                    self.b.mov(copy, list);
+                    copy
+                };
                 let len = self.b.load(list, 0);
                 let zero = self.b.konst(0);
                 self.counted(zero, len, |f, i| {
@@ -508,8 +514,11 @@ impl<'a> FnLowerer<'a, '_> {
                 })?;
             }
             TirStmt::ForRange(id, low, high, body) => {
+                // Both bounds are evaluated once, on entry: copy `high` out of any `var`
                 let (low, high) = (self.expr(low)?, self.expr(high)?);
-                self.counted(low, high, |f, i| {
+                let end = self.b.fresh();
+                self.b.mov(end, high);
+                self.counted(low, end, |f, i| {
                     f.bind(*id, i);
                     f.stmts(body)
                 })?;

@@ -1,0 +1,14 @@
+fn main() -> Nothing
+  pure
+
+  log("start")
+  let mode: Text = "broken"
+  if mode == "fine"
+    fail "mode is fine"
+  end
+  if mode == "broken"
+    fail "mode is broken"
+  end
+  log("unreachable")
+  return nothing
+end fn main

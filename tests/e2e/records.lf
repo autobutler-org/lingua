@@ -1,0 +1,59 @@
+type Point
+  x: Int
+  y: Int
+end type Point
+
+type Segment
+  start: Point
+  finish: Point
+end type Segment
+
+type Person
+  name: Text
+  age: Int
+end type Person
+
+fn magnitude(n: Int) -> Int
+  pure
+  example "negative"
+    n: -3
+    -> 3
+  end
+  example "positive"
+    n: 4
+    -> 4
+  end
+
+  if n < 0
+    return -n
+  end
+  return n
+end fn magnitude
+
+fn manhattan(segment: Segment) -> Int
+  pure
+  example "unit diagonal"
+    segment: Segment(start: Point(x: 0, y: 0), finish: Point(x: 1, y: 1))
+    -> 2
+  end
+
+  let dx = segment.finish.x - segment.start.x
+  let dy = segment.finish.y - segment.start.y
+  return magnitude(dx) + magnitude(dy)
+end fn manhattan
+
+fn main() -> Nothing
+  pure
+
+  let origin = Point(x: 0, y: 0)
+  let corner = Point(x: 3, y: -4)
+  let seg = Segment(start: origin, finish: corner)
+  log("corner {corner.x},{corner.y}")
+  log("distance {manhattan(seg)}")
+  log("start y {seg.start.y}")
+  let flipped = Point(y: 9, x: 1)
+  log("flipped {flipped.x} {flipped.y}")
+  let ada = Person("Ada", 36)
+  log("{ada.name} is {ada.age}")
+  return nothing
+end fn main

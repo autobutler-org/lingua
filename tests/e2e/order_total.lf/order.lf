@@ -1,0 +1,90 @@
+import Cents, percent, half_up from "money"
+
+type Line
+  name: Text
+  price: Cents
+  quantity: Int at least 1
+end type Line
+
+type Discount
+  NoDiscount
+  Percent(Int in 1 through 100)
+  CentsOff(Cents)
+end type Discount
+
+fn line_subtotal(line: Line) -> Cents
+  pure
+  example "two cups"
+    line: Line("cup", 500, 2)
+    -> 1000
+  end
+
+  return line.price * line.quantity
+end fn line_subtotal
+
+fn order_total(lines: List<Line>, discount: Discount) -> Cents
+  pure
+  example "empty cart"
+    lines: []
+    discount: NoDiscount
+    -> 0
+  end
+  example "percent applies to the sum"
+    lines: [Line("pen", 200, 1), Line("cup", 500, 2)]
+    discount: Percent(10)
+    -> 1080
+  end
+  example "cents off cannot go negative"
+    lines: [Line("pen", 200, 1)]
+    discount: CentsOff(500)
+    -> 0
+  end
+
+  var sum: Cents = 0
+  for line in lines
+    set sum += line_subtotal(line)
+  end
+  let off = match discount
+    NoDiscount -> 0
+    Percent(p) -> percent(p, sum, half_up)
+    CentsOff(c) -> c
+  end
+  return max(a: 0, b: sum - off)
+end fn order_total
+
+type ParseError
+  Empty
+  BadQuantity
+  UnknownDiscount(Text)
+end type ParseError
+
+fn parse_discount(raw: Text) -> Result<Discount, ParseError>
+  pure
+  example "percent"
+    raw: "percent:10"
+    -> Ok(Percent(10))
+  end
+  example "zero is not a percent discount"
+    raw: "percent:0"
+    -> Err(BadQuantity)
+  end
+  example "unknown word"
+    raw: "bogof"
+    -> Err(UnknownDiscount("bogof"))
+  end
+
+  let text = lower(trim(raw))
+  if text == ""
+    return Err(Empty)
+  end
+  match split(text: text, separator: ":")
+    ["none"] -> return Ok(NoDiscount)
+    ["percent", n] ->
+      let p = int_in(n, 1 through 100) or return Err(BadQuantity)
+      return Ok(Percent(p))
+    ["off", n] ->
+      let c: Cents = int_at_least(n, 0) or return Err(BadQuantity)
+      return Ok(CentsOff(c))
+    _ -> return Err(UnknownDiscount(text))
+  end
+end fn parse_discount

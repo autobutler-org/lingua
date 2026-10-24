@@ -1,0 +1,6 @@
+equal after interpolation
+case matters
+lower matches
+trimmed to empty
+prefix is not equal
+no normalization

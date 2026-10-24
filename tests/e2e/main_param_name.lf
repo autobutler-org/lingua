@@ -1,0 +1,9 @@
+fn main(env: Process) -> Nothing
+  pure
+
+  for arg in env.args
+    log("unexpected arg {arg}")
+  end
+  log("{env.os}/{env.arch}")
+  return nothing
+end fn main

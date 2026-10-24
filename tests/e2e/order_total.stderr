@@ -1,0 +1,18 @@
+no discount 1200
+ten percent 1080
+150 off 1050
+too much off 0
+empty 0
+percent 10 of 1200 120
+percent 1 of 150 2
+percent 49 of 1 0
+percent 50 of 1 1
+percent 33 of 1000 330
+percent 100 of max 9223372036854775807
+[none] -> 1200
+[percent:10] -> 1080
+[ OFF:300 ] -> 900
+[percent:0] -> rejected
+[percent:101] -> rejected
+[bogof] -> rejected
+[] -> rejected

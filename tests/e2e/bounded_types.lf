@@ -1,0 +1,73 @@
+type Percent = Int in 0 through 100
+
+type Score = Int in 0 through 10
+
+fn widen(score: Score) -> Int at least 0
+  pure
+  example "seven"
+    score: 7
+    -> 7
+  end
+
+  return score
+end fn widen
+
+fn half(p: Percent) -> Int in 0 through 50
+  pure
+  example "odd"
+    p: 85
+    -> 42
+  end
+
+  return p / 2
+end fn half
+
+fn last_digit(n: Int at least 0) -> Int in 0 through 9
+  pure
+  example "1234"
+    n: 1234
+    -> 4
+  end
+
+  return n % 10
+end fn last_digit
+
+fn signed_digit(n: Int) -> Int in -9 through 9
+  pure
+  example "negative"
+    n: -1234
+    -> -4
+  end
+
+  return n % 10
+end fn signed_digit
+
+fn triple(x: Int in 0 through 100) -> Int
+  pure
+  example "seven"
+    x: 7
+    -> 21
+  end
+
+  return x * 3
+end fn triple
+
+fn main() -> Nothing
+  pure
+
+  let s: Score = 7
+  log("widened {widen(s)}")
+  let p: Percent = 85
+  log("half {half(p)}")
+  log("digit {last_digit(1234)}")
+  log("signed {signed_digit(-1234)}")
+  log("tripled {triple(s)}")
+  log("tripled max {triple(100)}")
+  let as_int: Int = p
+  log("as int {as_int - 100}")
+  for i in 0 until 3
+    let letter = ["a", "b", "c"][i]
+    log("letter {i} {letter}")
+  end
+  return nothing
+end fn main

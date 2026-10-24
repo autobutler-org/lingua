@@ -1,0 +1,41 @@
+type Port = Int in 1 through 65535
+
+type Host = Text
+
+type ConfigError
+  MissingValue(Text)
+  BadPort(Text)
+end type ConfigError
+
+fn parse_port(raw: Text) -> Result<Port, ConfigError>
+  pure
+  example "http"
+    raw: "80"
+    -> Ok(80)
+  end
+  example "zero"
+    raw: "0"
+    -> Err(BadPort("0"))
+  end
+
+  let port: Port = int_in(raw, 1 through 65535) or return Err(BadPort(raw))
+  return Ok(port)
+end fn parse_port
+
+fn parse_host(raw: Text) -> Result<Host, ConfigError>
+  pure
+  example "trimmed"
+    raw: " db "
+    -> Ok("db")
+  end
+  example "blank"
+    raw: " "
+    -> Err(MissingValue("host"))
+  end
+
+  let cleaned = trim(raw)
+  if cleaned == ""
+    return Err(MissingValue("host"))
+  end
+  return Ok(Host(cleaned))
+end fn parse_host

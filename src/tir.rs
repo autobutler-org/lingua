@@ -1,7 +1,6 @@
 //! Typed IR (docs/lingua1.md, Data Model > Symbols and resolved types, Typed IR): the
 //! contract between the typechecker, which produces it, and the interpreter and
-//! `lingua build`, which consume it. `build::subset` produces a small part of it until the
-//! typechecker exists.
+//! `lingua build`, which consume it. `crate::check` produces it.
 //!
 //! Additions to lingua1.md's listing, each needed to lower or report:
 //! - `TirKind::Concat` for text with holes (lingua1.md lowers holes but names no node).
@@ -41,7 +40,7 @@ pub struct Symbol {
     pub module: String,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum SymbolKind {
     Type(TypeKind),
     /// `tag` is the variant's index in its sum's declaration order (`Ok` 0, `Err` 1).
@@ -66,7 +65,7 @@ pub enum SymbolKind {
     PreludeType,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum TypeKind {
     Product,
     Sum,
@@ -270,7 +269,7 @@ pub enum TirArmBody {
     Stmts(Vec<TirStmt>),
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum TirPat {
     Wild,
     Bind(SymbolId),

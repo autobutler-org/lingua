@@ -1,0 +1,32 @@
+// A comment before the first declaration
+fn add(left: Int, right: Int) -> Int
+  pure
+  example "small"
+    left: 2
+    right: 3
+    -> 5
+  end
+
+
+  // comments and blank lines inside a body are layout
+  return left + right // trailing comment
+end fn add
+
+fn main() -> Nothing
+  pure
+  example "main may have an example"
+    -> nothing
+  end
+
+  let total = add(
+    left: 40,
+    right: 2,
+  )
+
+  log("total {total}")
+  log(
+    "broken call",
+  )
+  log("a // b is not a comment inside a string")
+  return nothing
+end fn main

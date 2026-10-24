@@ -1,0 +1,9 @@
+fn main() -> Nothing
+  pure
+
+  let sep: Text = ""
+  log("before {length(split(text: "a:b", separator: ":"))}")
+  let parts = split(text: "abc", separator: sep)
+  log("after {length(parts)}")
+  return nothing
+end fn main

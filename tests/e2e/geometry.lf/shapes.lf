@@ -1,0 +1,39 @@
+type Point
+  x: Int
+  y: Int
+end type Point
+
+type Shape
+  Circle(Int)
+  Box(Point)
+end type Shape
+
+fn area(shape: Shape) -> Int
+  pure
+  example "circle"
+    shape: Circle(2)
+    -> 12
+  end
+  example "box"
+    shape: Box(Point(x: 3, y: 4))
+    -> 12
+  end
+
+  match shape
+    Circle(radius) -> return 3 * radius * radius
+    Box(corner) -> return corner.x * corner.y
+  end
+end fn area
+
+fn shape_name(shape: Shape) -> Text
+  pure
+  example "circle"
+    shape: Circle(1)
+    -> "circle"
+  end
+
+  return match shape
+    Circle(_) -> "circle"
+    Box(_) -> "box"
+  end
+end fn shape_name

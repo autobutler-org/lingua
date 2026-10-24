@@ -1,0 +1,23 @@
+fn show_parts(parts: List<Text>) -> Text
+  pure
+  example "two parts"
+    parts: ["a", ""]
+    -> "2 [a][]"
+  end
+
+  var shown: Text = "{length(parts)} "
+  for part in parts
+    set shown = "{shown}[{part}]"
+  end
+  return shown
+end fn show_parts
+
+fn main() -> Nothing
+  pure
+
+  log(show_parts(split(text: "a, b, c", separator: ", ")))
+  log(show_parts(split(text: "aXYbXY", separator: "XY")))
+  log(show_parts(split(text: "no match here", separator: "::")))
+  log(show_parts(split(text: "café→bar→", separator: "→")))
+  return nothing
+end fn main

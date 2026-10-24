@@ -1,0 +1,46 @@
+type OrderError
+  BadQuantity
+end type OrderError
+
+fn parse_quantity(raw: Text) -> Result<Int, OrderError>
+  pure
+  example "three"
+    raw: "3"
+    -> Ok(3)
+  end
+  example "zero"
+    raw: "0"
+    -> Err(BadQuantity)
+  end
+
+  let n = int_in(raw, 1 through 99) or return Err(BadQuantity)
+  return Ok(n)
+end fn parse_quantity
+
+fn render(raw: Text) -> Text
+  pure
+  example "ok"
+    raw: "3"
+    -> "3 -> 3"
+  end
+
+  return match parse_quantity(raw)
+    Ok(n) -> "{raw} -> {n}"
+    Err(BadQuantity) -> "{raw} -> bad quantity"
+  end
+end fn render
+
+fn main() -> Nothing
+  pure
+
+  log(render("3"))
+  log(render("99"))
+  log(render("0"))
+  log(render("100"))
+  log(render("abc"))
+  let first = parse_quantity("7") or return nothing
+  log("first {first}")
+  let second = parse_quantity("x") or return nothing
+  log("unreachable {second}")
+  return nothing
+end fn main

@@ -1,0 +1,6 @@
+good 42
+exception: not a percent
+  --> or_fail.lf:6:42
+   |
+ 6 |   let bad = int_in("420", 1 through 100) or fail "not a percent"
+   |                                          ^^^^^^^

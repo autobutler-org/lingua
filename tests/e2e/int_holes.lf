@@ -1,0 +1,17 @@
+fn main() -> Nothing
+  pure
+
+  let zero: Int = 0
+  let neg: Int = -42
+  let top: Int = 9223372036854775807
+  let bottom: Int = -9223372036854775807 - 1
+  log("zero={zero}")
+  log("neg={neg}")
+  log("max={top}")
+  log("min={bottom}")
+  log("literals {5} and {-5}")
+  log("braces {{ {zero} }}")
+  log("sum {top + bottom}")
+  log("{neg}{zero}{neg}")
+  return nothing
+end fn main

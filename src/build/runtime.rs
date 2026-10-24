@@ -63,7 +63,7 @@ pub fn rodata() -> Vec<RoData> {
     vec![
         text_block("rt.newline", "\n"),
         text_block("rt.main_name", "main"),
-        text_block(OOM, &report::fault("L047", "", None)),
+        text_block(OOM, &report::fault("L047", "", "", None)),
         singleton_block(OUT_OF_RANGE, 0),
         singleton_block(NOT_AN_INTEGER, 1),
     ]

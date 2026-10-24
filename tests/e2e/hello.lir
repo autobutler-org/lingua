@@ -5,4 +5,4 @@ b0:
   v2 = const 0
   ret v2
 
-site.0 fault L077 tests/e2e/hello.lf:1:1
+site.0 fault L077 hello.lf:1:1

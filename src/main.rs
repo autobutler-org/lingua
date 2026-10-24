@@ -1,72 +1,86 @@
+use std::path::PathBuf;
 use std::process::ExitCode;
 
-use lingua::ast::{Module, dump};
+use lingua::ast::dump;
 use lingua::build::{self, arch::amd64, lir};
+use lingua::check::{self, Diagnostic, Options};
 use lingua::lex::{TokenKind, lex_source};
-use lingua::parse::{Diagnostic, parse_source};
+use lingua::parse::parse_source;
 
 const USAGE: &str = "usage: lingua <command> [args]
 
 commands:
-  lex <file.lf>     print the tokens in a source file, one per line
-  parse <file.lf>   print the untyped AST of a source file as an S-expression
-  check <file.lf>   check a source file's syntax and print `parsed` when it is clean
-  build <file.lf>   build a static linux/amd64 executable at ./lingua-out
-  lir <file.lf>     print the LIR that `build` lowers a source file to
-  asm <file.lf>     print the amd64 instructions that `build` selects for a source file
+  lex <file.lf>       print the tokens in a source file, one per line
+  parse <file.lf>     print the untyped AST of a source file as an S-expression
+  check [PATH ...]    typecheck modules and their imports; silent when clean
+  check --explain L031
+                      print the catalog text for a diagnostic code
+  build [PATH ...]    check, then build a static linux/amd64 executable at ./lingua-out
+  lir <file.lf>       print the LIR that `build` lowers a source file to
+  asm <file.lf>       print the amd64 instructions that `build` selects for a source file
 
-`build` supports only `fn main() -> Nothing` with `log(\"...\")` statements so far.";
+PATH is a `.lf` file directly in the source root, or the source root itself (every module
+in it); it defaults to `.`. The source root is the nearest directory upward with a
+`lingua.toml`, else the directory of the path.
+
+flags for check and build:
+  --source-root PATH  use PATH as the source root instead of the upward walk
+  --refresh, --offline
+                      provider cache policy (no provider runs until comptime lands)
+
+Examples do not run yet, and comptime code (`const`, `comptime`, generative types, macros,
+package examples) is reported as not supported yet.";
 
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
-    match args
-        .iter()
-        .map(String::as_str)
-        .collect::<Vec<_>>()
-        .as_slice()
-    {
+    let args: Vec<&str> = args.iter().map(String::as_str).collect();
+    match args.as_slice() {
         ["-h" | "--help"] => {
             println!("{USAGE}");
             ExitCode::SUCCESS
         }
+        ["--version"] => {
+            println!("lingua1");
+            ExitCode::SUCCESS
+        }
         ["lex", path] => lex(path),
         ["lex"] => usage_error("lex needs a file, e.g. `lingua lex examples/lex/money.lf`"),
-        ["parse", path] => with_module(path, |module, _| {
-            print!("{}", dump(module));
-            ExitCode::SUCCESS
-        }),
+        ["parse", path] => parse(path),
         ["parse"] => usage_error("parse needs a file, e.g. `lingua parse tests/corpus/order.lf`"),
-        ["check", path] => with_module(path, |_, _| {
-            println!("parsed");
-            ExitCode::SUCCESS
-        }),
-        ["check"] => usage_error("check needs a file, e.g. `lingua check tests/corpus/order.lf`"),
-        ["build", args @ ..] => build_command(args),
-        ["lir", path] => with_module(path, |module, source| {
-            match build::lower(module, path, source) {
-                Ok(program) => {
-                    print!("{}", lir::dump(&program.functions, &program.sites));
-                    ExitCode::SUCCESS
-                }
-                Err(err) => build_error(path, err),
+        ["check", "--explain", code] => match check::explain(code) {
+            Some(text) => {
+                println!("{code}: {text}");
+                ExitCode::SUCCESS
             }
+            None => usage_error(&format!(
+                "`{code}` is not an allocated diagnostic code; codes look like `L031`"
+            )),
+        },
+        ["check", "--explain"] => {
+            usage_error("--explain needs a code, e.g. `lingua check --explain L031`")
+        }
+        ["check", rest @ ..] => {
+            with_flags("check", rest, false, |paths, options| {
+                match check::check(&paths, &options) {
+                    Ok(_) => ExitCode::SUCCESS,
+                    Err(err) => build_error(err.into()),
+                }
+            })
+        }
+        ["build", rest @ ..] => with_flags("build", rest, true, |paths, options| {
+            build_paths(&paths, &options)
+        }),
+        ["lir", path] => dump_program(path, |program| {
+            let lowered = build::lower(program)?;
+            Ok(lir::dump(&lowered.functions, &lowered.sites))
         }),
         ["lir"] => usage_error("lir needs a file, e.g. `lingua lir tests/e2e/hello.lf`"),
-        ["asm", path] => with_module(path, |module, source| {
-            match build::select(module, path, source) {
-                Ok(functions) => {
-                    print!(
-                        "{}",
-                        functions
-                            .iter()
-                            .map(|progs| amd64::dump(progs))
-                            .collect::<Vec<_>>()
-                            .join("\n")
-                    );
-                    ExitCode::SUCCESS
-                }
-                Err(err) => build_error(path, err),
-            }
+        ["asm", path] => dump_program(path, |program| {
+            Ok(build::select(program)?
+                .iter()
+                .map(|progs| amd64::dump(progs))
+                .collect::<Vec<_>>()
+                .join("\n"))
         }),
         ["asm"] => usage_error("asm needs a file, e.g. `lingua asm tests/e2e/hello.lf`"),
         [] => usage_error("no command given"),
@@ -79,12 +93,55 @@ fn usage_error(message: &str) -> ExitCode {
     ExitCode::from(2)
 }
 
+// Parses `--source-root PATH`, `--refresh`, `--offline`, and (build only) `--dynamic`
+fn with_flags(
+    command: &str,
+    args: &[&str],
+    build: bool,
+    run: impl FnOnce(Vec<PathBuf>, Options) -> ExitCode,
+) -> ExitCode {
+    let mut options = Options::default();
+    let mut paths = Vec::new();
+    let (mut refresh, mut offline) = (false, false);
+    let mut args = args.iter();
+    while let Some(arg) = args.next() {
+        match *arg {
+            "--source-root" => match args.next() {
+                Some(root) => options.source_root = Some(PathBuf::from(root)),
+                None => return usage_error("--source-root needs a directory"),
+            },
+            "--refresh" => refresh = true,
+            "--offline" => offline = true,
+            "--dynamic" if build => {
+                return usage_error(
+                    "`--dynamic` is not implemented yet; drop it to build a static linux/amd64 executable",
+                );
+            }
+            flag if flag.starts_with('-') => {
+                return usage_error(&format!("unknown flag `{flag}` for {command}"));
+            }
+            path => paths.push(PathBuf::from(path)),
+        }
+    }
+    if refresh && offline {
+        return usage_error("--refresh and --offline cannot be used together; pick one");
+    }
+    run(paths, options)
+}
+
 fn read(path: &str) -> Option<Vec<u8>> {
     std::fs::read(path)
         .map_err(|err| {
             eprintln!("error: cannot read `{path}`: {err}\ncheck the path and try again");
         })
         .ok()
+}
+
+fn report(diagnostics: &[Diagnostic]) -> ExitCode {
+    for diagnostic in diagnostics {
+        eprint!("{diagnostic}");
+    }
+    ExitCode::FAILURE
 }
 
 fn lex(path: &str) -> ExitCode {
@@ -98,48 +155,55 @@ fn lex(path: &str) -> ExitCode {
             }
             ExitCode::SUCCESS
         }
-        Err(err) => {
-            report(path, &err.into());
-            ExitCode::FAILURE
+        Err(err) => report(&[Diagnostic::from_parse(
+            &err.into(),
+            path,
+            &String::from_utf8_lossy(&bytes),
+        )]),
+    }
+}
+
+fn parse(path: &str) -> ExitCode {
+    let Some(bytes) = read(path) else {
+        return ExitCode::FAILURE;
+    };
+    let key = std::path::Path::new(path)
+        .file_stem()
+        .map_or_else(String::new, |stem| stem.to_string_lossy().into_owned());
+    let source = String::from_utf8_lossy(&bytes);
+    match parse_source(&bytes, &key) {
+        Ok(module) => {
+            print!("{}", dump(&module));
+            ExitCode::SUCCESS
         }
+        Err(diagnostics) => report(
+            &diagnostics
+                .iter()
+                .map(|d| Diagnostic::from_parse(d, path, &source))
+                .collect::<Vec<_>>(),
+        ),
     }
 }
 
 const HOST_IS_LINUX_AMD64: bool = cfg!(all(target_os = "linux", target_arch = "x86_64"));
 
-fn build_command(args: &[&str]) -> ExitCode {
-    match args {
-        [path] if !path.starts_with('-') => {
-            with_module(path, |module, source| build_module(path, module, source))
-        }
-        [] => usage_error("build needs a file, e.g. `lingua build hello.lf`"),
-        _ => match args.iter().find(|arg| arg.starts_with('-')) {
-            Some(&"--dynamic") => usage_error(
-                "`--dynamic` is not implemented yet; drop it to build a static linux/amd64 executable",
-            ),
-            Some(flag) => usage_error(&format!("unknown flag `{flag}` for build")),
-            None => usage_error("build takes one file so far, e.g. `lingua build hello.lf`"),
-        },
-    }
-}
-
-fn build_error(path: &str, err: build::Error) -> ExitCode {
+fn build_error(err: build::Error) -> ExitCode {
     match err {
-        build::Error::Diagnostics(diagnostics) => report_all(path, &diagnostics),
+        build::Error::Usage(message) => usage_error(&message),
+        build::Error::Diagnostics(diagnostics) => report(&diagnostics),
         build::Error::Internal(message) => {
             eprintln!(
-                "error: {message}
-this is a bug in lingua; please report it with `{path}`"
+                "error: {message}\nthis is a bug in lingua; please report it with the source that caused it"
             );
             ExitCode::FAILURE
         }
     }
 }
 
-fn build_module(path: &str, module: &Module, source: &str) -> ExitCode {
-    let image = match build::build(module, path, source) {
+fn build_paths(paths: &[PathBuf], options: &Options) -> ExitCode {
+    let image = match build::check(paths, options).and_then(|program| build::build_tir(&program)) {
         Ok(image) => image,
-        Err(err) => return build_error(path, err),
+        Err(err) => return build_error(err),
     };
     if let Err(err) = build::write_output(std::path::Path::new("."), &image) {
         eprintln!(
@@ -156,34 +220,16 @@ check that the current directory is writable"
     ExitCode::SUCCESS
 }
 
-// Parses `path` and runs `on_success` on a clean module and its source text, or prints every
-// diagnostic to stderr
-fn with_module(path: &str, on_success: impl FnOnce(&Module, &str) -> ExitCode) -> ExitCode {
-    let Some(bytes) = read(path) else {
-        return ExitCode::FAILURE;
-    };
-    let key = std::path::Path::new(path)
-        .file_stem()
-        .map_or_else(String::new, |stem| stem.to_string_lossy().into_owned());
-    match parse_source(&bytes, &key) {
-        Ok(module) => on_success(&module, &String::from_utf8_lossy(&bytes)),
-        Err(diagnostics) => report_all(path, &diagnostics),
-    }
-}
-
-fn report_all(path: &str, diagnostics: &[Diagnostic]) -> ExitCode {
-    for diagnostic in diagnostics {
-        report(path, diagnostic);
-    }
-    ExitCode::FAILURE
-}
-
-fn report(path: &str, diagnostic: &Diagnostic) {
-    eprintln!(
-        "{}: {}\n  --> {path}:{}:{}",
-        diagnostic.code, diagnostic.message, diagnostic.location.line, diagnostic.location.column
-    );
-    if let Some(help) = &diagnostic.help {
-        eprintln!("   = help: {help}");
+// Checks `path` as a build would and prints `dump` of the program
+fn dump_program(
+    path: &str,
+    dump: impl FnOnce(&lingua::tir::TirProgram) -> Result<String, build::Error>,
+) -> ExitCode {
+    match build::check(&[PathBuf::from(path)], &Options::default()).and_then(|p| dump(&p)) {
+        Ok(text) => {
+            print!("{text}");
+            ExitCode::SUCCESS
+        }
+        Err(err) => build_error(err),
     }
 }

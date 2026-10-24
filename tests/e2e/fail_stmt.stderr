@@ -1,0 +1,6 @@
+start
+exception: mode is broken
+  --> fail_stmt.lf:10:5
+   |
+10 |     fail "mode is broken"
+   |     ^^^^

@@ -338,7 +338,7 @@ ReportKind = Exception | Fault(code)                   (* L040, L046, L047, L076
 
 At build time, the backend calls the same Rust functions the interpreter uses to render an exception or a fault for a span (`src/report.rs`), and stores each result as a rodata block in the Text layout: `{len, bytes}`. The text is exactly what the interpreter writes to stderr for that root, including the trailing newline. The file path in the report is the one the checker prints for that module, fixed at build time.
 
-The shapes are `lingua1.md`'s, byte for byte: an exception is the header, the `-->` line, and the source line with carets under the span's first line; a fault is the header and the `-->` line only, as `lingua1.md` shows it. A match that falls off its last arm raises an `internal` site whose report names the match's position.
+The shapes are `lingua1.md`'s, byte for byte: an exception or a fault is the header, the `-->` line, and the source line with carets under the span's first line. The gutter is at least two columns wide. The path is relative to the source root. A fault with no span (`L047` from the allocator) is the header line alone. A match that falls off its last arm raises an `internal` site whose report names the match's position.
 
 A `Raise(site)` jumps to a per-function out-of-line stub that loads the report address into the first scratch register and jumps to `rt.fault`. `rt.fault` writes the block to fd 2 and exits with status 1. A `Div` or `Rem` site has two stubs, one per code.
 
@@ -856,7 +856,7 @@ The link-mode wording in `lingua1.md` already matches this design: static by def
 
 1. **`--target OS/ARCH`** on `lingua build`, defaulting to the host, with the supported list and exit 2 for an unknown value. `--static` is a usage error with the message in [Link modes and imports](#link-modes-and-imports).
 2. **`L077`: stack overflow.** "The native binary's stack is exhausted. Fault header, not an exception, exit 1. The span is the header of the function whose prologue failed. Native only." The interpreter has no call-depth limit of its own beyond the heap and fuel.
-3. **Native `L046` and `L047` shapes.** A runtime empty `split` separator in the binary is `fault L046: split on an empty separator` with the `split` call's span, exit 1. Heap exhaustion in the binary is `fault L047: out of memory` with no span, exit 1.
+3. **Native `L046` and `L047` shapes.** A runtime empty `split` separator in the binary is `fault L046: split on an empty separator` with the `split` call's span block, exit 1. `L077` carets the function header, `fn` through the return type. Heap exhaustion in the binary is `fault L047: out of memory` with no span, exit 1.
 4. **`lingua lir FILE` and `lingua asm [--target OS/ARCH] FILE`**, added to the stage-dump table and to the CLI listing. Not lossless; there is no reader.
 5. **argv encoding.** A `Process.program` or `Process.args` entry that is not valid UTF-8 has each invalid sequence replaced with U+FFFD.
 6. **Typed IR additions** (`src/tir.rs`): `TirKind::Concat` for text with holes, spans on `Assert`, `Fail`, and `TirFn`, a `tag` on variant symbols, and `TirProgram`/`TirModule` carrying each module's printed path and source text for pre-rendered reports.

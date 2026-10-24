@@ -1,0 +1,17 @@
+[7] -> 7
+[-10] -> -10
+[10] -> 10
+[11] -> out of range
+[-11] -> out of range
+[007] -> 7
+[-0] -> 0
+[] -> not an integer
+[ 5] -> not an integer
+[5 ] -> not an integer
+[+5] -> not an integer
+[1.5] -> not an integer
+[abc] -> not an integer
+[-] -> not an integer
+[--5] -> not an integer
+[9223372036854775807] -> out of range
+[99999999999999999999] -> out of range
