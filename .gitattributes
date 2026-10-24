@@ -1,0 +1,3 @@
+*.lf -text
+*.tokens -text
+*.err -text

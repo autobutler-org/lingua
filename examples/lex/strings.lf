@@ -1,0 +1,6 @@
+""
+"plain"
+"quote \" slash \\ newline \n tab \t"
+"braces {{literal}}"
+"loaded {n} orders"
+"nested {label("a", "{x}")} end"
