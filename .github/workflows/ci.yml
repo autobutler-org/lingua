@@ -33,5 +33,13 @@ jobs:
       - name: Build
         run: make build
 
+      - name: Check the compiler is a static executable
+        run: file target/release/lingua | tee /dev/stderr | grep -qE 'static(-pie)? linked'
+
       - name: Test
         run: make test
+
+      - name: Build and check the Docker image
+        run: |
+          docker build -t lingua .
+          docker run --rm -v "$PWD":/src -w /src lingua check tests/corpus/money.lf
