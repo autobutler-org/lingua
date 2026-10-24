@@ -1,0 +1,51 @@
+fn deep_recursion.depth params=1 vregs=9 stack=site.0
+b0:
+  v1 = const 0
+  v2 = eq v0, v1
+  branch v2, b1, b2
+b1:
+  v3 = const 0
+  ret v3
+b2:
+  jump b3
+b3:
+  v4 = const 1
+  v5 = const 1
+  v6 = sub.chk v0, v5 @site.1
+  v7 = call deep_recursion.depth(v6)
+  v8 = add.chk v4, v7 @site.2
+  ret v8
+
+fn deep_recursion.main params=0 vregs=19 stack=site.3
+b0:
+  v0 = addr str.0
+  v1 = const 1000
+  v2 = call deep_recursion.depth(v1)
+  v3 = call rt.int_to_text(v2)
+  v4 = const 24
+  v5 = call rt.alloc(v4)
+  v6 = const 2
+  store v5, 0, v6
+  store v5, 8, v0
+  store v5, 16, v3
+  v7 = call rt.text_concat(v5)
+  v8 = call rt.log(v7)
+  v9 = addr str.1
+  v10 = const 100000000
+  v11 = call deep_recursion.depth(v10)
+  v12 = call rt.int_to_text(v11)
+  v13 = const 24
+  v14 = call rt.alloc(v13)
+  v15 = const 2
+  store v14, 0, v15
+  store v14, 8, v9
+  store v14, 16, v12
+  v16 = call rt.text_concat(v14)
+  v17 = call rt.log(v16)
+  v18 = const 0
+  ret v18
+
+site.0 fault L077 deep_recursion.lf:1:1
+site.1 fault L040 deep_recursion.lf:11:20
+site.2 fault L040 deep_recursion.lf:11:10
+site.3 fault L077 deep_recursion.lf:14:1

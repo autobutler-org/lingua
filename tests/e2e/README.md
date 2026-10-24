@@ -7,8 +7,16 @@
 | `NAME.stderr` | exact stderr bytes (`log` output, then any exception or fault report) | empty |
 | `NAME.stdout` | exact stdout bytes. lingua1 never writes stdout, so no case has one | empty |
 | `NAME.exit` | the exit code | `0` |
+| `NAME.lir` | exact `lingua lir` output | test fails |
+| `NAME.amd64.asm` | exact `lingua asm` output | test fails |
 
 Each case builds in a fresh `target/tmp/e2e/NAME/`. The binaries are linux/amd64. On any other host, run `make e2e`, which uses Docker.
+
+The two dump goldens are checked by `lir_and_asm_dumps_match_goldens` in `tests/build_cli.rs`, not by `tests/e2e.rs`. The dumps are text, so that test runs on every host. They show changes to lowering and instruction selection as diffs in review. After an intended change, regenerate them and read the diff before committing it:
+
+```sh
+LINGUA_BLESS=1 cargo test --test build_cli
+```
 
 Every case goes through the real checker and the native backend. The expected outputs were worked out by hand from `docs/lingua1.md` and `docs/build.md`.
 

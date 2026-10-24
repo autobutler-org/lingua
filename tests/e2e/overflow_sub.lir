@@ -1,0 +1,40 @@
+fn overflow_sub.main params=0 vregs=25 stack=site.0
+b0:
+  v0 = const -9223372036854775807
+  v1 = const 1
+  v2 = sub.chk v0, v1 @site.1
+  v3 = move v2
+  v4 = const 1
+  v5 = move v4
+  v6 = addr str.0
+  v7 = add.chk v3, v5 @site.2
+  v8 = sub.chk v7, v5 @site.3
+  v9 = call rt.int_to_text(v8)
+  v10 = const 24
+  v11 = call rt.alloc(v10)
+  v12 = const 2
+  store v11, 0, v12
+  store v11, 8, v6
+  store v11, 16, v9
+  v13 = call rt.text_concat(v11)
+  v14 = call rt.log(v13)
+  v15 = sub.chk v3, v5 @site.4
+  v16 = move v15
+  v17 = addr str.1
+  v18 = call rt.int_to_text(v16)
+  v19 = const 24
+  v20 = call rt.alloc(v19)
+  v21 = const 2
+  store v20, 0, v21
+  store v20, 8, v17
+  store v20, 16, v18
+  v22 = call rt.text_concat(v20)
+  v23 = call rt.log(v22)
+  v24 = const 0
+  ret v24
+
+site.0 fault L077 overflow_sub.lf:1:1
+site.1 fault L040 overflow_sub.lf:4:21
+site.2 fault L040 overflow_sub.lf:6:16
+site.3 fault L040 overflow_sub.lf:6:16
+site.4 fault L040 overflow_sub.lf:7:15

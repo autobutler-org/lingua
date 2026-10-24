@@ -1,0 +1,97 @@
+fn text_equality.main params=0 vregs=53 stack=site.0
+b0:
+  v0 = addr str.0
+  v1 = move v0
+  v2 = addr str.1
+  v3 = move v2
+  v4 = addr str.2
+  v5 = const 24
+  v6 = call rt.alloc(v5)
+  v7 = const 2
+  store v6, 0, v7
+  store v6, 8, v3
+  store v6, 16, v4
+  v8 = call rt.text_concat(v6)
+  v9 = move v8
+  v10 = call rt.text_eq(v1, v9)
+  v11 = const 1
+  v12 = eq v10, v11
+  branch v12, b1, b2
+b1:
+  v13 = addr str.3
+  v14 = call rt.log(v13)
+  jump b3
+b2:
+  jump b3
+b3:
+  v15 = addr str.4
+  v16 = call rt.text_eq(v1, v15)
+  v17 = const 1
+  v18 = ne v16, v17
+  branch v18, b4, b5
+b4:
+  v19 = addr str.5
+  v20 = call rt.log(v19)
+  jump b6
+b5:
+  jump b6
+b6:
+  v21 = addr str.6
+  v22 = call rt.lower(v21)
+  v23 = call rt.text_eq(v22, v1)
+  v24 = const 1
+  v25 = eq v23, v24
+  branch v25, b7, b8
+b7:
+  v26 = addr str.7
+  v27 = call rt.log(v26)
+  jump b9
+b8:
+  jump b9
+b9:
+  v28 = addr str.8
+  v29 = addr str.9
+  v30 = call rt.trim(v29)
+  v31 = call rt.text_eq(v28, v30)
+  v32 = const 1
+  v33 = eq v31, v32
+  branch v33, b10, b11
+b10:
+  v34 = addr str.10
+  v35 = call rt.log(v34)
+  jump b12
+b11:
+  jump b12
+b12:
+  v36 = call rt.text_eq(v1, v3)
+  v37 = const 1
+  v38 = eq v36, v37
+  branch v38, b13, b14
+b13:
+  v39 = addr str.11
+  v40 = call rt.log(v39)
+  jump b15
+b14:
+  v41 = addr str.12
+  v42 = call rt.log(v41)
+  jump b15
+b15:
+  v43 = addr str.13
+  v44 = move v43
+  v45 = addr str.14
+  v46 = move v45
+  v47 = call rt.text_eq(v44, v46)
+  v48 = const 1
+  v49 = ne v47, v48
+  branch v49, b16, b17
+b16:
+  v50 = addr str.15
+  v51 = call rt.log(v50)
+  jump b18
+b17:
+  jump b18
+b18:
+  v52 = const 0
+  ret v52
+
+site.0 fault L077 text_equality.lf:1:1

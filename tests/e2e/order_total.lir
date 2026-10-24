@@ -1,0 +1,556 @@
+fn money.percent params=3 vregs=4 stack=site.0
+b0:
+  v3 = call rt.percent(v0, v1, v2)
+  ret v3
+
+fn order.line_subtotal params=1 vregs=4 stack=site.1
+b0:
+  v1 = load v0, 8
+  v2 = load v0, 16
+  v3 = mul.chk v1, v2 @site.2
+  ret v3
+
+fn order.order_total params=2 vregs=38 stack=site.3
+b0:
+  v2 = const 0
+  v3 = move v2
+  v4 = move v0
+  v5 = load v4, 0
+  v6 = const 0
+  v7 = move v6
+  jump b1
+b1:
+  v8 = lt v7, v5
+  branch v8, b2, b3
+b2:
+  v9 = const 3
+  v10 = shl v7, v9
+  v11 = add v4, v10
+  v12 = load v11, 8
+  v13 = call order.line_subtotal(v12)
+  v14 = add.chk v3, v13 @site.4
+  v3 = move v14
+  v15 = const 1
+  v7 = add v7, v15
+  jump b1
+b3:
+  v17 = load v1, 0
+  v18 = const 0
+  v19 = eq v17, v18
+  branch v19, b6, b5
+b4:
+  v33 = move v16
+  v34 = const 0
+  v35 = sub.chk v3, v33 @site.6
+  v37 = ge v34, v35
+  branch v37, b11, b12
+b5:
+  v21 = load v1, 0
+  v22 = const 1
+  v23 = eq v21, v22
+  branch v23, b8, b7
+b6:
+  v20 = const 0
+  v16 = move v20
+  jump b4
+b7:
+  v28 = load v1, 0
+  v29 = const 2
+  v30 = eq v28, v29
+  branch v30, b10, b9
+b8:
+  v24 = load v1, 8
+  v25 = move v24
+  v26 = addr var.money.Rounding.half_up
+  v27 = call money.percent(v25, v3, v26)
+  v16 = move v27
+  jump b4
+b9:
+  raise site.5
+b10:
+  v31 = load v1, 8
+  v32 = move v31
+  v16 = move v32
+  jump b4
+b11:
+  v36 = move v34
+  jump b13
+b12:
+  v36 = move v35
+  jump b13
+b13:
+  ret v36
+
+fn order.parse_discount params=1 vregs=96 stack=site.7
+b0:
+  v1 = call rt.trim(v0)
+  v2 = call rt.lower(v1)
+  v3 = move v2
+  v4 = addr str.0
+  v5 = call rt.text_eq(v3, v4)
+  v6 = const 1
+  v7 = eq v5, v6
+  branch v7, b1, b2
+b1:
+  v8 = addr var.order.ParseError.Empty
+  v9 = const 1
+  v10 = const 16
+  v11 = call rt.alloc(v10)
+  store v11, 0, v9
+  store v11, 8, v8
+  ret v11
+b2:
+  jump b3
+b3:
+  v12 = addr str.1
+  v13 = addr site.8
+  v14 = call rt.split(v3, v12, v13)
+  v15 = load v14, 0
+  v16 = const 1
+  v17 = eq v15, v16
+  branch v17, b6, b5
+b4:
+  v95 = const 0
+  ret v95
+b5:
+  v25 = load v14, 0
+  v26 = const 2
+  v27 = eq v25, v26
+  branch v27, b9, b8
+b6:
+  v18 = load v14, 8
+  v19 = addr str.2
+  v20 = call rt.text_eq(v18, v19)
+  branch v20, b7, b5
+b7:
+  v21 = addr var.order.Discount.NoDiscount
+  v22 = const 0
+  v23 = const 16
+  v24 = call rt.alloc(v23)
+  store v24, 0, v22
+  store v24, 8, v21
+  ret v24
+b8:
+  v57 = load v14, 0
+  v58 = const 2
+  v59 = eq v57, v58
+  branch v59, b17, b16
+b9:
+  v28 = load v14, 8
+  v29 = addr str.3
+  v30 = call rt.text_eq(v28, v29)
+  branch v30, b10, b8
+b10:
+  v31 = load v14, 16
+  v32 = move v31
+  v34 = const 1
+  v35 = const 100
+  v36 = call rt.int_in_text(v32, v34, v35)
+  v37 = load v36, 0
+  v38 = const 0
+  v39 = eq v37, v38
+  branch v39, b13, b12
+b11:
+  v50 = move v33
+  v51 = const 1
+  v52 = const 16
+  v53 = call rt.alloc(v52)
+  store v53, 0, v51
+  store v53, 8, v50
+  v54 = const 0
+  v55 = const 16
+  v56 = call rt.alloc(v55)
+  store v56, 0, v54
+  store v56, 8, v53
+  ret v56
+b12:
+  v42 = load v36, 0
+  v43 = const 1
+  v44 = eq v42, v43
+  branch v44, b15, b14
+b13:
+  v40 = load v36, 8
+  v41 = move v40
+  v33 = move v41
+  jump b11
+b14:
+  raise site.9
+b15:
+  v45 = load v36, 8
+  v46 = addr var.order.ParseError.BadQuantity
+  v47 = const 1
+  v48 = const 16
+  v49 = call rt.alloc(v48)
+  store v49, 0, v47
+  store v49, 8, v46
+  ret v49
+b16:
+  v89 = const 2
+  v90 = const 16
+  v91 = call rt.alloc(v90)
+  store v91, 0, v89
+  store v91, 8, v3
+  v92 = const 1
+  v93 = const 16
+  v94 = call rt.alloc(v93)
+  store v94, 0, v92
+  store v94, 8, v91
+  ret v94
+b17:
+  v60 = load v14, 8
+  v61 = addr str.4
+  v62 = call rt.text_eq(v60, v61)
+  branch v62, b18, b16
+b18:
+  v63 = load v14, 16
+  v64 = move v63
+  v66 = const 0
+  v67 = const 9223372036854775807
+  v68 = call rt.int_in_text(v64, v66, v67)
+  v69 = load v68, 0
+  v70 = const 0
+  v71 = eq v69, v70
+  branch v71, b21, b20
+b19:
+  v82 = move v65
+  v83 = const 2
+  v84 = const 16
+  v85 = call rt.alloc(v84)
+  store v85, 0, v83
+  store v85, 8, v82
+  v86 = const 0
+  v87 = const 16
+  v88 = call rt.alloc(v87)
+  store v88, 0, v86
+  store v88, 8, v85
+  ret v88
+b20:
+  v74 = load v68, 0
+  v75 = const 1
+  v76 = eq v74, v75
+  branch v76, b23, b22
+b21:
+  v72 = load v68, 8
+  v73 = move v72
+  v65 = move v73
+  jump b19
+b22:
+  raise site.10
+b23:
+  v77 = load v68, 8
+  v78 = addr var.order.ParseError.BadQuantity
+  v79 = const 1
+  v80 = const 16
+  v81 = call rt.alloc(v80)
+  store v81, 0, v79
+  store v81, 8, v78
+  ret v81
+b24:
+  raise site.11
+
+fn main.apply_code params=2 vregs=27 stack=site.12
+b0:
+  v3 = call order.parse_discount(v1)
+  v4 = load v3, 0
+  v5 = const 0
+  v6 = eq v4, v5
+  branch v6, b3, b2
+b1:
+  ret v2
+b2:
+  v17 = load v3, 0
+  v18 = const 1
+  v19 = eq v17, v18
+  branch v19, b5, b4
+b3:
+  v7 = load v3, 8
+  v8 = move v7
+  v9 = addr str.5
+  v10 = addr str.6
+  v11 = call order.order_total(v0, v8)
+  v12 = call rt.int_to_text(v11)
+  v13 = const 40
+  v14 = call rt.alloc(v13)
+  v15 = const 4
+  store v14, 0, v15
+  store v14, 8, v9
+  store v14, 16, v1
+  store v14, 24, v10
+  store v14, 32, v12
+  v16 = call rt.text_concat(v14)
+  v2 = move v16
+  jump b1
+b4:
+  raise site.13
+b5:
+  v20 = load v3, 8
+  v21 = addr str.5
+  v22 = addr str.7
+  v23 = const 32
+  v24 = call rt.alloc(v23)
+  v25 = const 3
+  store v24, 0, v25
+  store v24, 8, v21
+  store v24, 16, v1
+  store v24, 24, v22
+  v26 = call rt.text_concat(v24)
+  v2 = move v26
+  jump b1
+
+fn main.main params=0 vregs=169 stack=site.14
+b0:
+  v0 = addr str.8
+  v1 = const 200
+  v2 = const 1
+  v3 = const 24
+  v4 = call rt.alloc(v3)
+  store v4, 0, v0
+  store v4, 8, v1
+  store v4, 16, v2
+  v5 = addr str.9
+  v6 = const 500
+  v7 = const 2
+  v8 = const 24
+  v9 = call rt.alloc(v8)
+  store v9, 0, v5
+  store v9, 8, v6
+  store v9, 16, v7
+  v10 = const 24
+  v11 = call rt.alloc(v10)
+  v12 = const 2
+  store v11, 0, v12
+  store v11, 8, v4
+  store v11, 16, v9
+  v13 = move v11
+  v14 = addr str.10
+  v15 = addr var.order.Discount.NoDiscount
+  v16 = call order.order_total(v13, v15)
+  v17 = call rt.int_to_text(v16)
+  v18 = const 24
+  v19 = call rt.alloc(v18)
+  v20 = const 2
+  store v19, 0, v20
+  store v19, 8, v14
+  store v19, 16, v17
+  v21 = call rt.text_concat(v19)
+  v22 = call rt.log(v21)
+  v23 = addr str.11
+  v24 = const 10
+  v25 = const 1
+  v26 = const 16
+  v27 = call rt.alloc(v26)
+  store v27, 0, v25
+  store v27, 8, v24
+  v28 = call order.order_total(v13, v27)
+  v29 = call rt.int_to_text(v28)
+  v30 = const 24
+  v31 = call rt.alloc(v30)
+  v32 = const 2
+  store v31, 0, v32
+  store v31, 8, v23
+  store v31, 16, v29
+  v33 = call rt.text_concat(v31)
+  v34 = call rt.log(v33)
+  v35 = addr str.12
+  v36 = const 150
+  v37 = const 2
+  v38 = const 16
+  v39 = call rt.alloc(v38)
+  store v39, 0, v37
+  store v39, 8, v36
+  v40 = call order.order_total(v13, v39)
+  v41 = call rt.int_to_text(v40)
+  v42 = const 24
+  v43 = call rt.alloc(v42)
+  v44 = const 2
+  store v43, 0, v44
+  store v43, 8, v35
+  store v43, 16, v41
+  v45 = call rt.text_concat(v43)
+  v46 = call rt.log(v45)
+  v47 = addr str.13
+  v48 = addr str.8
+  v49 = const 200
+  v50 = const 1
+  v51 = const 24
+  v52 = call rt.alloc(v51)
+  store v52, 0, v48
+  store v52, 8, v49
+  store v52, 16, v50
+  v53 = const 16
+  v54 = call rt.alloc(v53)
+  v55 = const 1
+  store v54, 0, v55
+  store v54, 8, v52
+  v56 = const 500
+  v57 = const 2
+  v58 = const 16
+  v59 = call rt.alloc(v58)
+  store v59, 0, v57
+  store v59, 8, v56
+  v60 = call order.order_total(v54, v59)
+  v61 = call rt.int_to_text(v60)
+  v62 = const 24
+  v63 = call rt.alloc(v62)
+  v64 = const 2
+  store v63, 0, v64
+  store v63, 8, v47
+  store v63, 16, v61
+  v65 = call rt.text_concat(v63)
+  v66 = call rt.log(v65)
+  v67 = addr str.14
+  v68 = const 8
+  v69 = call rt.alloc(v68)
+  v70 = const 0
+  store v69, 0, v70
+  v71 = addr var.order.Discount.NoDiscount
+  v72 = call order.order_total(v69, v71)
+  v73 = call rt.int_to_text(v72)
+  v74 = const 24
+  v75 = call rt.alloc(v74)
+  v76 = const 2
+  store v75, 0, v76
+  store v75, 8, v67
+  store v75, 16, v73
+  v77 = call rt.text_concat(v75)
+  v78 = call rt.log(v77)
+  v79 = addr str.15
+  v80 = const 10
+  v81 = const 1200
+  v82 = addr var.money.Rounding.half_up
+  v83 = call money.percent(v80, v81, v82)
+  v84 = call rt.int_to_text(v83)
+  v85 = const 24
+  v86 = call rt.alloc(v85)
+  v87 = const 2
+  store v86, 0, v87
+  store v86, 8, v79
+  store v86, 16, v84
+  v88 = call rt.text_concat(v86)
+  v89 = call rt.log(v88)
+  v90 = addr str.16
+  v91 = const 1
+  v92 = const 150
+  v93 = addr var.money.Rounding.half_up
+  v94 = call money.percent(v91, v92, v93)
+  v95 = call rt.int_to_text(v94)
+  v96 = const 24
+  v97 = call rt.alloc(v96)
+  v98 = const 2
+  store v97, 0, v98
+  store v97, 8, v90
+  store v97, 16, v95
+  v99 = call rt.text_concat(v97)
+  v100 = call rt.log(v99)
+  v101 = addr str.17
+  v102 = const 49
+  v103 = const 1
+  v104 = addr var.money.Rounding.half_up
+  v105 = call money.percent(v102, v103, v104)
+  v106 = call rt.int_to_text(v105)
+  v107 = const 24
+  v108 = call rt.alloc(v107)
+  v109 = const 2
+  store v108, 0, v109
+  store v108, 8, v101
+  store v108, 16, v106
+  v110 = call rt.text_concat(v108)
+  v111 = call rt.log(v110)
+  v112 = addr str.18
+  v113 = const 50
+  v114 = const 1
+  v115 = addr var.money.Rounding.half_up
+  v116 = call money.percent(v113, v114, v115)
+  v117 = call rt.int_to_text(v116)
+  v118 = const 24
+  v119 = call rt.alloc(v118)
+  v120 = const 2
+  store v119, 0, v120
+  store v119, 8, v112
+  store v119, 16, v117
+  v121 = call rt.text_concat(v119)
+  v122 = call rt.log(v121)
+  v123 = addr str.19
+  v124 = const 33
+  v125 = const 1000
+  v126 = addr var.money.Rounding.half_up
+  v127 = call money.percent(v124, v125, v126)
+  v128 = call rt.int_to_text(v127)
+  v129 = const 24
+  v130 = call rt.alloc(v129)
+  v131 = const 2
+  store v130, 0, v131
+  store v130, 8, v123
+  store v130, 16, v128
+  v132 = call rt.text_concat(v130)
+  v133 = call rt.log(v132)
+  v134 = addr str.20
+  v135 = const 100
+  v136 = const 9223372036854775807
+  v137 = addr var.money.Rounding.half_up
+  v138 = call money.percent(v135, v136, v137)
+  v139 = call rt.int_to_text(v138)
+  v140 = const 24
+  v141 = call rt.alloc(v140)
+  v142 = const 2
+  store v141, 0, v142
+  store v141, 8, v134
+  store v141, 16, v139
+  v143 = call rt.text_concat(v141)
+  v144 = call rt.log(v143)
+  v145 = addr str.2
+  v146 = addr str.21
+  v147 = addr str.22
+  v148 = addr str.23
+  v149 = addr str.24
+  v150 = addr str.25
+  v151 = addr str.0
+  v152 = const 64
+  v153 = call rt.alloc(v152)
+  v154 = const 7
+  store v153, 0, v154
+  store v153, 8, v145
+  store v153, 16, v146
+  store v153, 24, v147
+  store v153, 32, v148
+  store v153, 40, v149
+  store v153, 48, v150
+  store v153, 56, v151
+  v155 = move v153
+  v156 = move v155
+  v157 = load v156, 0
+  v158 = const 0
+  v159 = move v158
+  jump b1
+b1:
+  v160 = lt v159, v157
+  branch v160, b2, b3
+b2:
+  v161 = const 3
+  v162 = shl v159, v161
+  v163 = add v156, v162
+  v164 = load v163, 8
+  v165 = call main.apply_code(v13, v164)
+  v166 = call rt.log(v165)
+  v167 = const 1
+  v159 = add v159, v167
+  jump b1
+b3:
+  v168 = const 0
+  ret v168
+
+site.0 fault L077 money.lf:7:1
+site.1 fault L077 order.lf:15:1
+site.2 fault L040 order.lf:22:10
+site.3 fault L077 order.lf:25:1
+site.4 fault L040 order.lf:45:16
+site.5 internal order.lf:47:13
+site.6 fault L040 order.lf:52:23
+site.7 fault L077 order.lf:61:1
+site.8 fault L046 order.lf:80:9
+site.9 internal order.lf:83:15
+site.10 internal order.lf:86:22
+site.11 internal order.lf:80:9
+site.12 fault L077 main.lf:4:1
+site.13 internal main.lf:12:10
+site.14 fault L077 main.lf:18:1

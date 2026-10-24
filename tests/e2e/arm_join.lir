@@ -1,0 +1,183 @@
+fn arm_join.coupon_value params=1 vregs=17 stack=site.0
+b0:
+  v2 = load v0, 0
+  v3 = const 0
+  v4 = eq v2, v3
+  branch v4, b3, b2
+b1:
+  v16 = move v1
+  ret v16
+b2:
+  v6 = load v0, 0
+  v7 = const 1
+  v8 = eq v6, v7
+  branch v8, b5, b4
+b3:
+  v5 = const 0
+  v1 = move v5
+  jump b1
+b4:
+  v11 = load v0, 0
+  v12 = const 2
+  v13 = eq v11, v12
+  branch v13, b7, b6
+b5:
+  v9 = load v0, 8
+  v10 = move v9
+  v1 = move v10
+  jump b1
+b6:
+  raise site.1
+b7:
+  v14 = load v0, 8
+  v15 = const 5
+  v1 = move v15
+  jump b1
+
+fn arm_join.main params=0 vregs=85 stack=site.2
+b0:
+  v0 = addr str.0
+  v1 = addr var.arm_join.Coupon.NoCoupon
+  v2 = call arm_join.coupon_value(v1)
+  v3 = call rt.int_to_text(v2)
+  v4 = const 24
+  v5 = call rt.alloc(v4)
+  v6 = const 2
+  store v5, 0, v6
+  store v5, 8, v0
+  store v5, 16, v3
+  v7 = call rt.text_concat(v5)
+  v8 = call rt.log(v7)
+  v9 = addr str.1
+  v10 = const 250
+  v11 = const 1
+  v12 = const 16
+  v13 = call rt.alloc(v12)
+  store v13, 0, v11
+  store v13, 8, v10
+  v14 = call arm_join.coupon_value(v13)
+  v15 = call rt.int_to_text(v14)
+  v16 = const 24
+  v17 = call rt.alloc(v16)
+  v18 = const 2
+  store v17, 0, v18
+  store v17, 8, v9
+  store v17, 16, v15
+  v19 = call rt.text_concat(v17)
+  v20 = call rt.log(v19)
+  v21 = addr str.2
+  v22 = const -9
+  v23 = const 2
+  v24 = const 16
+  v25 = call rt.alloc(v24)
+  store v25, 0, v23
+  store v25, 8, v22
+  v26 = call arm_join.coupon_value(v25)
+  v27 = call rt.int_to_text(v26)
+  v28 = const 24
+  v29 = call rt.alloc(v28)
+  v30 = const 2
+  store v29, 0, v30
+  store v29, 8, v21
+  store v29, 16, v27
+  v31 = call rt.text_concat(v29)
+  v32 = call rt.log(v31)
+  v33 = const 3
+  v34 = const 2
+  v35 = const 16
+  v36 = call rt.alloc(v35)
+  store v36, 0, v34
+  store v36, 8, v33
+  v37 = move v36
+  v39 = load v37, 0
+  v40 = const 0
+  v41 = eq v39, v40
+  branch v41, b3, b2
+b1:
+  v53 = move v38
+  v54 = addr str.3
+  v55 = call rt.int_to_text(v53)
+  v56 = const 24
+  v57 = call rt.alloc(v56)
+  v58 = const 2
+  store v57, 0, v58
+  store v57, 8, v54
+  store v57, 16, v55
+  v59 = call rt.text_concat(v57)
+  v60 = call rt.log(v59)
+  v62 = load v37, 0
+  v63 = const 0
+  v64 = eq v62, v63
+  branch v64, b10, b9
+b2:
+  v43 = load v37, 0
+  v44 = const 1
+  v45 = eq v43, v44
+  branch v45, b5, b4
+b3:
+  v42 = const 0
+  v38 = move v42
+  jump b1
+b4:
+  v48 = load v37, 0
+  v49 = const 2
+  v50 = eq v48, v49
+  branch v50, b7, b6
+b5:
+  v46 = load v37, 8
+  v47 = const 1
+  v38 = move v47
+  jump b1
+b6:
+  raise site.3
+b7:
+  v51 = load v37, 8
+  v52 = const -1
+  v38 = move v52
+  jump b1
+b8:
+  v82 = move v61
+  v83 = call rt.log(v82)
+  v84 = const 0
+  ret v84
+b9:
+  v66 = load v37, 0
+  v67 = const 1
+  v68 = eq v66, v67
+  branch v68, b12, b11
+b10:
+  v65 = addr str.4
+  v61 = move v65
+  jump b8
+b11:
+  v71 = load v37, 0
+  v72 = const 2
+  v73 = eq v71, v72
+  branch v73, b14, b13
+b12:
+  v69 = load v37, 8
+  v70 = addr str.5
+  v61 = move v70
+  jump b8
+b13:
+  raise site.4
+b14:
+  v74 = load v37, 8
+  v75 = move v74
+  v76 = addr str.2
+  v77 = call rt.int_to_text(v75)
+  v78 = const 24
+  v79 = call rt.alloc(v78)
+  v80 = const 2
+  store v79, 0, v80
+  store v79, 8, v76
+  store v79, 16, v77
+  v81 = call rt.text_concat(v79)
+  v61 = move v81
+  jump b8
+
+site.0 fault L077 arm_join.lf:9:1
+site.1 internal arm_join.lf:20:13
+site.2 fault L077 arm_join.lf:28:1
+site.3 internal arm_join.lf:35:14
+site.4 internal arm_join.lf:41:15

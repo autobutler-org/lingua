@@ -1,0 +1,35 @@
+fn rem_zero.main params=0 vregs=22 stack=site.0
+b0:
+  v0 = const 10
+  v1 = move v0
+  v2 = const 0
+  v3 = move v2
+  v4 = addr str.0
+  v5 = rem.chk v3, v1 @site.1
+  v6 = call rt.int_to_text(v5)
+  v7 = const 24
+  v8 = call rt.alloc(v7)
+  v9 = const 2
+  store v8, 0, v9
+  store v8, 8, v4
+  store v8, 16, v6
+  v10 = call rt.text_concat(v8)
+  v11 = call rt.log(v10)
+  v12 = rem.chk v1, v3 @site.2
+  v13 = move v12
+  v14 = addr str.1
+  v15 = call rt.int_to_text(v13)
+  v16 = const 24
+  v17 = call rt.alloc(v16)
+  v18 = const 2
+  store v17, 0, v18
+  store v17, 8, v14
+  store v17, 16, v15
+  v19 = call rt.text_concat(v17)
+  v20 = call rt.log(v19)
+  v21 = const 0
+  ret v21
+
+site.0 fault L077 rem_zero.lf:1:1
+site.1 fault L076 fault L040 rem_zero.lf:6:16
+site.2 fault L076 fault L040 rem_zero.lf:7:19

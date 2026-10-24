@@ -1,0 +1,313 @@
+fn int_at_least.bounds_name params=1 vregs=10 stack=site.0
+b0:
+  v2 = load v0, 0
+  v3 = const 0
+  v4 = eq v2, v3
+  branch v4, b3, b2
+b1:
+  ret v1
+b2:
+  v6 = load v0, 0
+  v7 = const 1
+  v8 = eq v6, v7
+  branch v8, b5, b4
+b3:
+  v5 = addr str.0
+  v1 = move v5
+  jump b1
+b4:
+  raise site.1
+b5:
+  v9 = addr str.1
+  v1 = move v9
+  jump b1
+
+fn int_at_least.at_least_zero params=1 vregs=29 stack=site.2
+b0:
+  v2 = const 0
+  v3 = const 9223372036854775807
+  v4 = call rt.int_in_int(v0, v2, v3)
+  v5 = load v4, 0
+  v6 = const 0
+  v7 = eq v5, v6
+  branch v7, b3, b2
+b1:
+  ret v1
+b2:
+  v17 = load v4, 0
+  v18 = const 1
+  v19 = eq v17, v18
+  branch v19, b5, b4
+b3:
+  v8 = load v4, 8
+  v9 = move v8
+  v10 = call rt.int_to_text(v0)
+  v11 = addr str.2
+  v12 = call rt.int_to_text(v9)
+  v13 = const 32
+  v14 = call rt.alloc(v13)
+  v15 = const 3
+  store v14, 0, v15
+  store v14, 8, v10
+  store v14, 16, v11
+  store v14, 24, v12
+  v16 = call rt.text_concat(v14)
+  v1 = move v16
+  jump b1
+b4:
+  raise site.3
+b5:
+  v20 = load v4, 8
+  v21 = move v20
+  v22 = call rt.int_to_text(v0)
+  v23 = addr str.3
+  v24 = call int_at_least.bounds_name(v21)
+  v25 = const 32
+  v26 = call rt.alloc(v25)
+  v27 = const 3
+  store v26, 0, v27
+  store v26, 8, v22
+  store v26, 16, v23
+  store v26, 24, v24
+  v28 = call rt.text_concat(v26)
+  v1 = move v28
+  jump b1
+
+fn int_at_least.to_cents params=1 vregs=22 stack=site.4
+b0:
+  v2 = const 0
+  v3 = const 9223372036854775807
+  v4 = call rt.int_in_int(v0, v2, v3)
+  v5 = load v4, 0
+  v6 = const 0
+  v7 = eq v5, v6
+  branch v7, b3, b2
+b1:
+  v18 = move v1
+  v19 = const 0
+  v20 = const 16
+  v21 = call rt.alloc(v20)
+  store v21, 0, v19
+  store v21, 8, v18
+  ret v21
+b2:
+  v10 = load v4, 0
+  v11 = const 1
+  v12 = eq v10, v11
+  branch v12, b5, b4
+b3:
+  v8 = load v4, 8
+  v9 = move v8
+  v1 = move v9
+  jump b1
+b4:
+  raise site.5
+b5:
+  v13 = load v4, 8
+  v14 = move v13
+  v15 = const 1
+  v16 = const 16
+  v17 = call rt.alloc(v16)
+  store v17, 0, v15
+  store v17, 8, v14
+  ret v17
+
+fn int_at_least.main params=0 vregs=114 stack=site.6
+b0:
+  v0 = const 9223372036854775807
+  v1 = move v0
+  v2 = const -9223372036854775807
+  v3 = const 1
+  v4 = sub.chk v2, v3 @site.7
+  v5 = move v4
+  v6 = const 5
+  v7 = const 0
+  v8 = const -1
+  v9 = const 48
+  v10 = call rt.alloc(v9)
+  v11 = const 5
+  store v10, 0, v11
+  store v10, 8, v6
+  store v10, 16, v7
+  store v10, 24, v8
+  store v10, 32, v1
+  store v10, 40, v5
+  v12 = move v10
+  v13 = move v12
+  v14 = load v13, 0
+  v15 = const 0
+  v16 = move v15
+  jump b1
+b1:
+  v17 = lt v16, v14
+  branch v17, b2, b3
+b2:
+  v18 = const 3
+  v19 = shl v16, v18
+  v20 = add v13, v19
+  v21 = load v20, 8
+  v22 = call int_at_least.at_least_zero(v21)
+  v23 = call rt.log(v22)
+  v24 = const 1
+  v16 = add v16, v24
+  jump b1
+b3:
+  v25 = const 100
+  v26 = move v25
+  v27 = const 99
+  v28 = move v27
+  v30 = const 100
+  v31 = const 9223372036854775807
+  v32 = call rt.int_in_int(v26, v30, v31)
+  v33 = load v32, 0
+  v34 = const 0
+  v35 = eq v33, v34
+  branch v35, b6, b5
+b4:
+  v42 = move v29
+  v43 = addr str.4
+  v44 = call rt.int_to_text(v42)
+  v45 = const 24
+  v46 = call rt.alloc(v45)
+  v47 = const 2
+  store v46, 0, v47
+  store v46, 8, v43
+  store v46, 16, v44
+  v48 = call rt.text_concat(v46)
+  v49 = call rt.log(v48)
+  v51 = const 100
+  v52 = const 9223372036854775807
+  v53 = call rt.int_in_int(v28, v51, v52)
+  v54 = load v53, 0
+  v55 = const 0
+  v56 = eq v54, v55
+  branch v56, b11, b10
+b5:
+  v38 = load v32, 0
+  v39 = const 1
+  v40 = eq v38, v39
+  branch v40, b8, b7
+b6:
+  v36 = load v32, 8
+  v37 = move v36
+  v29 = move v37
+  jump b4
+b7:
+  raise site.9
+b8:
+  v41 = load v32, 8
+  raise site.8
+b9:
+  v65 = move v50
+  v66 = addr str.6
+  v67 = const 24
+  v68 = call rt.alloc(v67)
+  v69 = const 2
+  store v68, 0, v69
+  store v68, 8, v66
+  store v68, 16, v65
+  v70 = call rt.text_concat(v68)
+  v71 = call rt.log(v70)
+  v73 = const 250
+  v74 = call int_at_least.to_cents(v73)
+  v75 = load v74, 0
+  v76 = const 0
+  v77 = eq v75, v76
+  branch v77, b16, b15
+b10:
+  v59 = load v53, 0
+  v60 = const 1
+  v61 = eq v59, v60
+  branch v61, b13, b12
+b11:
+  v57 = load v53, 8
+  v58 = addr str.5
+  v50 = move v58
+  jump b9
+b12:
+  raise site.10
+b13:
+  v62 = load v53, 8
+  v63 = move v62
+  v64 = call int_at_least.bounds_name(v63)
+  v50 = move v64
+  jump b9
+b14:
+  v84 = move v72
+  v85 = addr str.7
+  v86 = call rt.int_to_text(v84)
+  v87 = const 24
+  v88 = call rt.alloc(v87)
+  v89 = const 2
+  store v88, 0, v89
+  store v88, 8, v85
+  store v88, 16, v86
+  v90 = call rt.text_concat(v88)
+  v91 = call rt.log(v90)
+  v93 = const -250
+  v94 = call int_at_least.to_cents(v93)
+  v95 = load v94, 0
+  v96 = const 0
+  v97 = eq v95, v96
+  branch v97, b21, b20
+b15:
+  v80 = load v74, 0
+  v81 = const 1
+  v82 = eq v80, v81
+  branch v82, b18, b17
+b16:
+  v78 = load v74, 8
+  v79 = move v78
+  v72 = move v79
+  jump b14
+b17:
+  raise site.12
+b18:
+  v83 = load v74, 8
+  raise site.11
+b19:
+  v106 = move v92
+  v107 = addr str.8
+  v108 = const 24
+  v109 = call rt.alloc(v108)
+  v110 = const 2
+  store v109, 0, v110
+  store v109, 8, v107
+  store v109, 16, v106
+  v111 = call rt.text_concat(v109)
+  v112 = call rt.log(v111)
+  v113 = const 0
+  ret v113
+b20:
+  v100 = load v94, 0
+  v101 = const 1
+  v102 = eq v100, v101
+  branch v102, b23, b22
+b21:
+  v98 = load v94, 8
+  v99 = addr str.5
+  v92 = move v99
+  jump b19
+b22:
+  raise site.13
+b23:
+  v103 = load v94, 8
+  v104 = move v103
+  v105 = call int_at_least.bounds_name(v104)
+  v92 = move v105
+  jump b19
+
+site.0 fault L077 int_at_least.lf:1:1
+site.1 internal int_at_least.lf:8:10
+site.2 fault L077 int_at_least.lf:16:1
+site.3 internal int_at_least.lf:27:10
+site.4 fault L077 int_at_least.lf:33:1
+site.5 internal int_at_least.lf:40:23
+site.6 fault L077 int_at_least.lf:44:1
+site.7 fault L040 int_at_least.lf:48:21
+site.8 exception int_at_least.lf:55:41
+site.9 internal int_at_least.lf:55:14
+site.10 internal int_at_least.lf:57:13
+site.11 exception int_at_least.lf:62:29
+site.12 internal int_at_least.lf:62:15
+site.13 internal int_at_least.lf:64:17

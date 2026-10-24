@@ -1,0 +1,102 @@
+fn while_collatz.main params=0 vregs=51 stack=site.0
+b0:
+  v0 = const 27
+  v1 = const 0
+  v2 = const 16
+  v3 = call rt.alloc(v2)
+  store v3, 0, v1
+  store v3, 8, v0
+  v4 = move v3
+  v5 = const 0
+  v6 = move v5
+  v7 = const 27
+  v8 = move v7
+  jump b1
+b1:
+  v9 = load v4, 0
+  v10 = const 0
+  v11 = eq v9, v10
+  branch v11, b2, b3
+b2:
+  v12 = load v4, 8
+  v13 = move v12
+  v14 = gt v13, v8
+  branch v14, b4, b5
+b3:
+  v36 = addr str.0
+  v37 = call rt.int_to_text(v6)
+  v38 = const 24
+  v39 = call rt.alloc(v38)
+  v40 = const 2
+  store v39, 0, v40
+  store v39, 8, v36
+  store v39, 16, v37
+  v41 = call rt.text_concat(v39)
+  v42 = call rt.log(v41)
+  v43 = addr str.1
+  v44 = call rt.int_to_text(v8)
+  v45 = const 24
+  v46 = call rt.alloc(v45)
+  v47 = const 2
+  store v46, 0, v47
+  store v46, 8, v43
+  store v46, 16, v44
+  v48 = call rt.text_concat(v46)
+  v49 = call rt.log(v48)
+  v50 = const 0
+  ret v50
+b4:
+  v8 = move v13
+  jump b6
+b5:
+  jump b6
+b6:
+  v15 = const 1
+  v16 = eq v13, v15
+  branch v16, b7, b8
+b7:
+  v17 = addr var.while_collatz.Collatz.Finished
+  v4 = move v17
+  jump b9
+b8:
+  v18 = const 1
+  v19 = add.chk v6, v18 @site.1
+  v6 = move v19
+  v20 = const 2
+  v21 = rem.chk v13, v20 @site.2
+  v22 = const 0
+  v23 = eq v21, v22
+  branch v23, b10, b11
+b9:
+  jump b1
+b10:
+  v24 = const 2
+  v25 = div.chk v13, v24 @site.3
+  v26 = const 0
+  v27 = const 16
+  v28 = call rt.alloc(v27)
+  store v28, 0, v26
+  store v28, 8, v25
+  v4 = move v28
+  jump b12
+b11:
+  v29 = const 3
+  v30 = mul.chk v29, v13 @site.4
+  v31 = const 1
+  v32 = add.chk v30, v31 @site.5
+  v33 = const 0
+  v34 = const 16
+  v35 = call rt.alloc(v34)
+  store v35, 0, v33
+  store v35, 8, v32
+  v4 = move v35
+  jump b12
+b12:
+  jump b9
+
+site.0 fault L077 while_collatz.lf:6:1
+site.1 fault L040 while_collatz.lf:19:20
+site.2 fault L076 fault L040 while_collatz.lf:20:10
+site.3 fault L076 fault L040 while_collatz.lf:21:29
+site.4 fault L040 while_collatz.lf:23:29
+site.5 fault L040 while_collatz.lf:23:29

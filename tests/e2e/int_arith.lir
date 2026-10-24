@@ -1,0 +1,143 @@
+fn int_arith.main params=0 vregs=97 stack=site.0
+b0:
+  v0 = const 7
+  v1 = move v0
+  v2 = const 3
+  v3 = move v2
+  v4 = add.chk v1, v3 @site.1
+  v5 = call rt.int_to_text(v4)
+  v6 = const 16
+  v7 = call rt.alloc(v6)
+  v8 = const 1
+  store v7, 0, v8
+  store v7, 8, v5
+  v9 = call rt.text_concat(v7)
+  v10 = call rt.log(v9)
+  v11 = sub.chk v1, v3 @site.2
+  v12 = call rt.int_to_text(v11)
+  v13 = const 16
+  v14 = call rt.alloc(v13)
+  v15 = const 1
+  store v14, 0, v15
+  store v14, 8, v12
+  v16 = call rt.text_concat(v14)
+  v17 = call rt.log(v16)
+  v18 = sub.chk v3, v1 @site.3
+  v19 = call rt.int_to_text(v18)
+  v20 = const 16
+  v21 = call rt.alloc(v20)
+  v22 = const 1
+  store v21, 0, v22
+  store v21, 8, v19
+  v23 = call rt.text_concat(v21)
+  v24 = call rt.log(v23)
+  v25 = mul.chk v1, v3 @site.4
+  v26 = call rt.int_to_text(v25)
+  v27 = const 16
+  v28 = call rt.alloc(v27)
+  v29 = const 1
+  store v28, 0, v29
+  store v28, 8, v26
+  v30 = call rt.text_concat(v28)
+  v31 = call rt.log(v30)
+  v32 = const 2
+  v33 = mul.chk v3, v32 @site.5
+  v34 = add.chk v1, v33 @site.6
+  v35 = call rt.int_to_text(v34)
+  v36 = const 16
+  v37 = call rt.alloc(v36)
+  v38 = const 1
+  store v37, 0, v38
+  store v37, 8, v35
+  v39 = call rt.text_concat(v37)
+  v40 = call rt.log(v39)
+  v41 = add.chk v1, v3 @site.7
+  v42 = const 2
+  v43 = mul.chk v41, v42 @site.8
+  v44 = call rt.int_to_text(v43)
+  v45 = const 16
+  v46 = call rt.alloc(v45)
+  v47 = const 1
+  store v46, 0, v47
+  store v46, 8, v44
+  v48 = call rt.text_concat(v46)
+  v49 = call rt.log(v48)
+  v50 = sub.chk v1, v3 @site.9
+  v51 = const 1
+  v52 = sub.chk v50, v51 @site.10
+  v53 = call rt.int_to_text(v52)
+  v54 = const 16
+  v55 = call rt.alloc(v54)
+  v56 = const 1
+  store v55, 0, v56
+  store v55, 8, v53
+  v57 = call rt.text_concat(v55)
+  v58 = call rt.log(v57)
+  v59 = const 2
+  v60 = const 3
+  v61 = mul.chk v59, v60 @site.11
+  v62 = const 4
+  v63 = const 5
+  v64 = mul.chk v62, v63 @site.12
+  v65 = add.chk v61, v64 @site.13
+  v66 = call rt.int_to_text(v65)
+  v67 = const 16
+  v68 = call rt.alloc(v67)
+  v69 = const 1
+  store v68, 0, v69
+  store v68, 8, v66
+  v70 = call rt.text_concat(v68)
+  v71 = call rt.log(v70)
+  v72 = neg.chk v1 @site.14
+  v73 = add.chk v72, v3 @site.15
+  v74 = call rt.int_to_text(v73)
+  v75 = const 16
+  v76 = call rt.alloc(v75)
+  v77 = const 1
+  store v76, 0, v77
+  store v76, 8, v74
+  v78 = call rt.text_concat(v76)
+  v79 = call rt.log(v78)
+  v80 = add.chk v1, v3 @site.16
+  v81 = neg.chk v80 @site.17
+  v82 = call rt.int_to_text(v81)
+  v83 = const 16
+  v84 = call rt.alloc(v83)
+  v85 = const 1
+  store v84, 0, v85
+  store v84, 8, v82
+  v86 = call rt.text_concat(v84)
+  v87 = call rt.log(v86)
+  v88 = neg.chk v3 @site.18
+  v89 = mul.chk v1, v88 @site.19
+  v90 = call rt.int_to_text(v89)
+  v91 = const 16
+  v92 = call rt.alloc(v91)
+  v93 = const 1
+  store v92, 0, v93
+  store v92, 8, v90
+  v94 = call rt.text_concat(v92)
+  v95 = call rt.log(v94)
+  v96 = const 0
+  ret v96
+
+site.0 fault L077 int_arith.lf:1:1
+site.1 fault L040 int_arith.lf:6:9
+site.2 fault L040 int_arith.lf:7:9
+site.3 fault L040 int_arith.lf:8:9
+site.4 fault L040 int_arith.lf:9:9
+site.5 fault L040 int_arith.lf:10:13
+site.6 fault L040 int_arith.lf:10:9
+site.7 fault L040 int_arith.lf:11:10
+site.8 fault L040 int_arith.lf:11:9
+site.9 fault L040 int_arith.lf:12:9
+site.10 fault L040 int_arith.lf:12:9
+site.11 fault L040 int_arith.lf:13:9
+site.12 fault L040 int_arith.lf:13:17
+site.13 fault L040 int_arith.lf:13:9
+site.14 fault L040 int_arith.lf:14:9
+site.15 fault L040 int_arith.lf:14:9
+site.16 fault L040 int_arith.lf:15:11
+site.17 fault L040 int_arith.lf:15:9
+site.18 fault L040 int_arith.lf:16:13
+site.19 fault L040 int_arith.lf:16:9

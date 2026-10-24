@@ -1,0 +1,26 @@
+fn assert_fail.main params=0 vregs=11 stack=site.0
+b0:
+  v0 = const 3
+  v1 = move v0
+  v2 = const 0
+  v3 = gt v1, v2
+  branch v3, b1, b2
+b1:
+  v4 = addr str.0
+  v5 = call rt.log(v4)
+  v6 = const 5
+  v7 = gt v1, v6
+  branch v7, b3, b4
+b2:
+  raise site.1
+b3:
+  v8 = addr str.1
+  v9 = call rt.log(v8)
+  v10 = const 0
+  ret v10
+b4:
+  raise site.2
+
+site.0 fault L077 assert_fail.lf:1:1
+site.1 exception assert_fail.lf:5:3
+site.2 exception assert_fail.lf:7:3

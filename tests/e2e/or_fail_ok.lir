@@ -1,0 +1,88 @@
+fn or_fail_ok.main params=0 vregs=50 stack=site.0
+b0:
+  v1 = addr str.0
+  v2 = const 0
+  v3 = const 9223372036854775807
+  v4 = call rt.int_in_text(v1, v2, v3)
+  v5 = load v4, 0
+  v6 = const 0
+  v7 = eq v5, v6
+  branch v7, b3, b2
+b1:
+  v14 = move v0
+  v15 = addr str.1
+  v16 = call rt.int_to_text(v14)
+  v17 = const 24
+  v18 = call rt.alloc(v17)
+  v19 = const 2
+  store v18, 0, v19
+  store v18, 8, v15
+  store v18, 16, v16
+  v20 = call rt.text_concat(v18)
+  v21 = call rt.log(v20)
+  v22 = addr str.2
+  v23 = addr str.3
+  v24 = const 24
+  v25 = call rt.alloc(v24)
+  v26 = const 2
+  store v25, 0, v26
+  store v25, 8, v22
+  store v25, 16, v23
+  v27 = move v25
+  v29 = const 1
+  v30 = call rt.list_index(v27, v29)
+  v31 = load v30, 0
+  v32 = const 0
+  v33 = eq v31, v32
+  branch v33, b8, b7
+b2:
+  v10 = load v4, 0
+  v11 = const 1
+  v12 = eq v10, v11
+  branch v12, b5, b4
+b3:
+  v8 = load v4, 8
+  v9 = move v8
+  v0 = move v9
+  jump b1
+b4:
+  raise site.2
+b5:
+  v13 = load v4, 8
+  raise site.1
+b6:
+  v40 = move v28
+  v41 = addr str.4
+  v42 = const 24
+  v43 = call rt.alloc(v42)
+  v44 = const 2
+  store v43, 0, v44
+  store v43, 8, v41
+  store v43, 16, v40
+  v45 = call rt.text_concat(v43)
+  v46 = call rt.log(v45)
+  v47 = addr str.5
+  v48 = call rt.log(v47)
+  v49 = const 0
+  ret v49
+b7:
+  v36 = load v30, 0
+  v37 = const 1
+  v38 = eq v36, v37
+  branch v38, b10, b9
+b8:
+  v34 = load v30, 8
+  v35 = move v34
+  v28 = move v35
+  jump b6
+b9:
+  raise site.4
+b10:
+  v39 = load v30, 8
+  raise site.3
+
+site.0 fault L077 or_fail_ok.lf:1:1
+site.1 exception or_fail_ok.lf:4:38
+site.2 internal or_fail_ok.lf:4:16
+site.3 exception or_fail_ok.lf:7:25
+site.4 internal or_fail_ok.lf:7:16

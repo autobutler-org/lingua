@@ -1,0 +1,180 @@
+fn arg_order.noisy params=1 vregs=8 stack=site.0
+b0:
+  v1 = addr str.0
+  v2 = call rt.int_to_text(v0)
+  v3 = const 24
+  v4 = call rt.alloc(v3)
+  v5 = const 2
+  store v4, 0, v5
+  store v4, 8, v1
+  store v4, 16, v2
+  v6 = call rt.text_concat(v4)
+  v7 = call rt.log(v6)
+  ret v0
+
+fn arg_order.noisy_text params=1 vregs=7 stack=site.1
+b0:
+  v1 = addr str.0
+  v2 = const 24
+  v3 = call rt.alloc(v2)
+  v4 = const 2
+  store v3, 0, v4
+  store v3, 8, v1
+  store v3, 16, v0
+  v5 = call rt.text_concat(v3)
+  v6 = call rt.log(v5)
+  ret v0
+
+fn arg_order.diff params=2 vregs=3 stack=site.2
+b0:
+  v2 = sub.chk v0, v1 @site.3
+  ret v2
+
+fn arg_order.main params=0 vregs=104 stack=site.4
+b0:
+  v0 = addr str.1
+  v1 = const 1
+  v2 = call arg_order.noisy(v1)
+  v3 = move v2
+  v4 = const 3
+  v5 = call arg_order.noisy(v4)
+  v6 = move v5
+  v7 = call arg_order.diff(v6, v3)
+  v8 = call rt.int_to_text(v7)
+  v9 = const 24
+  v10 = call rt.alloc(v9)
+  v11 = const 2
+  store v10, 0, v11
+  store v10, 8, v0
+  store v10, 16, v8
+  v12 = call rt.text_concat(v10)
+  v13 = call rt.log(v12)
+  v14 = const 2
+  v15 = call arg_order.noisy(v14)
+  v16 = move v15
+  v17 = const 1
+  v18 = call arg_order.noisy(v17)
+  v19 = move v18
+  v20 = const 16
+  v21 = call rt.alloc(v20)
+  store v21, 0, v19
+  store v21, 8, v16
+  v22 = move v21
+  v23 = addr str.2
+  v24 = load v22, 0
+  v25 = call rt.int_to_text(v24)
+  v26 = addr str.3
+  v27 = load v22, 8
+  v28 = call rt.int_to_text(v27)
+  v29 = const 40
+  v30 = call rt.alloc(v29)
+  v31 = const 4
+  store v30, 0, v31
+  store v30, 8, v23
+  store v30, 16, v25
+  store v30, 24, v26
+  store v30, 32, v28
+  v32 = call rt.text_concat(v30)
+  v33 = call rt.log(v32)
+  v34 = addr str.4
+  v35 = const 5
+  v36 = call arg_order.noisy(v35)
+  v37 = move v36
+  v38 = const 4
+  v39 = call arg_order.noisy(v38)
+  v40 = move v39
+  v42 = ge v40, v37
+  branch v42, b1, b2
+b1:
+  v41 = move v40
+  jump b3
+b2:
+  v41 = move v37
+  jump b3
+b3:
+  v43 = call rt.int_to_text(v41)
+  v44 = const 24
+  v45 = call rt.alloc(v44)
+  v46 = const 2
+  store v45, 0, v46
+  store v45, 8, v34
+  store v45, 16, v43
+  v47 = call rt.text_concat(v45)
+  v48 = call rt.log(v47)
+  v49 = addr str.5
+  v50 = call arg_order.noisy_text(v49)
+  v51 = move v50
+  v52 = addr str.6
+  v53 = call arg_order.noisy_text(v52)
+  v54 = move v53
+  v55 = addr site.5
+  v56 = call rt.split(v54, v51, v55)
+  v57 = move v56
+  v58 = addr str.7
+  v59 = load v57, 0
+  v60 = call rt.int_to_text(v59)
+  v61 = const 24
+  v62 = call rt.alloc(v61)
+  v63 = const 2
+  store v62, 0, v63
+  store v62, 8, v58
+  store v62, 16, v60
+  v64 = call rt.text_concat(v62)
+  v65 = call rt.log(v64)
+  v66 = addr str.8
+  v67 = const 7
+  v68 = call arg_order.noisy(v67)
+  v69 = const 16
+  v70 = call rt.alloc(v69)
+  v71 = const 1
+  store v70, 0, v71
+  store v70, 8, v68
+  v72 = move v70
+  v73 = const 6
+  v74 = call arg_order.noisy(v73)
+  v75 = const 16
+  v76 = call rt.alloc(v75)
+  v77 = const 1
+  store v76, 0, v77
+  store v76, 8, v74
+  v78 = move v76
+  v79 = call rt.join(v78, v72)
+  v80 = load v79, 0
+  v81 = call rt.int_to_text(v80)
+  v82 = const 24
+  v83 = call rt.alloc(v82)
+  v84 = const 2
+  store v83, 0, v84
+  store v83, 8, v66
+  store v83, 16, v81
+  v85 = call rt.text_concat(v83)
+  v86 = call rt.log(v85)
+  v87 = const 9223372036854775807
+  v88 = move v87
+  v89 = addr str.9
+  v90 = const 1
+  v91 = add.chk v88, v90 @site.6
+  v92 = move v91
+  v93 = const 9
+  v94 = call arg_order.noisy(v93)
+  v95 = move v94
+  v96 = call arg_order.diff(v95, v92)
+  v97 = call rt.int_to_text(v96)
+  v98 = const 24
+  v99 = call rt.alloc(v98)
+  v100 = const 2
+  store v99, 0, v100
+  store v99, 8, v89
+  store v99, 16, v97
+  v101 = call rt.text_concat(v99)
+  v102 = call rt.log(v101)
+  v103 = const 0
+  ret v103
+
+site.0 fault L077 arg_order.lf:6:1
+site.1 fault L077 arg_order.lf:17:1
+site.2 fault L077 arg_order.lf:28:1
+site.3 fault L040 arg_order.lf:36:10
+site.4 fault L077 arg_order.lf:39:1
+site.5 fault L046 arg_order.lf:46:15
+site.6 fault L040 arg_order.lf:50:23

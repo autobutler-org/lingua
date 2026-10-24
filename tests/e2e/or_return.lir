@@ -1,0 +1,237 @@
+fn or_return.lookup params=1 vregs=38 stack=site.0
+b0:
+  v1 = addr str.0
+  v2 = const 24
+  v3 = call rt.alloc(v2)
+  v4 = const 2
+  store v3, 0, v4
+  store v3, 8, v1
+  store v3, 16, v0
+  v5 = call rt.text_concat(v3)
+  v6 = call rt.log(v5)
+  v7 = addr str.1
+  v8 = call rt.text_eq(v0, v7)
+  v9 = const 1
+  v10 = eq v8, v9
+  branch v10, b1, b2
+b1:
+  v11 = const 4
+  v12 = const 0
+  v13 = const 16
+  v14 = call rt.alloc(v13)
+  store v14, 0, v12
+  store v14, 8, v11
+  ret v14
+b2:
+  jump b3
+b3:
+  v15 = addr str.2
+  v16 = call rt.text_eq(v0, v15)
+  v17 = const 1
+  v18 = eq v16, v17
+  branch v18, b4, b5
+b4:
+  v19 = const 5
+  v20 = const 0
+  v21 = const 16
+  v22 = call rt.alloc(v21)
+  store v22, 0, v20
+  store v22, 8, v19
+  ret v22
+b5:
+  jump b6
+b6:
+  v23 = addr str.3
+  v24 = call rt.text_eq(v0, v23)
+  v25 = const 1
+  v26 = eq v24, v25
+  branch v26, b7, b8
+b7:
+  v27 = addr str.3
+  v28 = const 1
+  v29 = const 16
+  v30 = call rt.alloc(v29)
+  store v30, 0, v28
+  store v30, 8, v27
+  v31 = const 1
+  v32 = const 16
+  v33 = call rt.alloc(v32)
+  store v33, 0, v31
+  store v33, 8, v30
+  ret v33
+b8:
+  jump b9
+b9:
+  v34 = addr var.or_return.AppError.Missing
+  v35 = const 1
+  v36 = const 16
+  v37 = call rt.alloc(v36)
+  store v37, 0, v35
+  store v37, 8, v34
+  ret v37
+
+fn or_return.area_of params=2 vregs=38 stack=site.1
+b0:
+  v3 = call or_return.lookup(v0)
+  v4 = load v3, 0
+  v5 = const 0
+  v6 = eq v4, v5
+  branch v6, b3, b2
+b1:
+  v17 = move v2
+  v19 = call or_return.lookup(v1)
+  v20 = load v19, 0
+  v21 = const 0
+  v22 = eq v20, v21
+  branch v22, b8, b7
+b2:
+  v9 = load v3, 0
+  v10 = const 1
+  v11 = eq v9, v10
+  branch v11, b5, b4
+b3:
+  v7 = load v3, 8
+  v8 = move v7
+  v2 = move v8
+  jump b1
+b4:
+  raise site.2
+b5:
+  v12 = load v3, 8
+  v13 = move v12
+  v14 = const 1
+  v15 = const 16
+  v16 = call rt.alloc(v15)
+  store v16, 0, v14
+  store v16, 8, v13
+  ret v16
+b6:
+  v33 = move v18
+  v34 = mul.chk v17, v33 @site.4
+  v35 = const 0
+  v36 = const 16
+  v37 = call rt.alloc(v36)
+  store v37, 0, v35
+  store v37, 8, v34
+  ret v37
+b7:
+  v25 = load v19, 0
+  v26 = const 1
+  v27 = eq v25, v26
+  branch v27, b10, b9
+b8:
+  v23 = load v19, 8
+  v24 = move v23
+  v18 = move v24
+  jump b6
+b9:
+  raise site.3
+b10:
+  v28 = load v19, 8
+  v29 = move v28
+  v30 = const 1
+  v31 = const 16
+  v32 = call rt.alloc(v31)
+  store v32, 0, v30
+  store v32, 8, v29
+  ret v32
+
+fn or_return.explain params=1 vregs=16 stack=site.5
+b0:
+  v2 = load v0, 0
+  v3 = const 0
+  v4 = eq v2, v3
+  branch v4, b3, b2
+b1:
+  ret v1
+b2:
+  v6 = load v0, 0
+  v7 = const 1
+  v8 = eq v6, v7
+  branch v8, b5, b4
+b3:
+  v5 = addr str.4
+  v1 = move v5
+  jump b1
+b4:
+  raise site.6
+b5:
+  v9 = load v0, 8
+  v10 = move v9
+  v11 = addr str.5
+  v12 = const 24
+  v13 = call rt.alloc(v12)
+  v14 = const 2
+  store v13, 0, v14
+  store v13, 8, v11
+  store v13, 16, v10
+  v15 = call rt.text_concat(v13)
+  v1 = move v15
+  jump b1
+
+fn or_return.render params=1 vregs=19 stack=site.7
+b0:
+  v2 = load v0, 0
+  v3 = const 0
+  v4 = eq v2, v3
+  branch v4, b3, b2
+b1:
+  ret v1
+b2:
+  v13 = load v0, 0
+  v14 = const 1
+  v15 = eq v13, v14
+  branch v15, b5, b4
+b3:
+  v5 = load v0, 8
+  v6 = move v5
+  v7 = addr str.6
+  v8 = call rt.int_to_text(v6)
+  v9 = const 24
+  v10 = call rt.alloc(v9)
+  v11 = const 2
+  store v10, 0, v11
+  store v10, 8, v7
+  store v10, 16, v8
+  v12 = call rt.text_concat(v10)
+  v1 = move v12
+  jump b1
+b4:
+  raise site.8
+b5:
+  v16 = load v0, 8
+  v17 = move v16
+  v18 = call or_return.explain(v17)
+  v1 = move v18
+  jump b1
+
+fn or_return.main params=0 vregs=16 stack=site.9
+b0:
+  v0 = addr str.1
+  v1 = addr str.2
+  v2 = call or_return.area_of(v0, v1)
+  v3 = call or_return.render(v2)
+  v4 = call rt.log(v3)
+  v5 = addr str.1
+  v6 = addr str.7
+  v7 = call or_return.area_of(v5, v6)
+  v8 = call or_return.render(v7)
+  v9 = call rt.log(v8)
+  v10 = addr str.3
+  v11 = addr str.1
+  v12 = call or_return.area_of(v10, v11)
+  v13 = call or_return.render(v12)
+  v14 = call rt.log(v13)
+  v15 = const 0
+  ret v15
+
+site.0 fault L077 or_return.lf:6:1
+site.1 fault L077 or_return.lf:30:1
+site.2 internal or_return.lf:38:11
+site.3 internal or_return.lf:39:11
+site.4 fault L040 or_return.lf:40:13
+site.5 fault L077 or_return.lf:43:1
+site.6 internal or_return.lf:50:10
+site.7 fault L077 or_return.lf:56:1
+site.8 internal or_return.lf:63:10
+site.9 fault L077 or_return.lf:69:1

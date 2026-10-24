@@ -1,0 +1,37 @@
+fn overflow_add.main params=0 vregs=23 stack=site.0
+b0:
+  v0 = const 9223372036854775807
+  v1 = move v0
+  v2 = const 1
+  v3 = move v2
+  v4 = addr str.0
+  v5 = sub.chk v1, v3 @site.1
+  v6 = add.chk v5, v3 @site.2
+  v7 = call rt.int_to_text(v6)
+  v8 = const 24
+  v9 = call rt.alloc(v8)
+  v10 = const 2
+  store v9, 0, v10
+  store v9, 8, v4
+  store v9, 16, v7
+  v11 = call rt.text_concat(v9)
+  v12 = call rt.log(v11)
+  v13 = add.chk v1, v3 @site.3
+  v14 = move v13
+  v15 = addr str.1
+  v16 = call rt.int_to_text(v14)
+  v17 = const 24
+  v18 = call rt.alloc(v17)
+  v19 = const 2
+  store v18, 0, v19
+  store v18, 8, v15
+  store v18, 16, v16
+  v20 = call rt.text_concat(v18)
+  v21 = call rt.log(v20)
+  v22 = const 0
+  ret v22
+
+site.0 fault L077 overflow_add.lf:1:1
+site.1 fault L040 overflow_add.lf:6:16
+site.2 fault L040 overflow_add.lf:6:16
+site.3 fault L040 overflow_add.lf:7:15

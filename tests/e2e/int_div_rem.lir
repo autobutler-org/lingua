@@ -1,0 +1,173 @@
+fn int_div_rem.main params=0 vregs=120 stack=site.0
+b0:
+  v0 = const 7
+  v1 = move v0
+  v2 = const -7
+  v3 = move v2
+  v4 = const 2
+  v5 = move v4
+  v6 = const -2
+  v7 = move v6
+  v8 = div.chk v1, v5 @site.1
+  v9 = call rt.int_to_text(v8)
+  v10 = const 16
+  v11 = call rt.alloc(v10)
+  v12 = const 1
+  store v11, 0, v12
+  store v11, 8, v9
+  v13 = call rt.text_concat(v11)
+  v14 = call rt.log(v13)
+  v15 = div.chk v3, v5 @site.2
+  v16 = call rt.int_to_text(v15)
+  v17 = const 16
+  v18 = call rt.alloc(v17)
+  v19 = const 1
+  store v18, 0, v19
+  store v18, 8, v16
+  v20 = call rt.text_concat(v18)
+  v21 = call rt.log(v20)
+  v22 = div.chk v1, v7 @site.3
+  v23 = call rt.int_to_text(v22)
+  v24 = const 16
+  v25 = call rt.alloc(v24)
+  v26 = const 1
+  store v25, 0, v26
+  store v25, 8, v23
+  v27 = call rt.text_concat(v25)
+  v28 = call rt.log(v27)
+  v29 = div.chk v3, v7 @site.4
+  v30 = call rt.int_to_text(v29)
+  v31 = const 16
+  v32 = call rt.alloc(v31)
+  v33 = const 1
+  store v32, 0, v33
+  store v32, 8, v30
+  v34 = call rt.text_concat(v32)
+  v35 = call rt.log(v34)
+  v36 = rem.chk v1, v5 @site.5
+  v37 = call rt.int_to_text(v36)
+  v38 = const 16
+  v39 = call rt.alloc(v38)
+  v40 = const 1
+  store v39, 0, v40
+  store v39, 8, v37
+  v41 = call rt.text_concat(v39)
+  v42 = call rt.log(v41)
+  v43 = rem.chk v3, v5 @site.6
+  v44 = call rt.int_to_text(v43)
+  v45 = const 16
+  v46 = call rt.alloc(v45)
+  v47 = const 1
+  store v46, 0, v47
+  store v46, 8, v44
+  v48 = call rt.text_concat(v46)
+  v49 = call rt.log(v48)
+  v50 = rem.chk v1, v7 @site.7
+  v51 = call rt.int_to_text(v50)
+  v52 = const 16
+  v53 = call rt.alloc(v52)
+  v54 = const 1
+  store v53, 0, v54
+  store v53, 8, v51
+  v55 = call rt.text_concat(v53)
+  v56 = call rt.log(v55)
+  v57 = rem.chk v3, v7 @site.8
+  v58 = call rt.int_to_text(v57)
+  v59 = const 16
+  v60 = call rt.alloc(v59)
+  v61 = const 1
+  store v60, 0, v61
+  store v60, 8, v58
+  v62 = call rt.text_concat(v60)
+  v63 = call rt.log(v62)
+  v64 = div.chk v3, v5 @site.9
+  v65 = mul.chk v64, v5 @site.10
+  v66 = rem.chk v3, v5 @site.11
+  v67 = add.chk v65, v66 @site.12
+  v68 = call rt.int_to_text(v67)
+  v69 = const 16
+  v70 = call rt.alloc(v69)
+  v71 = const 1
+  store v70, 0, v71
+  store v70, 8, v68
+  v72 = call rt.text_concat(v70)
+  v73 = call rt.log(v72)
+  v74 = const 0
+  v75 = div.chk v74, v1 @site.13
+  v76 = call rt.int_to_text(v75)
+  v77 = const 16
+  v78 = call rt.alloc(v77)
+  v79 = const 1
+  store v78, 0, v79
+  store v78, 8, v76
+  v80 = call rt.text_concat(v78)
+  v81 = call rt.log(v80)
+  v82 = const 1
+  v83 = div.chk v82, v1 @site.14
+  v84 = call rt.int_to_text(v83)
+  v85 = const 16
+  v86 = call rt.alloc(v85)
+  v87 = const 1
+  store v86, 0, v87
+  store v86, 8, v84
+  v88 = call rt.text_concat(v86)
+  v89 = call rt.log(v88)
+  v90 = const 100
+  v91 = div.chk v90, v1 @site.15
+  v92 = mul.chk v91, v1 @site.16
+  v93 = call rt.int_to_text(v92)
+  v94 = const 16
+  v95 = call rt.alloc(v94)
+  v96 = const 1
+  store v95, 0, v96
+  store v95, 8, v93
+  v97 = call rt.text_concat(v95)
+  v98 = call rt.log(v97)
+  v99 = const 100
+  v100 = rem.chk v99, v1 @site.17
+  v101 = const 4
+  v102 = rem.chk v100, v101 @site.18
+  v103 = call rt.int_to_text(v102)
+  v104 = const 16
+  v105 = call rt.alloc(v104)
+  v106 = const 1
+  store v105, 0, v106
+  store v105, 8, v103
+  v107 = call rt.text_concat(v105)
+  v108 = call rt.log(v107)
+  v109 = const 2
+  v110 = const 100
+  v111 = div.chk v110, v1 @site.19
+  v112 = add.chk v109, v111 @site.20
+  v113 = call rt.int_to_text(v112)
+  v114 = const 16
+  v115 = call rt.alloc(v114)
+  v116 = const 1
+  store v115, 0, v116
+  store v115, 8, v113
+  v117 = call rt.text_concat(v115)
+  v118 = call rt.log(v117)
+  v119 = const 0
+  ret v119
+
+site.0 fault L077 int_div_rem.lf:1:1
+site.1 fault L076 fault L040 int_div_rem.lf:9:9
+site.2 fault L076 fault L040 int_div_rem.lf:10:9
+site.3 fault L076 fault L040 int_div_rem.lf:11:9
+site.4 fault L076 fault L040 int_div_rem.lf:12:9
+site.5 fault L076 fault L040 int_div_rem.lf:14:9
+site.6 fault L076 fault L040 int_div_rem.lf:15:9
+site.7 fault L076 fault L040 int_div_rem.lf:16:9
+site.8 fault L076 fault L040 int_div_rem.lf:17:9
+site.9 fault L076 fault L040 int_div_rem.lf:19:10
+site.10 fault L040 int_div_rem.lf:19:9
+site.11 fault L076 fault L040 int_div_rem.lf:19:35
+site.12 fault L040 int_div_rem.lf:19:9
+site.13 fault L076 fault L040 int_div_rem.lf:20:9
+site.14 fault L076 fault L040 int_div_rem.lf:21:9
+site.15 fault L076 fault L040 int_div_rem.lf:23:9
+site.16 fault L040 int_div_rem.lf:23:9
+site.17 fault L076 fault L040 int_div_rem.lf:24:9
+site.18 fault L076 fault L040 int_div_rem.lf:24:9
+site.19 fault L076 fault L040 int_div_rem.lf:25:13
+site.20 fault L040 int_div_rem.lf:25:9

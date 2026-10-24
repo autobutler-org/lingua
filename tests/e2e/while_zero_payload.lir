@@ -1,0 +1,68 @@
+fn while_zero_payload.main params=0 vregs=34 stack=site.0
+b0:
+  v0 = addr var.while_zero_payload.Phase.Warmup
+  v1 = move v0
+  jump b1
+b1:
+  v2 = load v1, 0
+  v3 = const 0
+  v4 = eq v2, v3
+  branch v4, b2, b3
+b2:
+  v5 = addr str.0
+  v6 = call rt.log(v5)
+  v7 = const 2
+  v8 = const 1
+  v9 = const 16
+  v10 = call rt.alloc(v9)
+  store v10, 0, v8
+  store v10, 8, v7
+  v1 = move v10
+  jump b1
+b3:
+  jump b4
+b4:
+  v11 = load v1, 0
+  v12 = const 1
+  v13 = eq v11, v12
+  branch v13, b5, b6
+b5:
+  v14 = load v1, 8
+  v15 = move v14
+  v16 = addr str.1
+  v17 = call rt.int_to_text(v15)
+  v18 = const 24
+  v19 = call rt.alloc(v18)
+  v20 = const 2
+  store v19, 0, v20
+  store v19, 8, v16
+  store v19, 16, v17
+  v21 = call rt.text_concat(v19)
+  v22 = call rt.log(v21)
+  v23 = const 1
+  v24 = gt v15, v23
+  branch v24, b7, b8
+b6:
+  v31 = addr str.2
+  v32 = call rt.log(v31)
+  v33 = const 0
+  ret v33
+b7:
+  v25 = const 1
+  v26 = sub.chk v15, v25 @site.1
+  v27 = const 1
+  v28 = const 16
+  v29 = call rt.alloc(v28)
+  store v29, 0, v27
+  store v29, 8, v26
+  v1 = move v29
+  jump b9
+b8:
+  v30 = addr var.while_zero_payload.Phase.Cooldown
+  v1 = move v30
+  jump b9
+b9:
+  jump b4
+
+site.0 fault L077 while_zero_payload.lf:7:1
+site.1 fault L040 while_zero_payload.lf:18:27
