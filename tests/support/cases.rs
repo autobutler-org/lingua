@@ -701,10 +701,9 @@ fn deep_recursion() -> Case {
         down,
         3,
         vec![n],
-        TirBody::Stmts(vec![ret(call(
-            down,
-            vec![add(local(n, Type::Int), int(1))],
-            Type::Int,
+        TirBody::Stmts(vec![ret(add(
+            int(1),
+            call(down, vec![add(local(n, Type::Int), int(1))], Type::Int),
         ))]),
     );
     let main = p.declare("main", Type::Nothing);

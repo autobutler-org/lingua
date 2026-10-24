@@ -191,11 +191,14 @@ Lowering walks each `TirFn` in the runtime residue. A function whose body is `Pr
 | `Match` | tag and literal tests, below |
 | `If`, `ForList`, `ForRange`, `WhileIs` | blocks and branches, below |
 | `Return(e)` | `Ret(e)` |
+| `Return(Call(f, args))` in `f` itself | arguments into new vregs in source order, `Move`s into the parameters, `Jump` to the entry block |
 | `Assert(c, m)` | `Branch(c, next, fail)`, `fail` ends in `Raise` of a new exception site |
 | `Fail(m)` | `Raise` of a new exception site |
 | prelude `trim`, `lower`, `split`, `join`, `length`, `max` | `Call rt.trim` and so on. `length` is `Load(v, list, 0)`. `max` is `Cmp` and a branch |
 
 `FsRead`, `CatalogColumns`, `ResourceCall`, `Quote`, and `Unquote` cannot appear in the runtime residue. `lingua1.md` rejects the first three before this point and removes the last two at splice. Lowering treats any of them as an internal compiler error, not a diagnostic.
+
+**Self tail calls.** A `return` of a call to the enclosing function itself reuses the frame instead of calling. The arguments are evaluated in source order into new vregs (through the checker's `Let` when named arguments are out of order), then moved into the parameter vregs, and the block jumps to `blocks[0]`. The jump lands after the prologue, so the stack check runs once per real call and deep tail recursion never faults `L077`. Only a call whose result is returned directly counts: `return 1 + f(n - 1)` still calls. `ponytail:` self tail calls only, because a general tail call would write the callee's arguments into this frame's incoming area, which the caller sized for this function's parameters; reserving that area for the largest tail callee is the upgrade.
 
 There are no runtime bound checks on integer subtypes. `lingua1` narrows only through `int_in` and `int_at_least`, which return `Result`, and through static adoption. Overflow checks are the only integer checks the backend inserts.
 
@@ -321,7 +324,7 @@ arm64:  ADRP rt.stack_limit, X9
 
 `stack_fault` raises the function's stack site, whose report is `fault L077: stack overflow` at the function's header span. `L077` is a new code; see [Proposed amendments](#proposed-amendments-to-lingua1md). Runtime functions on the fault path (`rt.fault`, the write shims) are nosplit: they have no check and run inside the reserve.
 
-`ponytail:` fixed 64 MiB stack, so very deep recursion faults with `L077` where Go would grow the stack; segmented or copied stacks are the upgrade and need a stack map, which v1 does not have.
+`ponytail:` fixed 64 MiB stack, so very deep recursion that is not a self tail call faults with `L077` where Go would grow the stack; segmented or copied stacks are the upgrade and need a stack map, which v1 does not have.
 
 ### Fault sites
 
@@ -510,7 +513,7 @@ The dump syntax is Go's: sources first, destination last, `(SB)` for symbols, of
 
 #### Instruction selection
 
-Selection is a function per architecture from `Inst` to `Prog`s. Each `Inst` loads its operands from their slots into scratch registers, computes, and stores. A parameter's slot is `FP + 16 + 8i`; any other vreg's slot is `FP - 8(k-params+1)`. Block `i` is label `Li`.
+Selection is a function per architecture from `Inst` to `Prog`s. Each `Inst` loads its operands from their slots into scratch registers, computes, and stores. A parameter's slot is `FP + 16 + 8i`; any other vreg's slot is `FP - 8(k-params+1)`. Block `i` is label `Li`. `L0` is emitted only when a self tail call jumps to the entry block.
 
 | LIR | amd64 | arm64 |
 |---|---|---|

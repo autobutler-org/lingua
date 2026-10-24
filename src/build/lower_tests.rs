@@ -57,6 +57,58 @@ site.1 fault L040 order.lf:21:10
 }
 
 #[test]
+fn a_returned_self_call_jumps_to_the_entry_and_any_other_call_stays_a_call() {
+    let mut p = Program::default();
+    p.module("m", "");
+    let swap = p.declare("swap", Type::Int);
+    let (a, b) = (p.param("a", Type::Int), p.param("b", Type::Int));
+    p.define(
+        swap,
+        1,
+        vec![a, b],
+        TirBody::Stmts(vec![ret(call(
+            swap,
+            vec![local(b, Type::Int), local(a, Type::Int)],
+            Type::Int,
+        ))]),
+    );
+    let count = p.declare("count", Type::Int);
+    let n = p.param("n", Type::Int);
+    p.define(
+        count,
+        5,
+        vec![n],
+        TirBody::Stmts(vec![ret(add(
+            int(1),
+            call(count, vec![local(n, Type::Int)], Type::Int),
+        ))]),
+    );
+    let lowered = lower(&p.finish(count)).unwrap();
+    assert_eq!(
+        dump(&lowered.functions, &lowered.sites),
+        "fn m.swap params=2 vregs=4 stack=site.0
+b0:
+  v2 = move v1
+  v3 = move v0
+  v0 = move v2
+  v1 = move v3
+  jump b0
+
+fn m.count params=1 vregs=4 stack=site.1
+b0:
+  v1 = const 1
+  v2 = call m.count(v0)
+  v3 = add.chk v1, v2 @site.2
+  ret v3
+
+site.0 fault L077 m.lf:1:1
+site.1 fault L077 m.lf:5:1
+site.2 fault L040 m.lf:1:1
+"
+    );
+}
+
+#[test]
 fn entry_builds_process_only_when_main_takes_it() {
     let lowered = lower(&main_program("", vec![])).unwrap();
     assert_eq!(

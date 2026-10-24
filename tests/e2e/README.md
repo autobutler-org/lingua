@@ -61,7 +61,8 @@ The exception and fault blocks follow `lingua1.md` § Value errors and exception
 | `div_int_min` | `INT_MIN / -1` is `L040` |
 | `rem_int_min` | `INT_MIN % -1` is `L040` |
 | `factorial_overflow` | `L040` inside a recursive function (21!) |
-| `deep_recursion` | `L077` stack overflow at the function header |
+| `deep_recursion` | `L077` stack overflow at the function header from a non-tail recursion (`1 + depth(n - 1)`) |
+| `tail_recursion` | self tail calls 100000000 deep reuse the frame, in order and with named arguments out of order |
 | `split_empty_separator` | runtime `L046` from `split` with an empty separator held in a variable |
 | `assert_fail` | passing `assert`, then a failing one: exception block, exit 1 |
 | `assert_in_helper` | exception raised in a helper (whose example expects it), reported at the helper's line |
