@@ -1,0 +1,13 @@
+fn one(n: Int) -> Int
+  pure
+  example "one"
+    n: 1
+    -> 1
+  end
+  if n == 1
+    return 1
+end fn one
+
+type After
+  ok: Int
+end type After

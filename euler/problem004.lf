@@ -1,0 +1,101 @@
+import Loop from "helpers"
+
+fn reverse_digits(n: Int) -> Int
+  pure
+  example "one digit"
+    n: 7
+    -> 7
+  end
+  example "trailing zero drops"
+    n: 1230
+    -> 321
+  end
+  example "palindrome"
+    n: 9009
+    -> 9009
+  end
+
+  var rest: Int = n
+  var reversed: Int = 0
+  var state: Loop = Again
+  while state is Again
+    if rest == 0
+      set state = Done
+    else
+      set reversed = reversed * 10 + rest % 10
+      set rest = rest / 10
+      set state = Again
+    end
+  end
+  return reversed
+end fn reverse_digits
+
+fn is_palindrome(n: Int) -> Bool
+  pure
+  example "palindrome"
+    n: 9009
+    -> true
+  end
+  example "not a palindrome"
+    n: 9010
+    -> false
+  end
+
+  return reverse_digits(n) == n
+end fn is_palindrome
+
+// The largest palindrome `factor * partner` with `low <= partner <= factor`
+// that beats `best`, or `best` when none does.
+fn best_palindrome_with(factor: Int, low: Int, best: Int) -> Int
+  pure
+  example "ninety nine finds ninety one"
+    factor: 99
+    low: 10
+    best: 0
+    -> 9009
+  end
+  example "nothing beats the best so far"
+    factor: 98
+    low: 10
+    best: 9009
+    -> 9009
+  end
+
+  var partner: Int = factor
+  var state: Loop = Again
+  while state is Again
+    if partner < low
+      return best
+    end
+    let product = factor * partner
+    if product <= best
+      return best
+    end
+    if is_palindrome(product)
+      return product
+    end
+    set partner = partner - 1
+    set state = Again
+  end
+  return best
+end fn best_palindrome_with
+
+fn problem004(low: Int, high: Int) -> Int
+  pure
+  example "one digit factors"
+    low: 1
+    high: 9
+    -> 9
+  end
+  example "two digit factors"
+    low: 10
+    high: 99
+    -> 9009
+  end
+
+  var best: Int = 0
+  for offset in 0 until high - low + 1
+    set best = best_palindrome_with(factor: high - offset, low: low, best: best)
+  end
+  return best
+end fn problem004

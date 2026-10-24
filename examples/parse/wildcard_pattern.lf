@@ -1,0 +1,12 @@
+fn is_zero(n: Int) -> Bool
+  pure
+  example "zero"
+    n: 0
+    -> true
+  end
+  return match n
+    0 -> true
+    -1 -> false
+    _ -> false
+  end
+end fn is_zero

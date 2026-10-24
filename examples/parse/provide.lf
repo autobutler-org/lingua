@@ -1,0 +1,16 @@
+comptime
+  reads net
+  const body = http_get("https://api.example.com/openapi.json") or fail "schema unavailable"
+  provide Customer = schema(body: body, name: "Customer")
+  provide Invoice = schema(body: body, name: "Invoice")
+end
+
+type Customers
+  reads net
+  comptime
+    const body = http_get("https://api.example.com/openapi.json") or fail "schema unavailable"
+    return schema(body: body, name: "Customer")
+  end
+end type Customers
+
+provide Stray = schema(body: "{{}}", name: "Stray")

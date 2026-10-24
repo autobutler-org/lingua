@@ -1,0 +1,23 @@
+fn broken(n: Int) -> Int
+  pure
+  example "one"
+    n: 1
+    -> 1
+  end
+  let = n
+  return n
+end fn broken
+
+fn also_broken() -> Int
+  pure
+  example "one"
+    -> 1
+  end
+  return 1 +
+end fn also_broken
+
+type Fine
+  ok: Int
+end type Fine
+
+const tail = )

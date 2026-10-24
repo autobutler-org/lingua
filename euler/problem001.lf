@@ -1,0 +1,35 @@
+import triangle from "helpers"
+
+fn sum_multiples_below(step: Int, limit: Int) -> Int
+  pure
+  example "threes below ten"
+    step: 3
+    limit: 10
+    -> 18
+  end
+  example "the limit itself is excluded"
+    step: 5
+    limit: 10
+    -> 5
+  end
+  example "no multiple below the limit"
+    step: 15
+    limit: 10
+    -> 0
+  end
+
+  return step * triangle((limit - 1) / step)
+end fn sum_multiples_below
+
+fn problem001(limit: Int) -> Int
+  pure
+  example "below ten"
+    limit: 10
+    -> 23
+  end
+
+  let threes = sum_multiples_below(step: 3, limit: limit)
+  let fives = sum_multiples_below(step: 5, limit: limit)
+  let both = sum_multiples_below(step: 15, limit: limit)
+  return threes + fives - both
+end fn problem001

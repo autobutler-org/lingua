@@ -65,11 +65,17 @@ pub struct Lexer {
 impl Lexer {
     #[must_use]
     pub fn new(contents: &str) -> Self {
+        Self::starting_at(contents, Location { line: 1, column: 1 })
+    }
+
+    // For re-lexing an interpolation hole at its place in the file
+    #[must_use]
+    pub fn starting_at(contents: &str, location: Location) -> Self {
         Lexer {
             contents: contents.chars().collect(),
             position: 0,
-            line: 1,
-            column: 1,
+            line: location.line,
+            column: location.column,
         }
     }
 
@@ -88,6 +94,7 @@ impl Lexer {
             return Ok(Token {
                 kind: TokenKind::Eof,
                 location,
+                end: location,
             });
         };
 
@@ -106,7 +113,11 @@ impl Lexer {
             c if c.is_ascii_digit() => self.scan_integer()?,
             _ => self.scan_punctuation(current_char)?,
         };
-        Ok(Token { kind, location })
+        Ok(Token {
+            kind,
+            location,
+            end: self.location(),
+        })
     }
 
     #[must_use]
@@ -210,6 +221,9 @@ impl Lexer {
             ('+', _) => (TokenKind::Plus, 1),
             ('-', _) => (TokenKind::Minus, 1),
             ('*', _) => (TokenKind::Asterisk, 1),
+            // `//` never reaches here: skip_blanks takes it as a comment
+            ('/', _) => (TokenKind::Slash, 1),
+            ('%', _) => (TokenKind::Percent, 1),
             ('=', _) => (TokenKind::Equals, 1),
             ('<', _) => (TokenKind::LessThan, 1),
             ('>', _) => (TokenKind::GreaterThan, 1),
@@ -269,6 +283,7 @@ impl Lexer {
                     }
                     self.advance();
                     let hole_start = self.position;
+                    let hole_location = self.location();
                     loop {
                         match self.peek(0) {
                             None => return Err(unterminated()),
@@ -282,8 +297,10 @@ impl Lexer {
                             Some(_) => self.advance(),
                         }
                     }
-                    let hole = self.contents[hole_start..self.position].iter().collect();
-                    parts.push(StringPart::Hole(hole));
+                    parts.push(StringPart::Hole {
+                        source: self.contents[hole_start..self.position].iter().collect(),
+                        location: hole_location,
+                    });
                     self.advance();
                 }
                 _ => {
@@ -336,14 +353,17 @@ mod tests {
         StringPart::Text(value.to_string())
     }
 
-    fn hole(value: &str) -> StringPart {
-        StringPart::Hole(value.to_string())
+    fn hole(value: &str, column: usize) -> StringPart {
+        StringPart::Hole {
+            source: value.to_string(),
+            location: Location { line: 1, column },
+        }
     }
 
     #[test]
     fn lexes_punctuation() {
         assert_eq!(
-            kinds("_ ( ) [ ] , . : + - * = -> += == != < > <= >="),
+            kinds("_ ( ) [ ] , . : + - * / % = -> += == != < > <= >="),
             vec![
                 TokenKind::Wildcard,
                 TokenKind::LeftParen,
@@ -356,6 +376,8 @@ mod tests {
                 TokenKind::Plus,
                 TokenKind::Minus,
                 TokenKind::Asterisk,
+                TokenKind::Slash,
+                TokenKind::Percent,
                 TokenKind::Equals,
                 TokenKind::Arrow,
                 TokenKind::PlusEquals,
@@ -428,7 +450,7 @@ mod tests {
     fn rejects_unknown_characters() {
         assert_eq!(error("a ; b"), ("L004", 1, 3));
         assert_eq!(error("!"), ("L004", 1, 1));
-        assert_eq!(error("/"), ("L004", 1, 1));
+        assert_eq!(error("&"), ("L004", 1, 1));
     }
 
     #[test]
@@ -474,6 +496,19 @@ mod tests {
     }
 
     #[test]
+    fn slash_is_a_token_unless_a_comment_follows() {
+        assert_eq!(
+            kinds("a/b"),
+            vec![identifier("a"), TokenKind::Slash, identifier("b")]
+        );
+        assert_eq!(kinds("a // comment"), vec![identifier("a")]);
+        assert_eq!(
+            kinds("a %b"),
+            vec![identifier("a"), TokenKind::Percent, identifier("b")]
+        );
+    }
+
+    #[test]
     fn comments_keep_the_newline() {
         assert_eq!(
             kinds("a // hi there\n\tb // trailing"),
@@ -515,8 +550,8 @@ mod tests {
         assert_eq!(
             kinds(r#""loaded {n} orders" "{a.b}""#),
             vec![
-                TokenKind::String(vec![text("loaded "), hole("n"), text(" orders")]),
-                TokenKind::String(vec![hole("a.b")]),
+                TokenKind::String(vec![text("loaded "), hole("n", 10), text(" orders")]),
+                TokenKind::String(vec![hole("a.b", 23)]),
             ]
         );
     }
@@ -527,7 +562,7 @@ mod tests {
             kinds(r#""x{f("}}\"", "{y}")}z""#),
             vec![TokenKind::String(vec![
                 text("x"),
-                hole(r#"f("}}\"", "{y}")"#),
+                hole(r#"f("}}\"", "{y}")"#, 4),
                 text("z"),
             ])]
         );

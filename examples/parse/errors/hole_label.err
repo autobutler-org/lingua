@@ -1,0 +1,2 @@
+L068: an example label must be a string literal without holes
+  --> 3:11

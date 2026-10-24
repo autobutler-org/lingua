@@ -1,0 +1,6 @@
+L001: expected a binding name, found `=`
+  --> 7:7
+L001: expected an expression, found newline
+  --> 16:13
+L001: expected an expression, found `)`
+  --> 23:14

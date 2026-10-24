@@ -1,0 +1,23 @@
+fn problem009(perimeter: Int) -> Int
+  pure
+  example "three four five"
+    perimeter: 12
+    -> 60
+  end
+  example "no triplet"
+    perimeter: 5
+    -> exception "no Pythagorean triplet has that perimeter"
+  end
+
+  for a in 1 until perimeter
+    for b in a + 1 until perimeter
+      let c = perimeter - a - b
+      if c > b
+        if a * a + b * b == c * c
+          return a * b * c
+        end
+      end
+    end
+  end
+  fail "no Pythagorean triplet has that perimeter"
+end fn problem009

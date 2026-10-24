@@ -1,0 +1,11 @@
+fn sign(n: Int) -> Int
+  pure
+  example "zero"
+    n: 0
+    -> 0
+  end
+  return match n
+    0 -> 0
+    _ -> return 1
+  end
+end fn sign

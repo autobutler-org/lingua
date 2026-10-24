@@ -1,0 +1,17 @@
+import triangle from "helpers"
+
+fn problem006(n: Int) -> Int
+  pure
+  example "first ten"
+    n: 10
+    -> 2640
+  end
+  example "one has no difference"
+    n: 1
+    -> 0
+  end
+
+  let total = triangle(n)
+  let squares = n * (n + 1) * (n + n + 1) / 6
+  return total * total - squares
+end fn problem006

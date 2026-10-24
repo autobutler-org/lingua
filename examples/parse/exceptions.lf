@@ -1,0 +1,19 @@
+fn scale(n: Int, factor: Int) -> Int
+  pure
+  example "zero factor is a bug"
+    n: 10
+    factor: 0
+    -> exception "factor must be non-zero"
+  end
+
+  assert factor != 0, "factor must be non-zero"
+  if n < 0
+    fail "negative"
+  end
+  return n * factor
+end fn scale
+
+example "scale works"
+  const x = scale(2, 3)
+  -> x == 6
+end

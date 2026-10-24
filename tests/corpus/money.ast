@@ -1,0 +1,28 @@
+(module "money"
+  (imports)
+  (decls
+    (alias "Cents" (at-least (named "Int") (int 0)))
+    (sum "Rounding" (variants (variant "half_up" nil)))
+    (fn "percent"
+      (params
+        (param "part" (range (named "Int") (int 1) (int 100)))
+        (param "of" (named "Cents"))
+        (param "round" (named "Rounding")))
+      (named "Cents")
+      pure
+      (examples
+        (example "ten percent of 1200 half up"
+          (bindings
+            (binding "part" (int 10))
+            (binding "of" (int 1200))
+            (binding "round" (name "half_up")))
+          (body)
+          (value (int 120)))
+        (example "one percent of 150 rounds half up"
+          (bindings
+            (binding "part" (int 1))
+            (binding "of" (int 150))
+            (binding "round" (name "half_up")))
+          (body)
+          (value (int 2))))
+      primitive)))

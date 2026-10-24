@@ -1,0 +1,11 @@
+(module "blank_before_tail"
+  (imports)
+  (decls
+    (fn "double"
+      (params (param "n" (named "Int")))
+      (named "Int")
+      pure
+      (examples
+        (example "two" (bindings (binding "n" (int 1))) (body) (value (int 2)))
+        (example "zero" (bindings (binding "n" (int 0))) (body) (value (int 0))))
+      (statements (return (binary add (name "n") (name "n")))))))

@@ -1,0 +1,7 @@
+fn one() -> Int
+  pure
+  example "one"
+    -> 1
+  end
+  return 1
+end type one

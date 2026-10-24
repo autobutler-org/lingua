@@ -1,0 +1,109 @@
+(module "fulfillment"
+  (imports)
+  (decls
+    (alias "CustomerId" (named "Text"))
+    (alias "Cursor" (named "Text"))
+    (product "Order" (fields (field "id" (named "Text"))))
+    (sum "DbError" (variants (variant "Unavailable" nil)))
+    (sum "PageEnd"
+      (variants (variant "More" (named "Cursor")) (variant "Done" nil)))
+    (product "Page"
+      (fields
+        (field "orders" (apply "List" (args (named "Order"))))
+        (field "next" (named "PageEnd"))))
+    (resource "db"
+      (resource-op "open_orders"
+        (params
+          (param "customer" (named "CustomerId"))
+          (param "after" (named "Cursor")))
+        (apply "Result" (args (named "Page") (named "DbError")))
+        read))
+    (fn "all_open_orders"
+      (params (param "customer" (named "CustomerId")))
+      (apply "Result"
+        (args (apply "List" (args (named "Order"))) (named "DbError")))
+      (reads "db")
+      (examples
+        (example "two pages then Done"
+          (bindings
+            (binding "db"
+              (list
+                (items
+                  (call
+                    (name "Page")
+                    (args
+                      (arg nil
+                        (list
+                          (items
+                            (call
+                              (name "Order")
+                              (args (arg nil (text (literal "a"))))
+                              false))
+                          false))
+                      (arg nil
+                        (call
+                          (name "More")
+                          (args (arg nil (text (literal "p2"))))
+                          false)))
+                    false)
+                  (call
+                    (name "Page")
+                    (args
+                      (arg nil
+                        (list
+                          (items
+                            (call
+                              (name "Order")
+                              (args (arg nil (text (literal "b"))))
+                              false))
+                          false))
+                      (arg nil (name "Done")))
+                    false))
+                true))
+            (binding "customer" (text (literal "c1"))))
+          (body)
+          (value
+            (call
+              (name "Ok")
+              (args
+                (arg nil
+                  (list
+                    (items
+                      (call
+                        (name "Order")
+                        (args (arg nil (text (literal "a"))))
+                        false)
+                      (call
+                        (name "Order")
+                        (args (arg nil (text (literal "b"))))
+                        false))
+                    false)))
+              false))))
+      (statements
+        (var "collected"
+          (apply "List" (args (named "Order")))
+          (list (items) false))
+        (var "next"
+          (named "PageEnd")
+          (call (name "More") (args (arg nil (text (literal "start")))) false))
+        (while-is "next"
+          (variant-pat "More" (bind "cursor"))
+          (body
+            (let "page" nil
+              (or-return
+                (call
+                  (field (name "db") "open_orders")
+                  (args
+                    (arg nil (name "customer"))
+                    (arg "after" (name "cursor")))
+                  false)
+                nil))
+            (set "collected" assign
+              (call
+                (name "join")
+                (args
+                  (arg "left" (name "collected"))
+                  (arg "right" (field (name "page") "orders")))
+                false))
+            (set "next" assign (field (name "page") "next"))))
+        (return (call (name "Ok") (args (arg nil (name "collected"))) false))))))

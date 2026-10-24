@@ -1,0 +1,82 @@
+// Shared pieces for the Project Euler solutions.
+
+// The loop state for an open-ended `while`. A loop that only exits through
+// `return` still sets `Again` on every path that goes back to the condition.
+type Loop
+  Again
+  Done
+end type Loop
+
+fn triangle(n: Int) -> Int
+  pure
+  example "zero"
+    n: 0
+    -> 0
+  end
+  example "one"
+    n: 1
+    -> 1
+  end
+  example "one through ten"
+    n: 10
+    -> 55
+  end
+
+  return n * (n + 1) / 2
+end fn triangle
+
+fn is_prime(n: Int) -> Bool
+  pure
+  example "one is not prime"
+    n: 1
+    -> false
+  end
+  example "two is prime"
+    n: 2
+    -> true
+  end
+  example "three is prime"
+    n: 3
+    -> true
+  end
+  example "four is even"
+    n: 4
+    -> false
+  end
+  example "nine is an odd square"
+    n: 9
+    -> false
+  end
+  example "ninety seven is prime"
+    n: 97
+    -> true
+  end
+  example "ninety one is seven times thirteen"
+    n: 91
+    -> false
+  end
+
+  if n < 2
+    return false
+  end
+  if n < 4
+    return true
+  end
+  if n % 2 == 0
+    return false
+  end
+  var factor: Int = 3
+  var state: Loop = Again
+  while state is Again
+    if factor * factor > n
+      set state = Done
+    else
+      if n % factor == 0
+        return false
+      end
+      set factor += 2
+      set state = Again
+    end
+  end
+  return true
+end fn is_prime

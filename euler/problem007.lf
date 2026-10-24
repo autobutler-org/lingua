@@ -1,0 +1,28 @@
+import is_prime, Loop from "helpers"
+
+fn problem007(target: Int) -> Int
+  pure
+  example "first prime"
+    target: 1
+    -> 2
+  end
+  example "sixth prime"
+    target: 6
+    -> 13
+  end
+
+  var count: Int = 0
+  var candidate: Int = 1
+  var state: Loop = Again
+  while state is Again
+    set candidate += 1
+    if is_prime(candidate)
+      set count += 1
+      if count == target
+        return candidate
+      end
+    end
+    set state = Again
+  end
+  return candidate
+end fn problem007

@@ -1,0 +1,46 @@
+import problem001 from "problem001"
+import problem002 from "problem002"
+import problem003 from "problem003"
+import problem004 from "problem004"
+import problem005 from "problem005"
+import problem006 from "problem006"
+import problem007 from "problem007"
+import problem008, thousand_digits from "problem008"
+import problem009 from "problem009"
+import problem010 from "problem010"
+
+fn main() -> Nothing
+  pure
+
+  let answer001 = problem001(1000)
+  assert answer001 == 233168, "problem 1 has the wrong answer"
+  log("problem 1: {answer001}")
+  let answer002 = problem002(4000000)
+  assert answer002 == 4613732, "problem 2 has the wrong answer"
+  log("problem 2: {answer002}")
+  let answer003 = problem003(600851475143)
+  assert answer003 == 6857, "problem 3 has the wrong answer"
+  log("problem 3: {answer003}")
+  let answer004 = problem004(low: 100, high: 999)
+  assert answer004 == 906609, "problem 4 has the wrong answer"
+  log("problem 4: {answer004}")
+  let answer005 = problem005(20)
+  assert answer005 == 232792560, "problem 5 has the wrong answer"
+  log("problem 5: {answer005}")
+  let answer006 = problem006(100)
+  assert answer006 == 25164150, "problem 6 has the wrong answer"
+  log("problem 6: {answer006}")
+  let answer007 = problem007(10001)
+  assert answer007 == 104743, "problem 7 has the wrong answer"
+  log("problem 7: {answer007}")
+  let answer008 = problem008(digits: thousand_digits, window: 13)
+  assert answer008 == 23514624000, "problem 8 has the wrong answer"
+  log("problem 8: {answer008}")
+  let answer009 = problem009(1000)
+  assert answer009 == 31875000, "problem 9 has the wrong answer"
+  log("problem 9: {answer009}")
+  let answer010 = problem010(2000000)
+  assert answer010 == 142913828922, "problem 10 has the wrong answer"
+  log("problem 10: {answer010}")
+  return nothing
+end fn main

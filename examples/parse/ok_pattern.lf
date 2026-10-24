@@ -1,0 +1,12 @@
+fn unwrap_or_zero(r: Result<Int, Text>) -> Int
+  pure
+  example "ok"
+    r: Ok(3)
+    -> 3
+  end
+  match r
+    Ok(n) ->
+      return n
+    Err(_) -> return 0
+  end
+end fn unwrap_or_zero

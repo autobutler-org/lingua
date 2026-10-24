@@ -1,0 +1,64 @@
+(module "expressions"
+  (imports (import (names "Cents" "percent" "half_up") "money"))
+  (decls
+    (fn "exprs"
+      (params
+        (param "xs" (apply "List" (args (named "Int"))))
+        (param "t"
+          (apply "Result"
+            (args (apply "List" (args (named "Int"))) (named "Text")))))
+      (named "Int")
+      reads-clock
+      (examples
+        (example "all"
+          (bindings
+            (binding "xs" (list (items (int 1) (int 2)) false))
+            (binding "t"
+              (call (name "Ok") (args (arg nil (list (items) false))) false))
+            (binding "clock" (list (items (int 1)) false)))
+          (body)
+          (value (int 7))))
+      (statements
+        (let "a" nil
+          (binary sub
+            (binary add (int 1) (binary mul (int 2) (int 3)))
+            (neg (index (name "xs") (int 0)))))
+        (let "b" nil (neg (field (field (name "t") "items") "first")))
+        (let "c" nil
+          (binary add
+            (comptime (call (name "f") (args (arg nil (int 1))) false))
+            (int 2)))
+        (let "d" nil (binary le (name "a") (name "b")))
+        (let "e" nil (clock-now))
+        (let "s" nil
+          (text
+            (literal "sum ")
+            (hole (binary add (name "a") (int 1)))
+            (literal " of ")
+            (hole (index (name "xs") (int 0)))
+            (literal " and ")
+            (hole (call (name "f") (args (arg nil (text (literal "x")))) false))))
+        (var "i" nil (int 0))
+        (for-range "k" (int 0) (int 3) (body (set "i" add-assign (name "k"))))
+        (for-list "x"
+          (name "xs")
+          (body
+            (expr-stmt
+              (call
+                (name "log")
+                (args (arg nil (text (literal "x is ") (hole (name "x")))))
+                false))))
+        (let "p" nil (or-return (int-in (name "a") (int 1) (int 100)) (int 0)))
+        (let "q" nil (or-return (int-at-least (name "b") (int 0)) nil))
+        (let "r" nil (list (items (bool true) (bool false) (nothing)) false))
+        (let "m" nil
+          (binary add
+            (name "a")
+            (binary rem
+              (binary mul (binary div (name "b") (name "c")) (name "d"))
+              (name "e"))))
+        (let "n" nil
+          (binary rem
+            (binary div (binary div (name "a") (name "b")) (name "c"))
+            (name "d")))
+        (return (binary mul (binary add (name "a") (name "b")) (name "c")))))))

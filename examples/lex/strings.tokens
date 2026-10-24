@@ -6,7 +6,7 @@
 3:38 Newline
 4:1 String([Text("braces {literal}")])
 4:21 Newline
-5:1 String([Text("loaded "), Hole("n"), Text(" orders")])
+5:1 String([Text("loaded "), Hole { source: "n", location: Location { line: 5, column: 10 } }, Text(" orders")])
 5:20 Newline
-6:1 String([Text("nested "), Hole("label(\"a\", \"{x}\")"), Text(" end")])
+6:1 String([Text("nested "), Hole { source: "label(\"a\", \"{x}\")", location: Location { line: 6, column: 10 } }, Text(" end")])
 6:33 Newline
