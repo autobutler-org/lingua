@@ -1,0 +1,102 @@
+fn nominal_int.subtotal params=2 vregs=3 stack=site.0
+b0:
+  v2 = mul.chk v0, v1 @site.1
+  ret v2
+
+fn nominal_int.change params=2 vregs=3 stack=site.2
+b0:
+  v2 = sub.chk v0, v1 @site.3
+  ret v2
+
+fn nominal_int.main params=0 vregs=60 stack=site.4
+b0:
+  v0 = const 250
+  v1 = move v0
+  v2 = const 3
+  v3 = move v2
+  v4 = call nominal_int.subtotal(v1, v3)
+  v5 = move v4
+  v6 = addr str.0
+  v7 = call rt.int_to_text(v5)
+  v8 = const 24
+  v9 = call rt.alloc(v8)
+  v10 = const 2
+  store v9, 0, v10
+  store v9, 8, v6
+  store v9, 16, v7
+  v11 = call rt.text_concat(v9)
+  v12 = call rt.log(v11)
+  v13 = const 1000
+  v14 = move v13
+  v15 = addr str.1
+  v16 = call nominal_int.change(v14, v5)
+  v17 = call rt.int_to_text(v16)
+  v18 = const 24
+  v19 = call rt.alloc(v18)
+  v20 = const 2
+  store v19, 0, v20
+  store v19, 8, v15
+  store v19, 16, v17
+  v21 = call rt.text_concat(v19)
+  v22 = call rt.log(v21)
+  v23 = addr str.2
+  v24 = call nominal_int.change(v1, v5)
+  v25 = call rt.int_to_text(v24)
+  v26 = const 24
+  v27 = call rt.alloc(v26)
+  v28 = const 2
+  store v27, 0, v28
+  store v27, 8, v23
+  store v27, 16, v25
+  v29 = call rt.text_concat(v27)
+  v30 = call rt.log(v29)
+  v31 = const 0
+  v32 = move v31
+  v33 = add.chk v32, v5 @site.5
+  v32 = move v33
+  v34 = add.chk v32, v1 @site.6
+  v32 = move v34
+  v35 = addr str.3
+  v36 = call rt.int_to_text(v32)
+  v37 = const 24
+  v38 = call rt.alloc(v37)
+  v39 = const 2
+  store v38, 0, v39
+  store v38, 8, v35
+  store v38, 16, v36
+  v40 = call rt.text_concat(v38)
+  v41 = call rt.log(v40)
+  v42 = move v32
+  v43 = addr str.4
+  v44 = const -2000
+  v45 = add.chk v42, v44 @site.7
+  v46 = call rt.int_to_text(v45)
+  v47 = const 24
+  v48 = call rt.alloc(v47)
+  v49 = const 2
+  store v48, 0, v49
+  store v48, 8, v43
+  store v48, 16, v46
+  v50 = call rt.text_concat(v48)
+  v51 = call rt.log(v50)
+  v52 = addr str.5
+  v53 = call rt.int_to_text(v3)
+  v54 = const 24
+  v55 = call rt.alloc(v54)
+  v56 = const 2
+  store v55, 0, v56
+  store v55, 8, v52
+  store v55, 16, v53
+  v57 = call rt.text_concat(v55)
+  v58 = call rt.log(v57)
+  v59 = const 0
+  ret v59
+
+site.0 fault L077 nominal_int.lf:5:1
+site.1 fault L040 nominal_int.lf:13:10
+site.2 fault L077 nominal_int.lf:16:1
+site.3 fault L040 nominal_int.lf:24:10
+site.4 fault L077 nominal_int.lf:27:1
+site.5 fault L040 nominal_int.lf:38:16
+site.6 fault L040 nominal_int.lf:39:16
+site.7 fault L040 nominal_int.lf:42:17

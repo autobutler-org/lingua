@@ -1,0 +1,151 @@
+fn list_patterns.shape_of params=1 vregs=43 stack=site.0
+b0:
+  v2 = load v0, 0
+  v3 = const 0
+  v4 = eq v2, v3
+  branch v4, b3, b2
+b1:
+  ret v1
+b2:
+  v6 = load v0, 0
+  v7 = const 1
+  v8 = eq v6, v7
+  branch v8, b5, b4
+b3:
+  v5 = addr str.0
+  v1 = move v5
+  jump b1
+b4:
+  v16 = load v0, 0
+  v17 = const 2
+  v18 = eq v16, v17
+  branch v18, b7, b6
+b5:
+  v9 = load v0, 8
+  v10 = move v9
+  v11 = addr str.1
+  v12 = const 24
+  v13 = call rt.alloc(v12)
+  v14 = const 2
+  store v13, 0, v14
+  store v13, 8, v11
+  store v13, 16, v10
+  v15 = call rt.text_concat(v13)
+  v1 = move v15
+  jump b1
+b6:
+  v29 = load v0, 0
+  v30 = const 2
+  v31 = eq v29, v30
+  branch v31, b10, b9
+b7:
+  v19 = load v0, 8
+  v20 = addr str.2
+  v21 = call rt.text_eq(v19, v20)
+  branch v21, b8, b6
+b8:
+  v22 = load v0, 16
+  v23 = move v22
+  v24 = addr str.3
+  v25 = const 24
+  v26 = call rt.alloc(v25)
+  v27 = const 2
+  store v26, 0, v27
+  store v26, 8, v24
+  store v26, 16, v23
+  v28 = call rt.text_concat(v26)
+  v1 = move v28
+  jump b1
+b9:
+  v42 = addr str.6
+  v1 = move v42
+  jump b1
+b10:
+  v32 = load v0, 8
+  v33 = move v32
+  v34 = load v0, 16
+  v35 = move v34
+  v36 = addr str.4
+  v37 = addr str.5
+  v38 = const 40
+  v39 = call rt.alloc(v38)
+  v40 = const 4
+  store v39, 0, v40
+  store v39, 8, v36
+  store v39, 16, v33
+  store v39, 24, v37
+  store v39, 32, v35
+  v41 = call rt.text_concat(v39)
+  v1 = move v41
+  jump b1
+b11:
+  raise site.1
+
+fn list_patterns.main params=0 vregs=46 stack=site.2
+b0:
+  v0 = const 8
+  v1 = call rt.alloc(v0)
+  v2 = const 0
+  store v1, 0, v2
+  v3 = call list_patterns.shape_of(v1)
+  v4 = call rt.log(v3)
+  v5 = addr str.7
+  v6 = const 16
+  v7 = call rt.alloc(v6)
+  v8 = const 1
+  store v7, 0, v8
+  store v7, 8, v5
+  v9 = call list_patterns.shape_of(v7)
+  v10 = call rt.log(v9)
+  v11 = addr str.2
+  v12 = addr str.8
+  v13 = const 24
+  v14 = call rt.alloc(v13)
+  v15 = const 2
+  store v14, 0, v15
+  store v14, 8, v11
+  store v14, 16, v12
+  v16 = call list_patterns.shape_of(v14)
+  v17 = call rt.log(v16)
+  v18 = addr str.9
+  v19 = addr str.10
+  v20 = const 24
+  v21 = call rt.alloc(v20)
+  v22 = const 2
+  store v21, 0, v22
+  store v21, 8, v18
+  store v21, 16, v19
+  v23 = call list_patterns.shape_of(v21)
+  v24 = call rt.log(v23)
+  v25 = addr str.2
+  v26 = addr str.9
+  v27 = addr str.10
+  v28 = const 32
+  v29 = call rt.alloc(v28)
+  v30 = const 3
+  store v29, 0, v30
+  store v29, 8, v25
+  store v29, 16, v26
+  store v29, 24, v27
+  v31 = call list_patterns.shape_of(v29)
+  v32 = call rt.log(v31)
+  v33 = addr str.11
+  v34 = addr str.12
+  v35 = addr site.3
+  v36 = call rt.split(v33, v34, v35)
+  v37 = call list_patterns.shape_of(v36)
+  v38 = call rt.log(v37)
+  v39 = addr str.13
+  v40 = addr str.12
+  v41 = addr site.4
+  v42 = call rt.split(v39, v40, v41)
+  v43 = call list_patterns.shape_of(v42)
+  v44 = call rt.log(v43)
+  v45 = const 0
+  ret v45
+
+site.0 fault L077 list_patterns.lf:1:1
+site.1 internal list_patterns.lf:12:10
+site.2 fault L077 list_patterns.lf:21:1
+site.3 fault L046 list_patterns.lf:29:16
+site.4 fault L046 list_patterns.lf:30:16

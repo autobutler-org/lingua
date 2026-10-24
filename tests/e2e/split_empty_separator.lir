@@ -1,0 +1,40 @@
+fn split_empty_separator.main params=0 vregs=27 stack=site.0
+b0:
+  v0 = addr str.0
+  v1 = move v0
+  v2 = addr str.1
+  v3 = addr str.2
+  v4 = addr str.3
+  v5 = addr site.1
+  v6 = call rt.split(v3, v4, v5)
+  v7 = load v6, 0
+  v8 = call rt.int_to_text(v7)
+  v9 = const 24
+  v10 = call rt.alloc(v9)
+  v11 = const 2
+  store v10, 0, v11
+  store v10, 8, v2
+  store v10, 16, v8
+  v12 = call rt.text_concat(v10)
+  v13 = call rt.log(v12)
+  v14 = addr str.4
+  v15 = addr site.2
+  v16 = call rt.split(v14, v1, v15)
+  v17 = move v16
+  v18 = addr str.5
+  v19 = load v17, 0
+  v20 = call rt.int_to_text(v19)
+  v21 = const 24
+  v22 = call rt.alloc(v21)
+  v23 = const 2
+  store v22, 0, v23
+  store v22, 8, v18
+  store v22, 16, v20
+  v24 = call rt.text_concat(v22)
+  v25 = call rt.log(v24)
+  v26 = const 0
+  ret v26
+
+site.0 fault L077 split_empty_separator.lf:1:1
+site.1 fault L046 split_empty_separator.lf:5:23
+site.2 fault L046 split_empty_separator.lf:6:15

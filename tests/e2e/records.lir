@@ -1,0 +1,145 @@
+fn records.magnitude params=1 vregs=4 stack=site.0
+b0:
+  v1 = const 0
+  v2 = lt v0, v1
+  branch v2, b1, b2
+b1:
+  v3 = neg.chk v0 @site.1
+  ret v3
+b2:
+  jump b3
+b3:
+  ret v0
+
+fn records.manhattan params=1 vregs=16 stack=site.2
+b0:
+  v1 = load v0, 8
+  v2 = load v1, 0
+  v3 = load v0, 0
+  v4 = load v3, 0
+  v5 = sub.chk v2, v4 @site.3
+  v6 = move v5
+  v7 = load v0, 8
+  v8 = load v7, 8
+  v9 = load v0, 0
+  v10 = load v9, 8
+  v11 = sub.chk v8, v10 @site.4
+  v12 = move v11
+  v13 = call records.magnitude(v6)
+  v14 = call records.magnitude(v12)
+  v15 = add.chk v13, v14 @site.5
+  ret v15
+
+fn records.main params=0 vregs=72 stack=site.6
+b0:
+  v0 = const 0
+  v1 = const 0
+  v2 = const 16
+  v3 = call rt.alloc(v2)
+  store v3, 0, v0
+  store v3, 8, v1
+  v4 = move v3
+  v5 = const 3
+  v6 = const -4
+  v7 = const 16
+  v8 = call rt.alloc(v7)
+  store v8, 0, v5
+  store v8, 8, v6
+  v9 = move v8
+  v10 = const 16
+  v11 = call rt.alloc(v10)
+  store v11, 0, v4
+  store v11, 8, v9
+  v12 = move v11
+  v13 = addr str.0
+  v14 = load v9, 0
+  v15 = call rt.int_to_text(v14)
+  v16 = addr str.1
+  v17 = load v9, 8
+  v18 = call rt.int_to_text(v17)
+  v19 = const 40
+  v20 = call rt.alloc(v19)
+  v21 = const 4
+  store v20, 0, v21
+  store v20, 8, v13
+  store v20, 16, v15
+  store v20, 24, v16
+  store v20, 32, v18
+  v22 = call rt.text_concat(v20)
+  v23 = call rt.log(v22)
+  v24 = addr str.2
+  v25 = call records.manhattan(v12)
+  v26 = call rt.int_to_text(v25)
+  v27 = const 24
+  v28 = call rt.alloc(v27)
+  v29 = const 2
+  store v28, 0, v29
+  store v28, 8, v24
+  store v28, 16, v26
+  v30 = call rt.text_concat(v28)
+  v31 = call rt.log(v30)
+  v32 = addr str.3
+  v33 = load v12, 0
+  v34 = load v33, 8
+  v35 = call rt.int_to_text(v34)
+  v36 = const 24
+  v37 = call rt.alloc(v36)
+  v38 = const 2
+  store v37, 0, v38
+  store v37, 8, v32
+  store v37, 16, v35
+  v39 = call rt.text_concat(v37)
+  v40 = call rt.log(v39)
+  v41 = const 1
+  v42 = const 9
+  v43 = const 16
+  v44 = call rt.alloc(v43)
+  store v44, 0, v41
+  store v44, 8, v42
+  v45 = move v44
+  v46 = addr str.4
+  v47 = load v45, 0
+  v48 = call rt.int_to_text(v47)
+  v49 = addr str.5
+  v50 = load v45, 8
+  v51 = call rt.int_to_text(v50)
+  v52 = const 40
+  v53 = call rt.alloc(v52)
+  v54 = const 4
+  store v53, 0, v54
+  store v53, 8, v46
+  store v53, 16, v48
+  store v53, 24, v49
+  store v53, 32, v51
+  v55 = call rt.text_concat(v53)
+  v56 = call rt.log(v55)
+  v57 = addr str.6
+  v58 = const 36
+  v59 = const 16
+  v60 = call rt.alloc(v59)
+  store v60, 0, v57
+  store v60, 8, v58
+  v61 = move v60
+  v62 = load v61, 0
+  v63 = addr str.7
+  v64 = load v61, 8
+  v65 = call rt.int_to_text(v64)
+  v66 = const 32
+  v67 = call rt.alloc(v66)
+  v68 = const 3
+  store v67, 0, v68
+  store v67, 8, v62
+  store v67, 16, v63
+  store v67, 24, v65
+  v69 = call rt.text_concat(v67)
+  v70 = call rt.log(v69)
+  v71 = const 0
+  ret v71
+
+site.0 fault L077 records.lf:16:1
+site.1 fault L040 records.lf:28:12
+site.2 fault L077 records.lf:33:1
+site.3 fault L040 records.lf:40:12
+site.4 fault L040 records.lf:41:12
+site.5 fault L040 records.lf:42:10
+site.6 fault L077 records.lf:45:1

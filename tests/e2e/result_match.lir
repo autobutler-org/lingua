@@ -1,0 +1,147 @@
+fn result_match.check_name params=1 vregs=28 stack=site.0
+b0:
+  v1 = call rt.trim(v0)
+  v2 = move v1
+  v3 = addr str.0
+  v4 = call rt.text_eq(v2, v3)
+  v5 = const 1
+  v6 = eq v4, v5
+  branch v6, b1, b2
+b1:
+  v7 = addr var.result_match.NameError.Empty
+  v8 = const 1
+  v9 = const 16
+  v10 = call rt.alloc(v9)
+  store v10, 0, v8
+  store v10, 8, v7
+  ret v10
+b2:
+  jump b3
+b3:
+  v11 = addr str.1
+  v12 = addr site.1
+  v13 = call rt.split(v2, v11, v12)
+  v14 = move v13
+  v15 = load v14, 0
+  v16 = const 2
+  v17 = gt v15, v16
+  branch v17, b4, b5
+b4:
+  v18 = load v14, 0
+  v19 = const 1
+  v20 = const 16
+  v21 = call rt.alloc(v20)
+  store v21, 0, v19
+  store v21, 8, v18
+  v22 = const 1
+  v23 = const 16
+  v24 = call rt.alloc(v23)
+  store v24, 0, v22
+  store v24, 8, v21
+  ret v24
+b5:
+  jump b6
+b6:
+  v25 = const 0
+  v26 = const 16
+  v27 = call rt.alloc(v26)
+  store v27, 0, v25
+  store v27, 8, v2
+  ret v27
+
+fn result_match.explain params=1 vregs=18 stack=site.2
+b0:
+  v2 = load v0, 0
+  v3 = const 0
+  v4 = eq v2, v3
+  branch v4, b3, b2
+b1:
+  ret v1
+b2:
+  v6 = load v0, 0
+  v7 = const 1
+  v8 = eq v6, v7
+  branch v8, b5, b4
+b3:
+  v5 = addr str.2
+  v1 = move v5
+  jump b1
+b4:
+  raise site.3
+b5:
+  v9 = load v0, 8
+  v10 = move v9
+  v11 = addr str.3
+  v12 = call rt.int_to_text(v10)
+  v13 = addr str.4
+  v14 = const 32
+  v15 = call rt.alloc(v14)
+  v16 = const 3
+  store v15, 0, v16
+  store v15, 8, v11
+  store v15, 16, v12
+  store v15, 24, v13
+  v17 = call rt.text_concat(v15)
+  v1 = move v17
+  jump b1
+
+fn result_match.report params=1 vregs=19 stack=site.4
+b0:
+  v2 = call result_match.check_name(v0)
+  v3 = load v2, 0
+  v4 = const 0
+  v5 = eq v3, v4
+  branch v5, b3, b2
+b1:
+  ret v1
+b2:
+  v13 = load v2, 0
+  v14 = const 1
+  v15 = eq v13, v14
+  branch v15, b5, b4
+b3:
+  v6 = load v2, 8
+  v7 = move v6
+  v8 = addr str.5
+  v9 = const 24
+  v10 = call rt.alloc(v9)
+  v11 = const 2
+  store v10, 0, v11
+  store v10, 8, v8
+  store v10, 16, v7
+  v12 = call rt.text_concat(v10)
+  v1 = move v12
+  jump b1
+b4:
+  raise site.5
+b5:
+  v16 = load v2, 8
+  v17 = move v16
+  v18 = call result_match.explain(v17)
+  v1 = move v18
+  jump b1
+
+fn result_match.main params=0 vregs=13 stack=site.6
+b0:
+  v0 = addr str.6
+  v1 = call result_match.report(v0)
+  v2 = call rt.log(v1)
+  v3 = addr str.7
+  v4 = call result_match.report(v3)
+  v5 = call rt.log(v4)
+  v6 = addr str.8
+  v7 = call result_match.report(v6)
+  v8 = call rt.log(v7)
+  v9 = addr str.9
+  v10 = call result_match.report(v9)
+  v11 = call rt.log(v10)
+  v12 = const 0
+  ret v12
+
+site.0 fault L077 result_match.lf:6:1
+site.1 fault L046 result_match.lf:25:15
+site.2 fault L077 result_match.lf:32:1
+site.3 internal result_match.lf:39:10
+site.4 fault L077 result_match.lf:45:1
+site.5 internal result_match.lf:52:10
+site.6 fault L077 result_match.lf:58:1

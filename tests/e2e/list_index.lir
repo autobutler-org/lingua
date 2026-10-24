@@ -1,0 +1,199 @@
+fn list_index.pick params=2 vregs=28 stack=site.0
+b0:
+  v3 = call rt.list_index(v0, v1)
+  v4 = load v3, 0
+  v5 = const 0
+  v6 = eq v4, v5
+  branch v6, b3, b2
+b1:
+  ret v2
+b2:
+  v17 = load v3, 0
+  v18 = const 1
+  v19 = eq v17, v18
+  branch v19, b5, b4
+b3:
+  v7 = load v3, 8
+  v8 = move v7
+  v9 = addr str.0
+  v10 = call rt.int_to_text(v1)
+  v11 = addr str.1
+  v12 = call rt.int_to_text(v8)
+  v13 = const 40
+  v14 = call rt.alloc(v13)
+  v15 = const 4
+  store v14, 0, v15
+  store v14, 8, v9
+  store v14, 16, v10
+  store v14, 24, v11
+  store v14, 32, v12
+  v16 = call rt.text_concat(v14)
+  v2 = move v16
+  jump b1
+b4:
+  raise site.1
+b5:
+  v20 = load v3, 8
+  v21 = addr str.0
+  v22 = call rt.int_to_text(v1)
+  v23 = addr str.2
+  v24 = const 32
+  v25 = call rt.alloc(v24)
+  v26 = const 3
+  store v25, 0, v26
+  store v25, 8, v21
+  store v25, 16, v22
+  store v25, 24, v23
+  v27 = call rt.text_concat(v25)
+  v2 = move v27
+  jump b1
+
+fn list_index.main params=0 vregs=96 stack=site.2
+b0:
+  v0 = const 2
+  v1 = const 3
+  v2 = const 5
+  v3 = const 7
+  v4 = const 40
+  v5 = call rt.alloc(v4)
+  v6 = const 4
+  store v5, 0, v6
+  store v5, 8, v0
+  store v5, 16, v1
+  store v5, 24, v2
+  store v5, 32, v3
+  v7 = move v5
+  v8 = const 0
+  v9 = call list_index.pick(v7, v8)
+  v10 = call rt.log(v9)
+  v11 = const 3
+  v12 = call list_index.pick(v7, v11)
+  v13 = call rt.log(v12)
+  v14 = const 4
+  v15 = call list_index.pick(v7, v14)
+  v16 = call rt.log(v15)
+  v17 = const -1
+  v18 = call list_index.pick(v7, v17)
+  v19 = call rt.log(v18)
+  v20 = const 8
+  v21 = call rt.alloc(v20)
+  v22 = const 0
+  store v21, 0, v22
+  v23 = const 0
+  v24 = call list_index.pick(v21, v23)
+  v25 = call rt.log(v24)
+  v26 = const 9223372036854775807
+  v27 = move v26
+  v28 = call list_index.pick(v7, v27)
+  v29 = call rt.log(v28)
+  v30 = const 10
+  v31 = const 20
+  v32 = const 30
+  v33 = const 32
+  v34 = call rt.alloc(v33)
+  v35 = const 3
+  store v34, 0, v35
+  store v34, 8, v30
+  store v34, 16, v31
+  store v34, 24, v32
+  v36 = const 2
+  v37 = const 3
+  v38 = shl v36, v37
+  v39 = add v34, v38
+  v40 = load v39, 8
+  v41 = move v40
+  v42 = addr str.3
+  v43 = call rt.int_to_text(v41)
+  v44 = const 24
+  v45 = call rt.alloc(v44)
+  v46 = const 2
+  store v45, 0, v46
+  store v45, 8, v42
+  store v45, 16, v43
+  v47 = call rt.text_concat(v45)
+  v48 = call rt.log(v47)
+  v50 = const 1
+  v51 = call rt.list_index(v7, v50)
+  v52 = load v51, 0
+  v53 = const 0
+  v54 = eq v52, v53
+  branch v54, b3, b2
+b1:
+  v61 = move v49
+  v62 = addr str.4
+  v63 = call rt.int_to_text(v61)
+  v64 = const 24
+  v65 = call rt.alloc(v64)
+  v66 = const 2
+  store v65, 0, v66
+  store v65, 8, v62
+  store v65, 16, v63
+  v67 = call rt.text_concat(v65)
+  v68 = call rt.log(v67)
+  v69 = addr str.5
+  v70 = addr str.6
+  v71 = const 24
+  v72 = call rt.alloc(v71)
+  v73 = const 2
+  store v72, 0, v73
+  store v72, 8, v69
+  store v72, 16, v70
+  v74 = move v72
+  v76 = const 5
+  v77 = call rt.list_index(v74, v76)
+  v78 = load v77, 0
+  v79 = const 0
+  v80 = eq v78, v79
+  branch v80, b8, b7
+b2:
+  v57 = load v51, 0
+  v58 = const 1
+  v59 = eq v57, v58
+  branch v59, b5, b4
+b3:
+  v55 = load v51, 8
+  v56 = move v55
+  v49 = move v56
+  jump b1
+b4:
+  raise site.4
+b5:
+  v60 = load v51, 8
+  raise site.3
+b6:
+  v88 = move v75
+  v89 = addr str.8
+  v90 = const 24
+  v91 = call rt.alloc(v90)
+  v92 = const 2
+  store v91, 0, v92
+  store v91, 8, v89
+  store v91, 16, v88
+  v93 = call rt.text_concat(v91)
+  v94 = call rt.log(v93)
+  v95 = const 0
+  ret v95
+b7:
+  v83 = load v77, 0
+  v84 = const 1
+  v85 = eq v83, v84
+  branch v85, b10, b9
+b8:
+  v81 = load v77, 8
+  v82 = move v81
+  v75 = move v82
+  jump b6
+b9:
+  raise site.5
+b10:
+  v86 = load v77, 8
+  v87 = addr str.7
+  v75 = move v87
+  jump b6
+
+site.0 fault L077 list_index.lf:1:1
+site.1 internal list_index.lf:14:10
+site.2 fault L077 list_index.lf:20:1
+site.3 exception list_index.lf:33:27
+site.4 internal list_index.lf:33:17
+site.5 internal list_index.lf:36:17

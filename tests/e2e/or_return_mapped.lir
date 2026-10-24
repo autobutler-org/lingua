@@ -1,0 +1,183 @@
+fn or_return_mapped.parse_quantity params=1 vregs=22 stack=site.0
+b0:
+  v2 = const 1
+  v3 = const 99
+  v4 = call rt.int_in_text(v0, v2, v3)
+  v5 = load v4, 0
+  v6 = const 0
+  v7 = eq v5, v6
+  branch v7, b3, b2
+b1:
+  v18 = move v1
+  v19 = const 0
+  v20 = const 16
+  v21 = call rt.alloc(v20)
+  store v21, 0, v19
+  store v21, 8, v18
+  ret v21
+b2:
+  v10 = load v4, 0
+  v11 = const 1
+  v12 = eq v10, v11
+  branch v12, b5, b4
+b3:
+  v8 = load v4, 8
+  v9 = move v8
+  v1 = move v9
+  jump b1
+b4:
+  raise site.1
+b5:
+  v13 = load v4, 8
+  v14 = addr var.or_return_mapped.OrderError.BadQuantity
+  v15 = const 1
+  v16 = const 16
+  v17 = call rt.alloc(v16)
+  store v17, 0, v15
+  store v17, 8, v14
+  ret v17
+
+fn or_return_mapped.render params=1 vregs=26 stack=site.2
+b0:
+  v2 = call or_return_mapped.parse_quantity(v0)
+  v3 = load v2, 0
+  v4 = const 0
+  v5 = eq v3, v4
+  branch v5, b3, b2
+b1:
+  ret v1
+b2:
+  v14 = load v2, 0
+  v15 = const 1
+  v16 = eq v14, v15
+  branch v16, b5, b4
+b3:
+  v6 = load v2, 8
+  v7 = move v6
+  v8 = addr str.0
+  v9 = call rt.int_to_text(v7)
+  v10 = const 32
+  v11 = call rt.alloc(v10)
+  v12 = const 3
+  store v11, 0, v12
+  store v11, 8, v0
+  store v11, 16, v8
+  store v11, 24, v9
+  v13 = call rt.text_concat(v11)
+  v1 = move v13
+  jump b1
+b4:
+  raise site.3
+b5:
+  v17 = load v2, 8
+  v18 = load v17, 0
+  v19 = const 0
+  v20 = eq v18, v19
+  branch v20, b6, b4
+b6:
+  v21 = addr str.1
+  v22 = const 24
+  v23 = call rt.alloc(v22)
+  v24 = const 2
+  store v23, 0, v24
+  store v23, 8, v0
+  store v23, 16, v21
+  v25 = call rt.text_concat(v23)
+  v1 = move v25
+  jump b1
+
+fn or_return_mapped.main params=0 vregs=58 stack=site.4
+b0:
+  v0 = addr str.2
+  v1 = call or_return_mapped.render(v0)
+  v2 = call rt.log(v1)
+  v3 = addr str.3
+  v4 = call or_return_mapped.render(v3)
+  v5 = call rt.log(v4)
+  v6 = addr str.4
+  v7 = call or_return_mapped.render(v6)
+  v8 = call rt.log(v7)
+  v9 = addr str.5
+  v10 = call or_return_mapped.render(v9)
+  v11 = call rt.log(v10)
+  v12 = addr str.6
+  v13 = call or_return_mapped.render(v12)
+  v14 = call rt.log(v13)
+  v16 = addr str.7
+  v17 = call or_return_mapped.parse_quantity(v16)
+  v18 = load v17, 0
+  v19 = const 0
+  v20 = eq v18, v19
+  branch v20, b3, b2
+b1:
+  v28 = move v15
+  v29 = addr str.8
+  v30 = call rt.int_to_text(v28)
+  v31 = const 24
+  v32 = call rt.alloc(v31)
+  v33 = const 2
+  store v32, 0, v33
+  store v32, 8, v29
+  store v32, 16, v30
+  v34 = call rt.text_concat(v32)
+  v35 = call rt.log(v34)
+  v37 = addr str.9
+  v38 = call or_return_mapped.parse_quantity(v37)
+  v39 = load v38, 0
+  v40 = const 0
+  v41 = eq v39, v40
+  branch v41, b8, b7
+b2:
+  v23 = load v17, 0
+  v24 = const 1
+  v25 = eq v23, v24
+  branch v25, b5, b4
+b3:
+  v21 = load v17, 8
+  v22 = move v21
+  v15 = move v22
+  jump b1
+b4:
+  raise site.5
+b5:
+  v26 = load v17, 8
+  v27 = const 0
+  ret v27
+b6:
+  v49 = move v36
+  v50 = addr str.10
+  v51 = call rt.int_to_text(v49)
+  v52 = const 24
+  v53 = call rt.alloc(v52)
+  v54 = const 2
+  store v53, 0, v54
+  store v53, 8, v50
+  store v53, 16, v51
+  v55 = call rt.text_concat(v53)
+  v56 = call rt.log(v55)
+  v57 = const 0
+  ret v57
+b7:
+  v44 = load v38, 0
+  v45 = const 1
+  v46 = eq v44, v45
+  branch v46, b10, b9
+b8:
+  v42 = load v38, 8
+  v43 = move v42
+  v36 = move v43
+  jump b6
+b9:
+  raise site.6
+b10:
+  v47 = load v38, 8
+  v48 = const 0
+  ret v48
+
+site.0 fault L077 or_return_mapped.lf:5:1
+site.1 internal or_return_mapped.lf:16:11
+site.2 fault L077 or_return_mapped.lf:20:1
+site.3 internal or_return_mapped.lf:27:10
+site.4 fault L077 or_return_mapped.lf:33:1
+site.5 internal or_return_mapped.lf:41:15
+site.6 internal or_return_mapped.lf:43:16

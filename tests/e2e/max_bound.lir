@@ -1,0 +1,176 @@
+fn max_bound.floor_zero params=1 vregs=4 stack=site.0
+b0:
+  v1 = const 0
+  v3 = ge v1, v0
+  branch v3, b1, b2
+b1:
+  v2 = move v1
+  jump b3
+b2:
+  v2 = move v0
+  jump b3
+b3:
+  ret v2
+
+fn max_bound.discounted params=2 vregs=6 stack=site.1
+b0:
+  v2 = sub.chk v0, v1 @site.2
+  v3 = const 0
+  v5 = ge v2, v3
+  branch v5, b1, b2
+b1:
+  v4 = move v2
+  jump b3
+b2:
+  v4 = move v3
+  jump b3
+b3:
+  ret v4
+
+fn max_bound.main params=0 vregs=86 stack=site.3
+b0:
+  v0 = addr str.0
+  v1 = const -5
+  v2 = call max_bound.floor_zero(v1)
+  v3 = call rt.int_to_text(v2)
+  v4 = const 24
+  v5 = call rt.alloc(v4)
+  v6 = const 2
+  store v5, 0, v6
+  store v5, 8, v0
+  store v5, 16, v3
+  v7 = call rt.text_concat(v5)
+  v8 = call rt.log(v7)
+  v9 = addr str.1
+  v10 = const 42
+  v11 = call max_bound.floor_zero(v10)
+  v12 = call rt.int_to_text(v11)
+  v13 = const 24
+  v14 = call rt.alloc(v13)
+  v15 = const 2
+  store v14, 0, v15
+  store v14, 8, v9
+  store v14, 16, v12
+  v16 = call rt.text_concat(v14)
+  v17 = call rt.log(v16)
+  v18 = addr str.2
+  v19 = const 200
+  v20 = const 500
+  v21 = call max_bound.discounted(v19, v20)
+  v22 = call rt.int_to_text(v21)
+  v23 = const 24
+  v24 = call rt.alloc(v23)
+  v25 = const 2
+  store v24, 0, v25
+  store v24, 8, v18
+  store v24, 16, v22
+  v26 = call rt.text_concat(v24)
+  v27 = call rt.log(v26)
+  v28 = addr str.3
+  v29 = const 1200
+  v30 = const 120
+  v31 = call max_bound.discounted(v29, v30)
+  v32 = call rt.int_to_text(v31)
+  v33 = const 24
+  v34 = call rt.alloc(v33)
+  v35 = const 2
+  store v34, 0, v35
+  store v34, 8, v28
+  store v34, 16, v32
+  v36 = call rt.text_concat(v34)
+  v37 = call rt.log(v36)
+  v38 = addr str.4
+  v39 = const 3
+  v40 = const 9
+  v42 = ge v39, v40
+  branch v42, b1, b2
+b1:
+  v41 = move v39
+  jump b3
+b2:
+  v41 = move v40
+  jump b3
+b3:
+  v43 = call rt.int_to_text(v41)
+  v44 = const 24
+  v45 = call rt.alloc(v44)
+  v46 = const 2
+  store v45, 0, v46
+  store v45, 8, v38
+  store v45, 16, v43
+  v47 = call rt.text_concat(v45)
+  v48 = call rt.log(v47)
+  v49 = addr str.5
+  v50 = const -3
+  v51 = const -9
+  v53 = ge v50, v51
+  branch v53, b4, b5
+b4:
+  v52 = move v50
+  jump b6
+b5:
+  v52 = move v51
+  jump b6
+b6:
+  v54 = call rt.int_to_text(v52)
+  v55 = const 24
+  v56 = call rt.alloc(v55)
+  v57 = const 2
+  store v56, 0, v57
+  store v56, 8, v49
+  store v56, 16, v54
+  v58 = call rt.text_concat(v56)
+  v59 = call rt.log(v58)
+  v60 = const 9223372036854775807
+  v61 = move v60
+  v62 = const -9223372036854775807
+  v63 = const 1
+  v64 = sub.chk v62, v63 @site.4
+  v65 = move v64
+  v66 = addr str.6
+  v67 = const 0
+  v69 = ge v61, v67
+  branch v69, b7, b8
+b7:
+  v68 = move v61
+  jump b9
+b8:
+  v68 = move v67
+  jump b9
+b9:
+  v70 = call rt.int_to_text(v68)
+  v71 = const 24
+  v72 = call rt.alloc(v71)
+  v73 = const 2
+  store v72, 0, v73
+  store v72, 8, v66
+  store v72, 16, v70
+  v74 = call rt.text_concat(v72)
+  v75 = call rt.log(v74)
+  v76 = addr str.7
+  v78 = ge v65, v65
+  branch v78, b10, b11
+b10:
+  v77 = move v65
+  jump b12
+b11:
+  v77 = move v65
+  jump b12
+b12:
+  v79 = call rt.int_to_text(v77)
+  v80 = const 24
+  v81 = call rt.alloc(v80)
+  v82 = const 2
+  store v81, 0, v82
+  store v81, 8, v76
+  store v81, 16, v79
+  v83 = call rt.text_concat(v81)
+  v84 = call rt.log(v83)
+  v85 = const 0
+  ret v85
+
+site.0 fault L077 max_bound.lf:3:1
+site.1 fault L077 max_bound.lf:17:1
+site.2 fault L040 max_bound.lf:30:17
+site.3 fault L077 max_bound.lf:33:1
+site.4 fault L040 max_bound.lf:43:21

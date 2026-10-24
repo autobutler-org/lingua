@@ -1,0 +1,145 @@
+fn int_in_text.bounds_name params=1 vregs=10 stack=site.0
+b0:
+  v2 = load v0, 0
+  v3 = const 0
+  v4 = eq v2, v3
+  branch v4, b3, b2
+b1:
+  ret v1
+b2:
+  v6 = load v0, 0
+  v7 = const 1
+  v8 = eq v6, v7
+  branch v8, b5, b4
+b3:
+  v5 = addr str.0
+  v1 = move v5
+  jump b1
+b4:
+  raise site.1
+b5:
+  v9 = addr str.1
+  v1 = move v9
+  jump b1
+
+fn int_in_text.probe params=1 vregs=29 stack=site.2
+b0:
+  v2 = const -10
+  v3 = const 10
+  v4 = call rt.int_in_text(v0, v2, v3)
+  v5 = load v4, 0
+  v6 = const 0
+  v7 = eq v5, v6
+  branch v7, b3, b2
+b1:
+  ret v1
+b2:
+  v17 = load v4, 0
+  v18 = const 1
+  v19 = eq v17, v18
+  branch v19, b5, b4
+b3:
+  v8 = load v4, 8
+  v9 = move v8
+  v10 = addr str.2
+  v11 = addr str.3
+  v12 = call rt.int_to_text(v9)
+  v13 = const 40
+  v14 = call rt.alloc(v13)
+  v15 = const 4
+  store v14, 0, v15
+  store v14, 8, v10
+  store v14, 16, v0
+  store v14, 24, v11
+  store v14, 32, v12
+  v16 = call rt.text_concat(v14)
+  v1 = move v16
+  jump b1
+b4:
+  raise site.3
+b5:
+  v20 = load v4, 8
+  v21 = move v20
+  v22 = addr str.2
+  v23 = addr str.3
+  v24 = call int_in_text.bounds_name(v21)
+  v25 = const 40
+  v26 = call rt.alloc(v25)
+  v27 = const 4
+  store v26, 0, v27
+  store v26, 8, v22
+  store v26, 16, v0
+  store v26, 24, v23
+  store v26, 32, v24
+  v28 = call rt.text_concat(v26)
+  v1 = move v28
+  jump b1
+
+fn int_in_text.main params=0 vregs=34 stack=site.4
+b0:
+  v0 = addr str.4
+  v1 = addr str.5
+  v2 = addr str.6
+  v3 = addr str.7
+  v4 = addr str.8
+  v5 = addr str.9
+  v6 = addr str.10
+  v7 = addr str.11
+  v8 = addr str.12
+  v9 = addr str.13
+  v10 = addr str.14
+  v11 = addr str.15
+  v12 = addr str.16
+  v13 = addr str.17
+  v14 = addr str.18
+  v15 = addr str.19
+  v16 = addr str.20
+  v17 = const 144
+  v18 = call rt.alloc(v17)
+  v19 = const 17
+  store v18, 0, v19
+  store v18, 8, v0
+  store v18, 16, v1
+  store v18, 24, v2
+  store v18, 32, v3
+  store v18, 40, v4
+  store v18, 48, v5
+  store v18, 56, v6
+  store v18, 64, v7
+  store v18, 72, v8
+  store v18, 80, v9
+  store v18, 88, v10
+  store v18, 96, v11
+  store v18, 104, v12
+  store v18, 112, v13
+  store v18, 120, v14
+  store v18, 128, v15
+  store v18, 136, v16
+  v20 = move v18
+  v21 = move v20
+  v22 = load v21, 0
+  v23 = const 0
+  v24 = move v23
+  jump b1
+b1:
+  v25 = lt v24, v22
+  branch v25, b2, b3
+b2:
+  v26 = const 3
+  v27 = shl v24, v26
+  v28 = add v21, v27
+  v29 = load v28, 8
+  v30 = call int_in_text.probe(v29)
+  v31 = call rt.log(v30)
+  v32 = const 1
+  v24 = add v24, v32
+  jump b1
+b3:
+  v33 = const 0
+  ret v33
+
+site.0 fault L077 int_in_text.lf:1:1
+site.1 internal int_in_text.lf:8:10
+site.2 fault L077 int_in_text.lf:14:1
+site.3 internal int_in_text.lf:25:10
+site.4 fault L077 int_in_text.lf:31:1

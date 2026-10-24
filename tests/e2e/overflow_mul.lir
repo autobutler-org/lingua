@@ -1,0 +1,37 @@
+fn overflow_mul.main params=0 vregs=24 stack=site.0
+b0:
+  v0 = const 4611686018427387904
+  v1 = move v0
+  v2 = const 2
+  v3 = move v2
+  v4 = const -2
+  v5 = move v4
+  v6 = addr str.0
+  v7 = mul.chk v1, v5 @site.1
+  v8 = call rt.int_to_text(v7)
+  v9 = const 24
+  v10 = call rt.alloc(v9)
+  v11 = const 2
+  store v10, 0, v11
+  store v10, 8, v6
+  store v10, 16, v8
+  v12 = call rt.text_concat(v10)
+  v13 = call rt.log(v12)
+  v14 = mul.chk v1, v3 @site.2
+  v15 = move v14
+  v16 = addr str.1
+  v17 = call rt.int_to_text(v15)
+  v18 = const 24
+  v19 = call rt.alloc(v18)
+  v20 = const 2
+  store v19, 0, v20
+  store v19, 8, v16
+  store v19, 16, v17
+  v21 = call rt.text_concat(v19)
+  v22 = call rt.log(v21)
+  v23 = const 0
+  ret v23
+
+site.0 fault L077 overflow_mul.lf:1:1
+site.1 fault L040 overflow_mul.lf:8:16
+site.2 fault L040 overflow_mul.lf:9:17

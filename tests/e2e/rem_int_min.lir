@@ -1,0 +1,40 @@
+fn rem_int_min.main params=0 vregs=26 stack=site.0
+b0:
+  v0 = const -9223372036854775807
+  v1 = const 1
+  v2 = sub.chk v0, v1 @site.1
+  v3 = move v2
+  v4 = const 2
+  v5 = move v4
+  v6 = const -1
+  v7 = move v6
+  v8 = addr str.0
+  v9 = rem.chk v3, v5 @site.2
+  v10 = call rt.int_to_text(v9)
+  v11 = const 24
+  v12 = call rt.alloc(v11)
+  v13 = const 2
+  store v12, 0, v13
+  store v12, 8, v8
+  store v12, 16, v10
+  v14 = call rt.text_concat(v12)
+  v15 = call rt.log(v14)
+  v16 = rem.chk v3, v7 @site.3
+  v17 = move v16
+  v18 = addr str.1
+  v19 = call rt.int_to_text(v17)
+  v20 = const 24
+  v21 = call rt.alloc(v20)
+  v22 = const 2
+  store v21, 0, v22
+  store v21, 8, v18
+  store v21, 16, v19
+  v23 = call rt.text_concat(v21)
+  v24 = call rt.log(v23)
+  v25 = const 0
+  ret v25
+
+site.0 fault L077 rem_int_min.lf:1:1
+site.1 fault L040 rem_int_min.lf:4:21
+site.2 fault L076 fault L040 rem_int_min.lf:7:16
+site.3 fault L076 fault L040 rem_int_min.lf:8:19

@@ -1,0 +1,172 @@
+fn bounded_types.widen params=1 vregs=1 stack=site.0
+b0:
+  ret v0
+
+fn bounded_types.half params=1 vregs=3 stack=site.1
+b0:
+  v1 = const 2
+  v2 = div.chk v0, v1 @site.2
+  ret v2
+
+fn bounded_types.last_digit params=1 vregs=3 stack=site.3
+b0:
+  v1 = const 10
+  v2 = rem.chk v0, v1 @site.4
+  ret v2
+
+fn bounded_types.signed_digit params=1 vregs=3 stack=site.5
+b0:
+  v1 = const 10
+  v2 = rem.chk v0, v1 @site.6
+  ret v2
+
+fn bounded_types.triple params=1 vregs=3 stack=site.7
+b0:
+  v1 = const 3
+  v2 = mul.chk v0, v1 @site.8
+  ret v2
+
+fn bounded_types.main params=0 vregs=92 stack=site.9
+b0:
+  v0 = const 7
+  v1 = move v0
+  v2 = addr str.0
+  v3 = call bounded_types.widen(v1)
+  v4 = call rt.int_to_text(v3)
+  v5 = const 24
+  v6 = call rt.alloc(v5)
+  v7 = const 2
+  store v6, 0, v7
+  store v6, 8, v2
+  store v6, 16, v4
+  v8 = call rt.text_concat(v6)
+  v9 = call rt.log(v8)
+  v10 = const 85
+  v11 = move v10
+  v12 = addr str.1
+  v13 = call bounded_types.half(v11)
+  v14 = call rt.int_to_text(v13)
+  v15 = const 24
+  v16 = call rt.alloc(v15)
+  v17 = const 2
+  store v16, 0, v17
+  store v16, 8, v12
+  store v16, 16, v14
+  v18 = call rt.text_concat(v16)
+  v19 = call rt.log(v18)
+  v20 = addr str.2
+  v21 = const 1234
+  v22 = call bounded_types.last_digit(v21)
+  v23 = call rt.int_to_text(v22)
+  v24 = const 24
+  v25 = call rt.alloc(v24)
+  v26 = const 2
+  store v25, 0, v26
+  store v25, 8, v20
+  store v25, 16, v23
+  v27 = call rt.text_concat(v25)
+  v28 = call rt.log(v27)
+  v29 = addr str.3
+  v30 = const -1234
+  v31 = call bounded_types.signed_digit(v30)
+  v32 = call rt.int_to_text(v31)
+  v33 = const 24
+  v34 = call rt.alloc(v33)
+  v35 = const 2
+  store v34, 0, v35
+  store v34, 8, v29
+  store v34, 16, v32
+  v36 = call rt.text_concat(v34)
+  v37 = call rt.log(v36)
+  v38 = addr str.4
+  v39 = call bounded_types.triple(v1)
+  v40 = call rt.int_to_text(v39)
+  v41 = const 24
+  v42 = call rt.alloc(v41)
+  v43 = const 2
+  store v42, 0, v43
+  store v42, 8, v38
+  store v42, 16, v40
+  v44 = call rt.text_concat(v42)
+  v45 = call rt.log(v44)
+  v46 = addr str.5
+  v47 = const 100
+  v48 = call bounded_types.triple(v47)
+  v49 = call rt.int_to_text(v48)
+  v50 = const 24
+  v51 = call rt.alloc(v50)
+  v52 = const 2
+  store v51, 0, v52
+  store v51, 8, v46
+  store v51, 16, v49
+  v53 = call rt.text_concat(v51)
+  v54 = call rt.log(v53)
+  v55 = move v11
+  v56 = addr str.6
+  v57 = const 100
+  v58 = sub.chk v55, v57 @site.10
+  v59 = call rt.int_to_text(v58)
+  v60 = const 24
+  v61 = call rt.alloc(v60)
+  v62 = const 2
+  store v61, 0, v62
+  store v61, 8, v56
+  store v61, 16, v59
+  v63 = call rt.text_concat(v61)
+  v64 = call rt.log(v63)
+  v65 = const 0
+  v66 = const 3
+  v67 = move v66
+  v68 = move v65
+  jump b1
+b1:
+  v69 = lt v68, v67
+  branch v69, b2, b3
+b2:
+  v70 = move v68
+  v71 = addr str.7
+  v72 = addr str.8
+  v73 = addr str.9
+  v74 = const 32
+  v75 = call rt.alloc(v74)
+  v76 = const 3
+  store v75, 0, v76
+  store v75, 8, v71
+  store v75, 16, v72
+  store v75, 24, v73
+  v77 = const 3
+  v78 = shl v70, v77
+  v79 = add v75, v78
+  v80 = load v79, 8
+  v81 = move v80
+  v82 = addr str.10
+  v83 = call rt.int_to_text(v70)
+  v84 = addr str.11
+  v85 = const 40
+  v86 = call rt.alloc(v85)
+  v87 = const 4
+  store v86, 0, v87
+  store v86, 8, v82
+  store v86, 16, v83
+  store v86, 24, v84
+  store v86, 32, v81
+  v88 = call rt.text_concat(v86)
+  v89 = call rt.log(v88)
+  v90 = const 1
+  v68 = add v68, v90
+  jump b1
+b3:
+  v91 = const 0
+  ret v91
+
+site.0 fault L077 bounded_types.lf:5:1
+site.1 fault L077 bounded_types.lf:15:1
+site.2 fault L076 fault L040 bounded_types.lf:22:10
+site.3 fault L077 bounded_types.lf:25:1
+site.4 fault L076 fault L040 bounded_types.lf:32:10
+site.5 fault L077 bounded_types.lf:35:1
+site.6 fault L076 fault L040 bounded_types.lf:42:10
+site.7 fault L077 bounded_types.lf:45:1
+site.8 fault L040 bounded_types.lf:52:10
+site.9 fault L077 bounded_types.lf:55:1
+site.10 fault L040 bounded_types.lf:67:16

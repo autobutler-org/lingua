@@ -1,0 +1,318 @@
+fn settings.parse_port params=1 vregs=24 stack=site.0
+b0:
+  v2 = const 1
+  v3 = const 65535
+  v4 = call rt.int_in_text(v0, v2, v3)
+  v5 = load v4, 0
+  v6 = const 0
+  v7 = eq v5, v6
+  branch v7, b3, b2
+b1:
+  v20 = move v1
+  v21 = const 0
+  v22 = const 16
+  v23 = call rt.alloc(v22)
+  store v23, 0, v21
+  store v23, 8, v20
+  ret v23
+b2:
+  v10 = load v4, 0
+  v11 = const 1
+  v12 = eq v10, v11
+  branch v12, b5, b4
+b3:
+  v8 = load v4, 8
+  v9 = move v8
+  v1 = move v9
+  jump b1
+b4:
+  raise site.1
+b5:
+  v13 = load v4, 8
+  v14 = const 1
+  v15 = const 16
+  v16 = call rt.alloc(v15)
+  store v16, 0, v14
+  store v16, 8, v0
+  v17 = const 1
+  v18 = const 16
+  v19 = call rt.alloc(v18)
+  store v19, 0, v17
+  store v19, 8, v16
+  ret v19
+
+fn settings.parse_host params=1 vregs=17 stack=site.2
+b0:
+  v1 = call rt.trim(v0)
+  v2 = move v1
+  v3 = addr str.0
+  v4 = call rt.text_eq(v2, v3)
+  v5 = const 1
+  v6 = eq v4, v5
+  branch v6, b1, b2
+b1:
+  v7 = addr str.1
+  v8 = const 0
+  v9 = const 16
+  v10 = call rt.alloc(v9)
+  store v10, 0, v8
+  store v10, 8, v7
+  v11 = const 1
+  v12 = const 16
+  v13 = call rt.alloc(v12)
+  store v13, 0, v11
+  store v13, 8, v10
+  ret v13
+b2:
+  jump b3
+b3:
+  v14 = const 0
+  v15 = const 16
+  v16 = call rt.alloc(v15)
+  store v16, 0, v14
+  store v16, 8, v2
+  ret v16
+
+fn main.parse_endpoint params=1 vregs=56 stack=site.3
+b0:
+  v1 = addr str.2
+  v2 = addr site.4
+  v3 = call rt.split(v0, v1, v2)
+  v4 = load v3, 0
+  v5 = const 2
+  v6 = eq v4, v5
+  branch v6, b3, b2
+b1:
+  v55 = const 0
+  ret v55
+b2:
+  v48 = addr str.3
+  v49 = const 0
+  v50 = const 16
+  v51 = call rt.alloc(v50)
+  store v51, 0, v49
+  store v51, 8, v48
+  v52 = const 1
+  v53 = const 16
+  v54 = call rt.alloc(v53)
+  store v54, 0, v52
+  store v54, 8, v51
+  ret v54
+b3:
+  v7 = load v3, 8
+  v8 = move v7
+  v9 = load v3, 16
+  v10 = move v9
+  v12 = call settings.parse_host(v8)
+  v13 = load v12, 0
+  v14 = const 0
+  v15 = eq v13, v14
+  branch v15, b6, b5
+b4:
+  v26 = move v11
+  v28 = call settings.parse_port(v10)
+  v29 = load v28, 0
+  v30 = const 0
+  v31 = eq v29, v30
+  branch v31, b11, b10
+b5:
+  v18 = load v12, 0
+  v19 = const 1
+  v20 = eq v18, v19
+  branch v20, b8, b7
+b6:
+  v16 = load v12, 8
+  v17 = move v16
+  v11 = move v17
+  jump b4
+b7:
+  raise site.5
+b8:
+  v21 = load v12, 8
+  v22 = move v21
+  v23 = const 1
+  v24 = const 16
+  v25 = call rt.alloc(v24)
+  store v25, 0, v23
+  store v25, 8, v22
+  ret v25
+b9:
+  v42 = move v27
+  v43 = const 16
+  v44 = call rt.alloc(v43)
+  store v44, 0, v26
+  store v44, 8, v42
+  v45 = const 0
+  v46 = const 16
+  v47 = call rt.alloc(v46)
+  store v47, 0, v45
+  store v47, 8, v44
+  ret v47
+b10:
+  v34 = load v28, 0
+  v35 = const 1
+  v36 = eq v34, v35
+  branch v36, b13, b12
+b11:
+  v32 = load v28, 8
+  v33 = move v32
+  v27 = move v33
+  jump b9
+b12:
+  raise site.6
+b13:
+  v37 = load v28, 8
+  v38 = move v37
+  v39 = const 1
+  v40 = const 16
+  v41 = call rt.alloc(v40)
+  store v41, 0, v39
+  store v41, 8, v38
+  ret v41
+b14:
+  raise site.7
+
+fn main.explain params=1 vregs=23 stack=site.8
+b0:
+  v2 = load v0, 0
+  v3 = const 0
+  v4 = eq v2, v3
+  branch v4, b3, b2
+b1:
+  ret v1
+b2:
+  v12 = load v0, 0
+  v13 = const 1
+  v14 = eq v12, v13
+  branch v14, b5, b4
+b3:
+  v5 = load v0, 8
+  v6 = move v5
+  v7 = addr str.4
+  v8 = const 24
+  v9 = call rt.alloc(v8)
+  v10 = const 2
+  store v9, 0, v10
+  store v9, 8, v7
+  store v9, 16, v6
+  v11 = call rt.text_concat(v9)
+  v1 = move v11
+  jump b1
+b4:
+  raise site.9
+b5:
+  v15 = load v0, 8
+  v16 = move v15
+  v17 = addr str.5
+  v18 = addr str.6
+  v19 = const 32
+  v20 = call rt.alloc(v19)
+  v21 = const 3
+  store v20, 0, v21
+  store v20, 8, v17
+  store v20, 16, v16
+  store v20, 24, v18
+  v22 = call rt.text_concat(v20)
+  v1 = move v22
+  jump b1
+
+fn main.render params=1 vregs=22 stack=site.10
+b0:
+  v2 = call main.parse_endpoint(v0)
+  v3 = load v2, 0
+  v4 = const 0
+  v5 = eq v3, v4
+  branch v5, b3, b2
+b1:
+  ret v1
+b2:
+  v16 = load v2, 0
+  v17 = const 1
+  v18 = eq v16, v17
+  branch v18, b5, b4
+b3:
+  v6 = load v2, 8
+  v7 = move v6
+  v8 = load v7, 0
+  v9 = addr str.7
+  v10 = load v7, 8
+  v11 = call rt.int_to_text(v10)
+  v12 = const 32
+  v13 = call rt.alloc(v12)
+  v14 = const 3
+  store v13, 0, v14
+  store v13, 8, v8
+  store v13, 16, v9
+  store v13, 24, v11
+  v15 = call rt.text_concat(v13)
+  v1 = move v15
+  jump b1
+b4:
+  raise site.11
+b5:
+  v19 = load v2, 8
+  v20 = move v19
+  v21 = call main.explain(v20)
+  v1 = move v21
+  jump b1
+
+fn main.main params=0 vregs=26 stack=site.12
+b0:
+  v0 = addr str.8
+  v1 = addr str.9
+  v2 = addr str.10
+  v3 = addr str.11
+  v4 = addr str.12
+  v5 = addr str.13
+  v6 = addr str.14
+  v7 = addr str.15
+  v8 = addr str.16
+  v9 = const 80
+  v10 = call rt.alloc(v9)
+  v11 = const 9
+  store v10, 0, v11
+  store v10, 8, v0
+  store v10, 16, v1
+  store v10, 24, v2
+  store v10, 32, v3
+  store v10, 40, v4
+  store v10, 48, v5
+  store v10, 56, v6
+  store v10, 64, v7
+  store v10, 72, v8
+  v12 = move v10
+  v13 = move v12
+  v14 = load v13, 0
+  v15 = const 0
+  v16 = move v15
+  jump b1
+b1:
+  v17 = lt v16, v14
+  branch v17, b2, b3
+b2:
+  v18 = const 3
+  v19 = shl v16, v18
+  v20 = add v13, v19
+  v21 = load v20, 8
+  v22 = call main.render(v21)
+  v23 = call rt.log(v22)
+  v24 = const 1
+  v16 = add v16, v24
+  jump b1
+b3:
+  v25 = const 0
+  ret v25
+
+site.0 fault L077 settings.lf:10:1
+site.1 internal settings.lf:21:20
+site.2 fault L077 settings.lf:25:1
+site.3 fault L077 main.lf:8:1
+site.4 fault L046 main.lf:19:9
+site.5 internal main.lf:21:18
+site.6 internal main.lf:22:18
+site.7 internal main.lf:19:9
+site.8 fault L077 main.lf:28:1
+site.9 internal main.lf:35:10
+site.10 fault L077 main.lf:41:1
+site.11 internal main.lf:48:10
+site.12 fault L077 main.lf:54:1

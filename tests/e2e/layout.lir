@@ -1,0 +1,31 @@
+fn layout.add params=2 vregs=3 stack=site.0
+b0:
+  v2 = add.chk v0, v1 @site.1
+  ret v2
+
+fn layout.main params=0 vregs=16 stack=site.2
+b0:
+  v0 = const 40
+  v1 = const 2
+  v2 = call layout.add(v0, v1)
+  v3 = move v2
+  v4 = addr str.0
+  v5 = call rt.int_to_text(v3)
+  v6 = const 24
+  v7 = call rt.alloc(v6)
+  v8 = const 2
+  store v7, 0, v8
+  store v7, 8, v4
+  store v7, 16, v5
+  v9 = call rt.text_concat(v7)
+  v10 = call rt.log(v9)
+  v11 = addr str.1
+  v12 = call rt.log(v11)
+  v13 = addr str.2
+  v14 = call rt.log(v13)
+  v15 = const 0
+  ret v15
+
+site.0 fault L077 layout.lf:2:1
+site.1 fault L040 layout.lf:12:10
+site.2 fault L077 layout.lf:15:1

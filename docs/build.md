@@ -221,7 +221,7 @@ An expression-arm match writes each arm's value into one result vreg and jumps t
 
 #### LIR dump
 
-`lingua lir FILE` prints LIR for the user functions of `FILE`'s link set, in module order and then source order. Runtime functions are not printed. The form is one function per paragraph:
+`lingua lir PATH` prints LIR for the user functions of `PATH`'s link set, where `PATH` is a file or a source root as for `build`, in module order and then source order. Runtime functions are not printed. The form is one function per paragraph:
 
 ```text
 fn order.line_subtotal params=1 vregs=4 stack=site.0
@@ -509,7 +509,7 @@ Reg = u8, numbered by the arch table
 
 The dump syntax is Go's: sources first, destination last, `(SB)` for symbols, offsets written `off(reg)`. `TEXT` opens a function and `LABEL` defines a branch target. Generic `JMP`, `CALL`, and `RET` are rewritten by each table into the architecture's forms, as in Go.
 
-`lingua asm [--target os/arch] FILE` prints the `Prog` list of every user function in the link set, in the same order as `lingua lir`.
+`lingua asm [--target os/arch] PATH` prints the `Prog` list of every user function in the link set, in the same order as `lingua lir`.
 
 #### Instruction selection
 
@@ -751,8 +751,8 @@ Code slot `i` is the SHA-256 of file bytes `[4096 i, min(4096 (i+1), codeLimit))
 
 ```text
 lingua build [--source-root PATH] [--target OS/ARCH] [--dynamic] [--refresh | --offline] [PATH ...]
-lingua lir FILE
-lingua asm [--target OS/ARCH] FILE
+lingua lir PATH
+lingua asm [--target OS/ARCH] PATH
 ```
 
 `--dynamic` is described in [Link modes and imports](#link-modes-and-imports); `--static` is a usage error with the message given there. `--target` defaults to the host. An unsupported or malformed value is exit 2, and the message lists the supported targets: `linux/amd64`, `linux/arm64`, `darwin/arm64`. A host that is not one of those targets must pass `--target`, and the error for a missing one says so. `lingua lir` and `lingua asm` run `check` first and exit 1 with its diagnostics if it fails. They do not apply `L074`, so a library module with no `main` still dumps. `lingua asm` without `--target` uses the host, and on an unsupported host it uses `linux/amd64` so goldens are stable.

@@ -1,0 +1,131 @@
+fn process_fields.base_name params=1 vregs=19 stack=site.0
+b0:
+  v1 = addr str.0
+  v2 = addr site.1
+  v3 = call rt.split(v0, v1, v2)
+  v4 = move v3
+  v6 = load v4, 0
+  v7 = const 1
+  v8 = sub.chk v6, v7 @site.2
+  v9 = call rt.list_index(v4, v8)
+  v10 = load v9, 0
+  v11 = const 0
+  v12 = eq v10, v11
+  branch v12, b3, b2
+b1:
+  ret v5
+b2:
+  v15 = load v9, 0
+  v16 = const 1
+  v17 = eq v15, v16
+  branch v17, b5, b4
+b3:
+  v13 = load v9, 8
+  v14 = move v13
+  v5 = move v14
+  jump b1
+b4:
+  raise site.3
+b5:
+  v18 = load v9, 8
+  v5 = move v0
+  jump b1
+
+fn process_fields.main params=1 vregs=57 stack=site.4
+b0:
+  v1 = addr str.1
+  v2 = load v0, 16
+  v3 = const 24
+  v4 = call rt.alloc(v3)
+  v5 = const 2
+  store v4, 0, v5
+  store v4, 8, v1
+  store v4, 16, v2
+  v6 = call rt.text_concat(v4)
+  v7 = call rt.log(v6)
+  v8 = addr str.2
+  v9 = load v0, 24
+  v10 = const 24
+  v11 = call rt.alloc(v10)
+  v12 = const 2
+  store v11, 0, v12
+  store v11, 8, v8
+  store v11, 16, v9
+  v13 = call rt.text_concat(v11)
+  v14 = call rt.log(v13)
+  v15 = addr str.3
+  v16 = load v0, 8
+  v17 = load v16, 0
+  v18 = call rt.int_to_text(v17)
+  v19 = const 24
+  v20 = call rt.alloc(v19)
+  v21 = const 2
+  store v20, 0, v21
+  store v20, 8, v15
+  store v20, 16, v18
+  v22 = call rt.text_concat(v20)
+  v23 = call rt.log(v22)
+  v24 = addr str.4
+  v25 = load v0, 0
+  v26 = call process_fields.base_name(v25)
+  v27 = const 24
+  v28 = call rt.alloc(v27)
+  v29 = const 2
+  store v28, 0, v29
+  store v28, 8, v24
+  store v28, 16, v26
+  v30 = call rt.text_concat(v28)
+  v31 = call rt.log(v30)
+  v32 = addr str.5
+  v33 = load v0, 40
+  v34 = load v33, 8
+  v35 = const 24
+  v36 = call rt.alloc(v35)
+  v37 = const 2
+  store v36, 0, v37
+  store v36, 8, v32
+  store v36, 16, v34
+  v38 = call rt.text_concat(v36)
+  v39 = call rt.log(v38)
+  v40 = load v0, 32
+  v41 = const 0
+  v42 = gt v40, v41
+  branch v42, b1, b2
+b1:
+  v43 = addr str.6
+  v44 = call rt.log(v43)
+  jump b3
+b2:
+  jump b3
+b3:
+  v45 = load v0, 40
+  v46 = load v45, 0
+  v47 = const 0
+  v48 = gt v46, v47
+  branch v48, b4, b5
+b4:
+  v49 = addr str.7
+  v50 = call rt.log(v49)
+  jump b6
+b5:
+  jump b6
+b6:
+  v51 = load v0, 48
+  v52 = const 0
+  v53 = gt v51, v52
+  branch v53, b7, b8
+b7:
+  v54 = addr str.8
+  v55 = call rt.log(v54)
+  jump b9
+b8:
+  jump b9
+b9:
+  v56 = const 0
+  ret v56
+
+site.0 fault L077 process_fields.lf:1:1
+site.1 fault L046 process_fields.lf:12:16
+site.2 fault L040 process_fields.lf:13:23
+site.3 internal process_fields.lf:13:10
+site.4 fault L077 process_fields.lf:19:1

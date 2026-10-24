@@ -16,8 +16,8 @@ commands:
   check --explain L031
                       print the catalog text for a diagnostic code
   build [PATH ...]    check, then build a static linux/amd64 executable at ./lingua-out
-  lir <file.lf>       print the LIR that `build` lowers a source file to
-  asm <file.lf>       print the amd64 instructions that `build` selects for a source file
+  lir PATH            print the LIR that `build` lowers PATH to
+  asm PATH            print the amd64 instructions that `build` selects for PATH
 
 PATH is a `.lf` file directly in the source root, or the source root itself (every module
 in it); it defaults to `.`. The source root is the nearest directory upward with a
@@ -74,7 +74,7 @@ fn main() -> ExitCode {
             let lowered = build::lower(program)?;
             Ok(lir::dump(&lowered.functions, &lowered.sites))
         }),
-        ["lir"] => usage_error("lir needs a file, e.g. `lingua lir tests/e2e/hello.lf`"),
+        ["lir"] => usage_error("lir needs a path, e.g. `lingua lir tests/e2e/hello.lf`"),
         ["asm", path] => dump_program(path, |program| {
             Ok(build::select(program)?
                 .iter()
@@ -82,7 +82,7 @@ fn main() -> ExitCode {
                 .collect::<Vec<_>>()
                 .join("\n"))
         }),
-        ["asm"] => usage_error("asm needs a file, e.g. `lingua asm tests/e2e/hello.lf`"),
+        ["asm"] => usage_error("asm needs a path, e.g. `lingua asm tests/e2e/hello.lf`"),
         [] => usage_error("no command given"),
         [command, ..] => usage_error(&format!("unknown command `{command}`")),
     }
