@@ -1,0 +1,21 @@
+import is_prime from "helpers"
+
+fn problem010(limit: Int) -> Int
+  pure
+  example "below ten"
+    limit: 10
+    -> 17
+  end
+  example "below two"
+    limit: 2
+    -> 0
+  end
+
+  var total: Int = 0
+  for n in 2 until limit
+    if is_prime(n)
+      set total += n
+    end
+  end
+  return total
+end fn problem010

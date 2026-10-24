@@ -1,0 +1,34 @@
+import Loop from "helpers"
+
+fn problem003(n: Int) -> Int
+  pure
+  example "the problem's small case"
+    n: 13195
+    -> 29
+  end
+  example "a prime is its own largest factor"
+    n: 13
+    -> 13
+  end
+  example "a power of two"
+    n: 8
+    -> 2
+  end
+
+  var rest: Int = n
+  var factor: Int = 2
+  var state: Loop = Again
+  while state is Again
+    if factor * factor > rest
+      set state = Done
+    else
+      if rest % factor == 0
+        set rest = rest / factor
+      else
+        set factor += 1
+      end
+      set state = Again
+    end
+  end
+  return rest
+end fn problem003

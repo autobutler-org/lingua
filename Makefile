@@ -49,6 +49,13 @@ run: build ## Build and run the application
 test: ## Run tests
 	$(CARGO) test --locked
 
+.PHONY: euler
+euler: build ## Check the Project Euler solutions in euler/
+	for file in euler/*.lf; do
+		printf '%s: ' "$$file"
+		$(EXE) check "$$file"
+	done
+
 ##@ Dependencies
 
 .PHONY: deps

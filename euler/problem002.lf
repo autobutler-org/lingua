@@ -1,0 +1,32 @@
+import Loop from "helpers"
+
+fn problem002(limit: Int) -> Int
+  pure
+  example "the first ten terms"
+    limit: 89
+    -> 44
+  end
+  example "below the first even term"
+    limit: 1
+    -> 0
+  end
+
+  var total: Int = 0
+  var current: Int = 1
+  var next: Int = 2
+  var state: Loop = Again
+  while state is Again
+    if current > limit
+      set state = Done
+    else
+      if current % 2 == 0
+        set total += current
+      end
+      let sum = current + next
+      set current = next
+      set next = sum
+      set state = Again
+    end
+  end
+  return total
+end fn problem002
