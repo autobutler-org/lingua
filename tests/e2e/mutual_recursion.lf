@@ -1,0 +1,106 @@
+fn is_even(n: Int) -> Bool
+  pure
+  example "zero is even"
+    n: 0
+    -> true
+  end
+  example "three is odd"
+    n: 3
+    -> false
+  end
+
+  if n == 0
+    return true
+  end
+  return is_odd(n: n - 1)
+end fn is_even
+
+fn is_odd(n: Int) -> Bool
+  pure
+  example "zero is not odd"
+    n: 0
+    -> false
+  end
+  example "three is odd"
+    n: 3
+    -> true
+  end
+
+  if n == 0
+    return false
+  end
+  return is_even(n: n - 1)
+end fn is_odd
+
+fn down(n: Int) -> Int
+  pure
+  example "counts down by twos"
+    n: 4
+    -> 0
+  end
+
+  if n <= 0
+    return n
+  end
+  return step(n: n, by: 2)
+end fn down
+
+fn step(n: Int, by: Int) -> Int
+  pure
+  example "one step"
+    n: 4
+    by: 2
+    -> 0
+  end
+
+  return down(n: n - by)
+end fn step
+
+fn tally(n: Int) -> Int
+  pure
+  example "named arguments out of order"
+    n: 3
+    -> 3
+  end
+
+  return add(acc: 0, n: n)
+end fn tally
+
+fn add(n: Int, acc: Int) -> Int
+  pure
+  example "adds one per level"
+    n: 3
+    acc: 0
+    -> 3
+  end
+
+  if n == 0
+    return acc
+  end
+  return again(acc: acc + 1, n: n - 1)
+end fn add
+
+fn again(n: Int, acc: Int) -> Int
+  pure
+  example "hands back"
+    n: 0
+    acc: 2
+    -> 2
+  end
+
+  return add(acc: acc, n: n)
+end fn again
+
+fn main() -> Nothing
+  pure
+
+  if is_even(n: 100000000)
+    log("even 100000000")
+  end
+  if is_odd(n: 100000001)
+    log("odd 100000001")
+  end
+  log("down {down(n: 100000000)}")
+  log("tally {tally(n: 100000000)}")
+  return nothing
+end fn main

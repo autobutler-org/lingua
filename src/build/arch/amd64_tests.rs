@@ -716,3 +716,24 @@ fn a_frame_without_calls_still_reserves_a_result_slot_and_stays_16_byte_aligned(
         "TEXT f(SB)\n  PUSHQ BP\n  MOVQ  SP, BP\n  SUBQ  $16, SP\n  MOVQ  BP, SP\n  POPQ  BP\n  RET\n"
     );
 }
+
+#[test]
+fn a_tail_call_tears_down_the_frame_and_jumps_to_the_callee() {
+    use crate::build::lir::{Block, LirFn, Term};
+    let function = LirFn {
+        name: "m.f".to_owned(),
+        params: 1,
+        vregs: 1,
+        blocks: vec![Block {
+            insts: vec![],
+            term: Term::TailCall("m.g".to_owned()),
+        }],
+        stack_site: None,
+    };
+    let progs = select(&function);
+    assert_eq!(
+        dump(&progs),
+        "TEXT m.f(SB)\n  PUSHQ BP\n  MOVQ  SP, BP\n  SUBQ  $16, SP\n  MOVQ  BP, SP\n  POPQ  BP\n  JMP   m.g(SB)\n"
+    );
+    assert!(encode(&progs).is_ok());
+}

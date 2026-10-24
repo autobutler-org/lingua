@@ -16,6 +16,12 @@ pub enum Stop {
     Exit(i64),
 }
 
+// How a function body ended: a return, or a tail call of `callee` with these arguments
+enum Exit<'a> {
+    Ret(u64),
+    Tail(&'a str, Vec<u64>),
+}
+
 pub struct Machine<'a> {
     functions: HashMap<&'a str, &'a LirFn>,
     symbols: HashMap<String, u64>,
@@ -193,21 +199,28 @@ impl<'a> Machine<'a> {
     /// # Errors
     /// `Stop::Exit` when the program exits, faults, or raises.
     pub fn call(&mut self, name: &str, args: &[u64]) -> Result<u64, Stop> {
-        let Some(&function) = self.functions.get(name) else {
-            return self.shim(name, args);
-        };
-        assert_eq!(args.len(), function.params as usize, "arity of {name}");
-        if let (Some(site), true) = (function.stack_site, self.depth >= self.max_depth) {
-            return Err(self.raise(&site_symbol(site, 0)));
+        // A tail call replaces the frame: the callee runs at the same depth, after its check
+        let (mut name, mut args) = (name, args.to_vec());
+        loop {
+            let Some(&function) = self.functions.get(name) else {
+                return self.shim(name, &args);
+            };
+            assert_eq!(args.len(), function.params as usize, "arity of {name}");
+            if let (Some(site), true) = (function.stack_site, self.depth >= self.max_depth) {
+                return Err(self.raise(&site_symbol(site, 0)));
+            }
+            self.depth += 1;
+            let result = self.run(function, &args);
+            self.depth -= 1;
+            match result? {
+                Exit::Ret(value) => return Ok(value),
+                Exit::Tail(callee, callee_args) => (name, args) = (callee, callee_args),
+            }
         }
-        self.depth += 1;
-        let result = self.run(function, args);
-        self.depth -= 1;
-        result
     }
 
     #[allow(clippy::too_many_lines, clippy::many_single_char_names)]
-    fn run(&mut self, function: &LirFn, args: &[u64]) -> Result<u64, Stop> {
+    fn run(&mut self, function: &'a LirFn, args: &[u64]) -> Result<Exit<'a>, Stop> {
         let mut v = vec![0u64; function.vregs as usize];
         v[..args.len()].copy_from_slice(args);
         let mut block = &function.blocks[0];
@@ -298,8 +311,12 @@ impl<'a> Machine<'a> {
                 Term::Branch(c, then, otherwise) => {
                     &function.blocks[if v[c as usize] == 0 { otherwise } else { then } as usize]
                 }
-                Term::Ret(value) => return Ok(value.map_or(0, |r| v[r as usize])),
+                Term::Ret(value) => return Ok(Exit::Ret(value.map_or(0, |r| v[r as usize]))),
                 Term::Raise(site) => return Err(self.raise(&site_symbol(site, 0))),
+                Term::TailCall(ref callee) => {
+                    let params = v[..function.params as usize].to_vec();
+                    return Ok(Exit::Tail(callee, params));
+                }
             };
         }
     }

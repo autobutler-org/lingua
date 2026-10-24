@@ -1,0 +1,161 @@
+fn mutual_recursion.is_even params=1 vregs=7 stack=site.0
+b0:
+  v1 = const 0
+  v2 = eq v0, v1
+  branch v2, b1, b2
+b1:
+  v3 = const 1
+  ret v3
+b2:
+  jump b3
+b3:
+  v4 = const 1
+  v5 = sub.chk v0, v4 @site.1
+  v6 = move v5
+  v0 = move v6
+  tailcall mutual_recursion.is_odd
+
+fn mutual_recursion.is_odd params=1 vregs=7 stack=site.2
+b0:
+  v1 = const 0
+  v2 = eq v0, v1
+  branch v2, b1, b2
+b1:
+  v3 = const 0
+  ret v3
+b2:
+  jump b3
+b3:
+  v4 = const 1
+  v5 = sub.chk v0, v4 @site.3
+  v6 = move v5
+  v0 = move v6
+  tailcall mutual_recursion.is_even
+
+fn mutual_recursion.down params=2 vregs=7 stack=site.4
+b0:
+  v2 = const 0
+  v3 = le v0, v2
+  branch v3, b1, b2
+b1:
+  ret v0
+b2:
+  jump b3
+b3:
+  v4 = const 2
+  v5 = move v0
+  v6 = move v4
+  v0 = move v5
+  v1 = move v6
+  tailcall mutual_recursion.step
+
+fn mutual_recursion.step params=2 vregs=4 stack=site.5
+b0:
+  v2 = sub.chk v0, v1 @site.6
+  v3 = move v2
+  v0 = move v3
+  tailcall mutual_recursion.down
+
+fn mutual_recursion.tally params=2 vregs=5 stack=site.7
+b0:
+  v2 = const 0
+  v3 = move v0
+  v4 = move v2
+  v0 = move v3
+  v1 = move v4
+  tailcall mutual_recursion.add
+
+fn mutual_recursion.add params=2 vregs=12 stack=site.8
+b0:
+  v2 = const 0
+  v3 = eq v0, v2
+  branch v3, b1, b2
+b1:
+  ret v1
+b2:
+  jump b3
+b3:
+  v4 = const 1
+  v5 = add.chk v1, v4 @site.9
+  v6 = move v5
+  v7 = const 1
+  v8 = sub.chk v0, v7 @site.10
+  v9 = move v8
+  v10 = move v9
+  v11 = move v6
+  v0 = move v10
+  v1 = move v11
+  tailcall mutual_recursion.again
+
+fn mutual_recursion.again params=2 vregs=4 stack=site.11
+b0:
+  v2 = move v0
+  v3 = move v1
+  v0 = move v2
+  v1 = move v3
+  tailcall mutual_recursion.add
+
+fn mutual_recursion.main params=0 vregs=29 stack=site.12
+b0:
+  v0 = const 100000000
+  v1 = call mutual_recursion.is_even(v0)
+  branch v1, b1, b2
+b1:
+  v2 = addr str.0
+  v3 = call rt.log(v2)
+  jump b3
+b2:
+  jump b3
+b3:
+  v4 = const 100000001
+  v5 = call mutual_recursion.is_odd(v4)
+  branch v5, b4, b5
+b4:
+  v6 = addr str.1
+  v7 = call rt.log(v6)
+  jump b6
+b5:
+  jump b6
+b6:
+  v8 = addr str.2
+  v9 = const 100000000
+  v10 = const 0
+  v11 = call mutual_recursion.down(v9, v10)
+  v12 = call rt.int_to_text(v11)
+  v13 = const 24
+  v14 = call rt.alloc(v13)
+  v15 = const 2
+  store v14, 0, v15
+  store v14, 8, v8
+  store v14, 16, v12
+  v16 = call rt.text_concat(v14)
+  v17 = call rt.log(v16)
+  v18 = addr str.3
+  v19 = const 100000000
+  v20 = const 0
+  v21 = call mutual_recursion.tally(v19, v20)
+  v22 = call rt.int_to_text(v21)
+  v23 = const 24
+  v24 = call rt.alloc(v23)
+  v25 = const 2
+  store v24, 0, v25
+  store v24, 8, v18
+  store v24, 16, v22
+  v26 = call rt.text_concat(v24)
+  v27 = call rt.log(v26)
+  v28 = const 0
+  ret v28
+
+site.0 fault L077 mutual_recursion.lf:1:1
+site.1 fault L040 mutual_recursion.lf:15:20
+site.2 fault L077 mutual_recursion.lf:18:1
+site.3 fault L040 mutual_recursion.lf:32:21
+site.4 fault L077 mutual_recursion.lf:35:1
+site.5 fault L077 mutual_recursion.lf:48:1
+site.6 fault L040 mutual_recursion.lf:56:18
+site.7 fault L077 mutual_recursion.lf:59:1
+site.8 fault L077 mutual_recursion.lf:69:1
+site.9 fault L040 mutual_recursion.lf:80:21
+site.10 fault L040 mutual_recursion.lf:80:33
+site.11 fault L077 mutual_recursion.lf:83:1
+site.12 fault L077 mutual_recursion.lf:94:1
