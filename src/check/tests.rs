@@ -521,3 +521,69 @@ fn bound_synthesis_adopts_where_the_spec_says() {
         "L023",
     );
 }
+
+#[test]
+fn out_of_order_arguments_are_bound_in_source_order() {
+    use crate::tir::{TirBody, TirExpr, TirKind, TirStmt};
+    let noisy = "fn noisy(n: Int) -> Int\n  pure\n  example \"e\"\n    n: 1\n    -> 1\n  end\n\n  log(\"{n}\")\n  return n\nend fn noisy\n\n";
+    let diff = "fn diff(a: Int, b: Int) -> Int\n  pure\n  example \"e\"\n    a: 3\n    b: 1\n    -> 2\n  end\n\n  return a - b\nend fn diff\n\n";
+    // The initializer of `let d = CALL` in `main`
+    let initializer = |call: &str| -> TirExpr {
+        let body = format!("  let d = {call}\n  log(\"{{d}}\")");
+        let source = format!("{noisy}{diff}{}", main(&body));
+        let mut program = link(&[package(&[("m.lf", &source)])], &Options::default()).unwrap();
+        let main_id = program.main;
+        let module = program.modules.pop().unwrap();
+        let f = module
+            .functions
+            .into_iter()
+            .find(|f| f.id == main_id)
+            .unwrap();
+        let TirBody::Stmts(mut stmts) = f.body else {
+            panic!("main has statements")
+        };
+        let TirStmt::Let(_, e) = stmts.remove(0) else {
+            panic!("main starts with the let")
+        };
+        e
+    };
+    // `n` in `noisy(n)`
+    let noisy_arg = |e: &TirExpr| match &e.kind {
+        TirKind::Call(_, args) => match args[..] {
+            [
+                TirExpr {
+                    kind: TirKind::Int(n),
+                    ..
+                },
+            ] => n,
+            _ => panic!("noisy takes one literal"),
+        },
+        _ => panic!("expected a call of noisy"),
+    };
+    let local = |e: &TirExpr| match e.kind {
+        TirKind::Local(id) => id,
+        _ => panic!("expected a temporary"),
+    };
+    // In parameter order, or out of order but moving only a literal: a plain call
+    for call in ["diff(a: noisy(3), b: noisy(1))", "diff(b: 1, a: noisy(3))"] {
+        assert!(
+            matches!(initializer(call).kind, TirKind::Call(..)),
+            "{call}"
+        );
+    }
+    // Out of order: `b`'s argument is bound first, and the call takes the temporaries as `a, b`
+    let TirKind::Let(binds, call) = initializer("diff(b: noisy(1), a: noisy(3))").kind else {
+        panic!("expected the arguments bound first")
+    };
+    assert_eq!(
+        binds.iter().map(|(_, e)| noisy_arg(e)).collect::<Vec<_>>(),
+        [1, 3]
+    );
+    let TirKind::Call(_, args) = &call.kind else {
+        panic!("expected the call last")
+    };
+    assert_eq!(
+        args.iter().map(local).collect::<Vec<_>>(),
+        [binds[1].0, binds[0].0]
+    );
+}
