@@ -55,7 +55,7 @@ Today there is no Lingua grammar, checker, or toolchain. The pain this design re
 - Indentation as syntax. Semicolons. Automatic semicolon insertion. Backslash line continuations.
 - User-defined generic types, Hindley–Milner inference, inheritance, reader macros, `macro_rules!` syntax, operator overloading, implicit numeric conversions other than the elimination and adoption rules in this document. A macro is an ordinary function that returns `Expr`, not a second grammar.
 - Maps, fixed-size arrays, floating point, modular (wrap) integers, Ada `range <>` unconstrained array formals, multi-payload variants (use a product as the one payload), variant payloads with field names.
-- Boolean `and` / `or` / `not`. Division or remainder operators. Range patterns. Trailing closures. `else if` as a distinct form (nest `else` and `if`).
+- Boolean `and` / `or` / `not`. Compound `/=` and `%=` (only `+=` exists). Range patterns. Trailing closures. `else if` as a distinct form (nest `else` and `if`).
 - Effect rows (`reads db` and `reads clock` on the same function). More than one operation on a resource. Exporting or importing resources.
 - Shadowing. Private visibility. Mutual recursion across modules (intra-module recursion is allowed).
 - Exceptions, panics, or null as the response to a bounds failure. `Cents(n)` does not throw. Silent two's-complement wrap. `catch`, `throw`, and `raises`. Using `assert` for a missing row or a down network that the program is designed to handle.
@@ -67,7 +67,7 @@ Today there is no Lingua grammar, checker, or toolchain. The pain this design re
 
 ## Key Decisions
 
-**Example before body.** The parser accepts a function only in the order: header, effect, one or more `example` blocks, body, closer. Examples are still in context when the model emits the body. The compiler executes them, so the rail is not a comment. Zero examples is `L001`, not a later lint. A coverage lint may ask for more later; the grammar requires one.
+**Example before body.** The parser accepts a function only in the order: header, effect, one or more `example` blocks, body, closer. Examples are still in context when the model emits the body. The compiler executes them, so the rail is not a comment. Zero examples is `L001`, not a later lint. A coverage lint may ask for more later; the grammar requires one. The one exception is the file-level entry `fn main`, which may have zero examples. Its body is the whole program, so an example would run the program under example fuel. `lingua build` is what runs it. An example written on `main` still runs.
 
 **Keyword `example`, not `ex`.** The label is a string used only in diagnostics (`example "two cups" expected 1000 got 500`). The prose does not constrain behavior. Each parameter is bound by name. `->` introduces exactly one expected result. There is no assertion library and no `intent` clause, because non-executable prose does not buy compliance.
 
@@ -79,7 +79,7 @@ Today there is no Lingua grammar, checker, or toolchain. The pain this design re
 
 **Nominal types.** `type CustomerId = Text` and `type Cursor = Text` do not unify. A string literal adopts the expected nominal text type, so samples stay short. A `Text` variable does not. The same rule separates `type Cents = Int at least 0` from a different nominal type with the same range, and from the anonymous bound `Int at least 0`.
 
-**Bounded subtypes and checking narrowing.** A bounded integer type has base `Int` and an inclusive range. `at least N` means `N through INT_MAX`, not an infinite integer. Values of the subtype eliminate implicitly to any wider anonymous bound and to `Int`. The reverse is not implicit. Checking introduction is `int_in` / `int_at_least`, both returning `Result<_, BoundsError>`. Literals outside the expected range are `L024` at compile time. `+` and `*` of non-negative operands synthesize `Int at least 0` and may adopt an expected nominal type whose range contains that result (`Cents`). `-` always synthesizes `Int`. `max(a: 0, b: expr)` restores a lower bound of `0`, which is why `order_total` can return `Cents` without a runtime check. Overflow of the implementation integer is a fault, not wrap and not `Result`.
+**Bounded subtypes and checking narrowing.** A bounded integer type has base `Int` and an inclusive range. `at least N` means `N through INT_MAX`, not an infinite integer. Values of the subtype eliminate implicitly to any wider anonymous bound and to `Int`. The reverse is not implicit. Checking introduction is `int_in` / `int_at_least`, both returning `Result<_, BoundsError>`. Literals outside the expected range are `L024` at compile time. `+` and `*` of non-negative operands synthesize `Int at least 0` and may adopt an expected nominal type whose range contains that result (`Cents`). `-` always synthesizes `Int`. `/` and `%` by a positive divisor may synthesize a bound from the operand ranges. `max(a: 0, b: expr)` restores a lower bound of `0`, which is why `order_total` can return `Cents` without a runtime check. Overflow of the implementation integer is a fault, not wrap and not `Result`.
 
 **Closed match.** A match on a sum declared in the program, or on prelude `Result` or `BoundsError`, requires every variant. `_` on those types is `L032` and the diagnostic lists the variants. `_` is legal on open scrutinees: `Text`, `Int`, integer bounds, and lists. List patterns are exact-length. No fallthrough. First match wins.
 
@@ -99,9 +99,9 @@ Today there is no Lingua grammar, checker, or toolchain. The pain this design re
 
 **`Cents` lives in `money.lf`.** `percent` returns `Cents`, and `order.lf` imports `money`. Defining `Cents` in both files would create two nominal types or an import cycle. One definition, in the module that implements `percent`.
 
-**`money.percent` is a primitive.** lingua1 has no division operator. A loop that added `of`, `part` times, would also blow the example fuel limit on large `Cents`. The body is the keyword `primitive`, allowlisted to that one signature. The runner evaluates the math in this document with a wide intermediate. Untrusted `primitive` on any other function is `L049`. It cannot inject I/O.
+**`money.percent` is a primitive.** `part * of / 100` is not enough: `part * of` does not fit in `Int` when `of` is near `INT_MAX`, so the 64-bit `*` faults with `L040` before `/` runs. A loop that added `of`, `part` times, would also blow the example fuel limit on large `Cents`. The body is the keyword `primitive`, allowlisted to that one signature. The runner evaluates the math in this document with a wide intermediate. Untrusted `primitive` on any other function is `L049`. It cannot inject I/O.
 
-**Implementation integer.** Signed 64-bit. `+`, `-`, and `*` have static type `Int` (then the bound rules may synthesize a tighter anonymous bound). The mathematical result must fit in signed 64-bit or the example faults with `L040`. No silent wrap.
+**Implementation integer.** Signed 64-bit. `+`, `-`, `*`, `/`, and `%` have static type `Int` (then the bound rules may synthesize a tighter anonymous bound). `/` truncates toward zero. `%` has the sign of the dividend. The mathematical result must fit in signed 64-bit or the example faults with `L040`. No silent wrap. A zero divisor faults with `L076`.
 
 **Upper bound of `at least`.** `Int at least N` is `N through 9223372036854775807`. There is no infinite integer in lingua1.
 
@@ -121,7 +121,7 @@ Today there is no Lingua grammar, checker, or toolchain. The pain this design re
 
 **Macros return `Expr`.** No reader macros and no `macro_rules!`. The call is `comptime assert_nonzero(total)`. An `Expr` parameter is the caller's AST, not the evaluated value. The interpreter splices the result before typechecking the surrounding body. Hygiene is the default. `quote` / `unquote` build nodes the grammar already has. A splice that is not one of those nodes is `L064`.
 
-**Two failure channels.** `Result` and `or return` stay the value channel, including bounds via `int_in` / `int_at_least`. `assert cond, "message"`, `fail "message"`, and `e or fail "message"` are the exception channel: no type, not an effect, no `catch`. An example matches a fatal path with `-> exception "message"` and does not match it with `-> Err(...)`. Overflow stays `L040`. Fuel exhaustion stays `L042`. Neither is catchable.
+**Two failure channels.** `Result` and `or return` stay the value channel, including bounds via `int_in` / `int_at_least`. `assert cond, "message"`, `fail "message"`, and `e or fail "message"` are the exception channel: no type, not an effect, no `catch`. An example matches a fatal path with `-> exception "message"` and does not match it with `-> Err(...)`. Overflow stays `L040`. A zero divisor stays `L076`. Fuel exhaustion stays `L042`. None of them is catchable.
 
 ---
 
@@ -185,6 +185,48 @@ If parse or the fixed point emits any diagnostic for a module, examples in that 
 **Provider cache flags.** `check`, `expand`, `pack`, and the check inside `build` use the same policy. Default: reuse a cache entry when the file already contains that declaration; otherwise run the declared effect and write the cache. `--offline` never runs an effect; each missing declaration is `L071`. `--refresh` reruns effects and replaces the cache. `--refresh` together with `--offline` is exit 2. `pack` writes the cache when it runs an effect. It does not default to offline.
 
 Formatter input is the parse tree before splice. It does not need types. A file that does not parse is not formatted. `lingua fmt` does not expand providers.
+
+**Stage dumps.** The lex and parse outputs each have a text form that is a full record of that stage:
+
+| Stage | Command | File | Form |
+|---|---|---|---|
+| Lex | `lingua lex FILE` | `.tokens` | One token per line: `line:col Kind(payload)`. The `Eof` token is omitted. |
+| Parse | `lingua parse FILE` | `.ast` | One S-expression for the untyped AST of the file, in the form below. Spans are omitted. |
+
+The `.ast` form:
+
+- A node is `(head child ...)`. The head is a short kebab-case name for the node kind (`fn`, `let`, `or-return`, `ok-pat`), defined in `src/ast/dump.rs`, and children follow in [Untyped AST](#untyped-ast) field order.
+- Every AST `String`, names included, is a double-quoted string escaped with `\"`, `\\`, `\n`, and `\t`. A bare atom is therefore always a head, a tag, `true` / `false`, an integer, or `nil` for an absent option. Names are quoted because `nil` is a legal `ident`.
+- A list field is `(label item ...)`: `(params ...)`, `(args ...)`, `(then ...)`, `(else ...)`. When a list is a node's only payload, its items follow the head directly: `(text ...)`, `(statements ...)`, `(stmt-arm ...)`, `(list-pat ...)`.
+- Tags are bare atoms. Effects are `pure`, `reads-clock`, `reads-net`, `reads-fs`, `reads-catalog`, `(reads "db")`, and `(writes "x")`. Operators are `add sub mul div rem eq ne lt gt le ge`. `Set` ops are `assign` and `add-assign`. Arm kinds are `expr-arms` and `stmt-arms`. Resource ops are `read` and `write`. A function body is `primitive` or `(statements ...)`. An expectation is `(value e)` or `(exception "m")`. Text parts are `(literal "...")` and `(hole e)`.
+- The `broken` flag is a trailing `true` or `false` on `list` and `call`. An argument is `(arg "name" e)`, or `(arg nil e)` when it is positional.
+- A node prints on one line when it fits in 80 columns. Otherwise the head and its leading atoms stay on the first line, and each remaining child goes on its own line, indented two spaces.
+
+```lisp
+(match (name "r")
+  (arms
+    (arm (ok-pat (bind "n")) (stmt-arm (return (name "n"))))
+    (arm (err-pat (wild)) (stmt-arm (return (int 0)))))
+  stmt-arms)
+```
+
+Each dump keeps everything the next stage reads. A `.tokens` file can feed the parser instead of re-lexing, and an `.ast` file can feed bind, typecheck, the interpreter, or `build` instead of re-parsing. This makes a stage testable on its own: golden tests compare a dump against a checked-in file, and a later phase can start from a hand-written `.ast` fixture. A tree read from an `.ast` file has no source positions, so its diagnostics have no span. lingua1 does not ship a reader for either form. The lossless rule exists so that one can be added later without changing the format.
+
+**Source generation.** The front end runs in both directions. Each inverse goes back exactly one phase, so source generation is unparse followed by unlex:
+
+```text
+forward:  source --lex--> tokens --parse--> untyped AST
+inverse:  untyped AST --unparse--> tokens --unlex--> source
+```
+
+| Inverse | Input | Output | Round trip |
+|---|---|---|---|
+| unparse | untyped AST | A token list in the [Formatter](#formatter) layout. unparse picks the line breaks and indent and gives each token its `line:col`. `broken` lists and calls get one element per line. Closers are generated: `end fn <name>`, `end type <name>`, or `end resource <name>` from the declaration, and bare `end` for every inner block. | `parse(unparse(a)) == a`, ignoring spans |
+| unlex | token list | Source with each token's lexeme placed at its `line:col`, and line breaks from `Newline` tokens. Strings are re-escaped. | `lex(unlex(t)) == t` |
+
+Layout belongs to unparse, and unlex makes no layout choices. That keeps unlex the exact inverse of lex for any token list, whether it came from lex, from unparse, or from an edit. The AST stores no closer. A tree that parsed already passed `L002` and `L003`, so the opener alone fixes the closer.
+
+Neither inverse is byte-identical to the original file. Comments are not tokens and are not AST, so both inverses drop them. unlex also drops trailing whitespace, and it may spell a string escape differently than the author did. unparse also drops blank lines and the author's indentation. The round trip is the contract, and the composition holds too: `parse(lex(unlex(unparse(a)))) == a`, ignoring spans. These properties are tests: every lex and parse golden fixture also checks its round trip. Source generation lets a tool or a model edit a token list or a tree, then print source that the forward stages accept. With a dump reader, it also turns a hand-written `.tokens` or `.ast` file into `.lf` source.
 
 ### Module and file model
 
@@ -281,10 +323,10 @@ Ok Err
 
 **Integers.** A digit string whose value is outside `0` through `INT_MAX` (`9223372036854775807`) is `L005` at the token. No hex, no underscores, no leading `+`. Negative values are unary `-` in expressions and an optional `-` in the bound literal syntax. `INT_MIN` (`-9223372036854775808`) is not a source literal. A digit string longer than 20 characters is `L005` without computing a big integer. Leading zeros count toward those 20 characters, so a zero-padded in-range value whose token is longer than 20 characters is still `L005`.
 
-**Operators and punctuation.** Longest match, except `>` is never joined into `>>`. Each `>` is its own token, so `List<List<Int>>` is two closes. `>=` is one token because `=` follows.
+**Operators and punctuation.** Longest match, except `>` is never joined into `>>`. Each `>` is its own token, so `List<List<Int>>` is two closes. `>=` is one token because `=` follows. `/` is a token unless another `/` follows. `//` is the longer match, so it starts a comment: `a/b` is three tokens and `a // b` is `a` followed by a comment.
 
 ```text
-_ ( ) [ ] , . : + - * = -> += == != < > <= >=
+_ ( ) [ ] , . : + - * / % = -> += == != < > <= >=
 ```
 
 `_` is one token. It is not punctuation that joins with a following ident: `_foo` is a single ident, and `_` with nothing after it is the wildcard.
@@ -327,11 +369,11 @@ Lowest precedence first.
 | 1 | `e or return` / `e or return m` / `e or fail m` | `or return` is tried before `or fail`. The operand of `or return` is a comparison-or-tighter expression (`cmp-expr`). The operand of `or fail` is an `expr`. `L068` then requires that operand to be a hole-free string literal |
 | 2 | `==` `!=` `<` `>` `<=` `>=` | none; `a == b == c` is `L001` |
 | 3 | `+` `-` (binary) | left |
-| 4 | `*` | left |
+| 4 | `*` `/` `%` | left |
 | 5 | unary `-`, unary `comptime` | prefix; they do not stack. `-foo.bar` is `-(foo.bar)`. `comptime` binds tighter than `+` and `-`. Both together are written `comptime (-e)` |
 | 6 | call, index, field | left |
 
-There is no `/`, `%`, `and`, `or` (boolean), or `not`. Keyword `or` appears only in `or return` and `or fail`.
+There is no `and`, `or` (boolean), or `not`. Keyword `or` appears only in `or return` and `or fail`. `+=` is the only compound assignment. There is no `/=` or `%=`.
 
 Evaluation of a call is left to right in source order, including named arguments written out of signature order, then the call. Binary operators evaluate the left operand, then the right, then the operation. `or return` evaluates the mapping expression only on `Err`. `or fail` evaluates the message expression only on `Err`. `if` and `match` evaluate one branch. `for low until high` evaluates both bounds once, on entry. A `comptime` call is not evaluated at runtime; the interpreter replaces it before the runtime residue is emitted.
 
@@ -339,11 +381,17 @@ Evaluation of a call is left to right in source order, including named arguments
 
 `Int` is signed 64-bit, range `-9223372036854775808` through `9223372036854775807`.
 
-The static type of binary `+`, `-`, and `*` on integer operands, **before** bound synthesis and adoption, is `Int`. Bound synthesis may replace that with an anonymous bound (next section). It never replaces it with `Result`.
+The static type of binary `+`, `-`, `*`, `/`, and `%` on integer operands, **before** bound synthesis and adoption, is `Int`. Bound synthesis may replace that with an anonymous bound (next section). It never replaces it with `Result`.
 
-Evaluation uses the mathematical value. If that value is outside signed 64-bit, the example faults with `L040`. The fault is not a Lingua value, not an exception the function can `match`, and not wrap. Unary `-` of a runtime value that does not fit (the only case is negating `INT_MIN`, which subtraction can produce: `(-9223372036854775807) - 1`) is the same fault. Primitive `percent` does not use this 64-bit `*`; it uses a wide intermediate and only faults if the **final** `Cents` result does not fit, which it cannot when `of` is `Cents` and `part` is in `1 through 100`.
+Evaluation uses the mathematical value. If that value is outside signed 64-bit, the example faults with `L040`. The fault is not a Lingua value, not an exception the function can `match`, and not wrap. Unary `-` of a runtime value that does not fit (the only case is negating `INT_MIN`, which subtraction can produce: `(-9223372036854775807) - 1`) is the same fault.
 
-`L040` fails the root that overflowed: that example, or that comptime item. It is not an exception and not `Result`. It is the same class of implementation limit as fuel. Other examples still run. A comptime `L040` fails the check.
+`a / b` truncates toward zero. `a % b` has the sign of `a`, so `a == (a / b) * b + a % b` always holds. `7 / -2` is `-3` and `-7 % 2` is `-1`. `INT_MIN / -1` does not fit and is `L040`. `INT_MIN % -1` follows the identity and is the same `L040`.
+
+A divisor of `0` in `/` or `%` faults with `L076`. It is the same class as `L040`: not a Lingua value, not an exception, and not matchable. A divisor that is the literal `0` (or `-0`) is `L076` at compile time, the same way `split` with the literal `""` is `L046` at compile time. Any other divisor is checked at run time.
+
+Primitive `percent` does not use this 64-bit `*`; it uses a wide intermediate and only faults if the **final** `Cents` result does not fit, which it cannot when `of` is `Cents` and `part` is in `1 through 100`.
+
+`L040` fails the root that overflowed: that example, or that comptime item. It is not an exception and not `Result`. It is the same class of implementation limit as fuel. Other examples still run. A comptime `L040` fails the check. A runtime `L076` fails its root the same way.
 
 ### Types
 
@@ -415,7 +463,7 @@ Not implicit, ever:
 1. If `S` is `T`, accept.
 2. If `S <: T` by the table above, accept (elimination).
 3. If the expression is one of the adoption forms below and the form's result range is contained in `range(T)` (equal, for `int_in` / `int_at_least`), accept and give the expression type `T`.
-4. If `T` is nominal or a tighter bound and `S` is an integer type that is not a subtype, `L023` (implicit narrowing). The `help:` line names the legal forms: a literal, unary `-` of a literal, `int_at_least` / `int_in`, or `max` / `+` / `*` whose static range already fits. A literal or unary-minus-of-literal whose value is outside `range(T)` does not reach this step; it is `L024`.
+4. If `T` is nominal or a tighter bound and `S` is an integer type that is not a subtype, `L023` (implicit narrowing). The `help:` line names the legal forms: a literal, unary `-` of a literal, `int_at_least` / `int_in`, or `max` / `+` / `*` / `/` / `%` whose static range already fits. A literal or unary-minus-of-literal whose value is outside `range(T)` does not reach this step; it is `L024`.
 5. Otherwise `L020`.
 
 Adoption forms. The expression itself must be one of these, not a variable that happens to have the anonymous type:
@@ -424,7 +472,7 @@ Adoption forms. The expression itself must be one of these, not a variable that 
 |---|---|
 | Integer literal `V`, or unary `-` of an integer literal (value `-V`) | the value is in `range(T)`; otherwise `L024`, not `L023` |
 | `max(...)` | static result range contained in `range(T)` |
-| `+` or `*` | static result range contained in `range(T)` |
+| `+`, `*`, `/`, or `%` | static result range contained in `range(T)` |
 | `int_in` / `int_at_least`, optionally under `or return` | success range **equals** `range(T)` |
 
 A variable of anonymous type `Int at least 0` does **not** check as `Cents`. The sample therefore writes `let c: Cents = int_at_least(...)`, so the `int_at_least` expression is in a checking context. A later `CentsOff(c)` sees a variable that is already `Cents`.
@@ -439,9 +487,13 @@ Ranges used here are the ranges of the operand types, not the ranges after elimi
 |---|---|
 | `+`, `*` | If both ranges are contained in `0 through INT_MAX`, anonymous `Int at least 0`. Otherwise `Int`. |
 | `-` | Always `Int`. `Cents - Cents` is `Int`. |
+| `/` | If the divisor range is the singleton `{k}` with `k >= 1`, anonymous `Int in L1 / k through U1 / k`. Else, if the dividend range is contained in `0 through INT_MAX` and the divisor range in `1 through INT_MAX`, anonymous `Int in 0 through U1`. Otherwise `Int`. |
+| `%` | If the divisor range is contained in `1 through INT_MAX`, with upper bound `U2`: anonymous `Int in 0 through U2 - 1` when the dividend range is contained in `0 through INT_MAX`, and anonymous `Int in -(U2 - 1) through U2 - 1` otherwise. Otherwise `Int`. |
 | unary `-` | `Int`, singleton range `{-V}` if the operand is literal `V`. |
 
 lingua1 does not compute a tighter upper bound than `INT_MAX` for `+` and `*`. Non-negative `+` is exactly the range of `Cents`, so in a checking context of `Cents` the adoption rule applies and no runtime bound check is inserted. The 64-bit overflow check is still inserted. `Int at least 0` is a statement about the lower bound, not a proof that the sum fits in 64 bits.
+
+In the `/` and `%` rows, `L1 through U1` is the dividend range and `L2 through U2` is the divisor range. A literal divisor `k` is the singleton `{k}`. `L1 / k` and `U1 / k` truncate toward zero. Truncating division by a positive `k` is monotone, so the bounds hold for every dividend in range. A non-negative quotient never exceeds its dividend. A remainder is smaller in magnitude than its divisor and has the sign of its dividend. So `n % 100` with `n: Cents` is `Int in 0 through 99`, `n / 100` is `Int in 0 through 92233720368547758`, and `x % 2` with `x: Int` is `Int in -1 through 1`. A divisor range that starts at `1` or above cannot fault with `L076` and cannot overflow, because `INT_MIN / -1` needs a negative divisor. lingua1 does not bound a negative divisor or a divisor range that contains `0`. Those are `Int`.
 
 `==` and `!=` require the same type after literal adoption. No elimination. `Cents == Int` is `L034`. `CustomerId == Cursor` is `L034`. `CustomerId == "c1"` is legal: the literal adopts. The result is `Bool`.
 
@@ -631,6 +683,18 @@ T1, T2 both ⊆ 0..INT_MAX
 Γ ⊢ e1 * e2 ⇒ Int at least 0
 Γ ⊢ e1 - e2 ⇒ Int
 
+Γ ⊢ e1 ⇒ T1 (range L1..U1)    Γ ⊢ e2 ⇒ T2 (range {k}), k ≥ 1
+Γ ⊢ e1 / e2 ⇒ Anonymous(L1/k..U1/k)     truncated toward zero
+
+Γ ⊢ e1 ⇒ T1 ⊆ 0..INT_MAX    Γ ⊢ e2 ⇒ T2 ⊆ 1..INT_MAX
+Γ ⊢ e1 / e2 ⇒ Anonymous(0..U1)          when the singleton rule does not apply
+
+Γ ⊢ e1 ⇒ T1    Γ ⊢ e2 ⇒ T2 ⊆ 1..U2
+Γ ⊢ e1 % e2 ⇒ Anonymous(0..U2-1)        if T1 ⊆ 0..INT_MAX
+Γ ⊢ e1 % e2 ⇒ Anonymous(-(U2-1)..U2-1)  otherwise
+
+any other / or % ⇒ Int
+
 Γ ⊢ max(a: e1, b: e2) ⇒ Anonymous(max(L1,L2)..max(U1,U2))
    with singleton ranges for literals
 
@@ -774,7 +838,7 @@ The abort applies to the root that is running:
 
 | Root | Result |
 |---|---|
-| `lingua build` binary | Exit 1. Print the exception shape below. `main` returning `Nothing` is process exit 0. Overflow is exit 1 with the fault header. |
+| `lingua build` binary | Exit 1. Print the exception shape below. `main` returning `Nothing` is process exit 0. Overflow and a zero divisor are exit 1 with the fault header. |
 | `example` that did not expect it | That example fails with `L057`. Other examples in the package still run. |
 | const, generative type, macro, or other comptime root | The check fails with `L058`. |
 
@@ -790,7 +854,7 @@ end
 
 `-> Err(...)` does not match an exception (`L057`). A value returned where the example expected an exception, or an exception whose message differs, is `L059`. A value mismatch that stays on the `Result` channel is still `L043`.
 
-Overflow stays `L040`. Fuel exhaustion stays `L042`. A failed `assert` is an exception, not `L040`. `L040` and `L042` are not catchable and are not `Result`.
+Overflow stays `L040`. A zero divisor stays `L076`. Fuel exhaustion stays `L042`. A failed `assert` is an exception, not `L040`. `L040`, `L042`, and `L076` are not catchable and are not `Result`.
 
 Both engines use one shape. The native binary does not invent a second report. argv and stdin are ignored. The entry point is specified under API.
 
@@ -809,7 +873,9 @@ fault L040: arithmetic overflow
   --> money.lf:40:12
 ```
 
-`L042` is interpreter-only. The native binary does not apply the 100_000 fuel cap. Overflow and exceptions do apply to the binary.
+A zero divisor uses the same header: `fault L076: division by zero`.
+
+`L042` is interpreter-only. The native binary does not apply the 100_000 fuel cap. Overflow, a zero divisor, and exceptions do apply to the binary.
 
 ### Type providers
 
@@ -1019,7 +1085,7 @@ An attacker-controlled `money.lf` that marks this signature `primitive` still ru
 
 ### Formatter
 
-`lingua fmt` reprints the parse tree. It does not typecheck and does not run examples. `lingua fmt --check` exits 1 when the file would change, and writes nothing.
+`lingua fmt` reprints the parse tree. It is unparse then unlex (see [Source generation](#compilation-pipeline)), with the comments from the input put back. It does not typecheck and does not run examples. `lingua fmt --check` exits 1 when the file would change, and writes nothing.
 
 Canonical layout:
 
@@ -1030,7 +1096,7 @@ Canonical layout:
 - No blank line between the header, the effect, and the first example.
 - One space after `,` and `:`. No space before `,` or `:`. One space around `=`, `+=`, `->`, and binary operators. No space before `(`. No space immediately inside `()` or `[]`.
 - Argument and field names the author wrote are preserved. Positional arguments stay positional.
-- Closer spelling is `end`, or `end fn <name>`, `end type <name>`, `end resource <name>`, with the name from the opener (the formatter does not "fix" a wrong checksum; that is `L002` and `fmt` will not typecheck). If the closer name does not match, `fmt` still reindents and reprints the closer the author wrote. `fmt` does not silently change names.
+- Closers are generated from the opener: `end fn <name>`, `end type <name>`, or `end resource <name>` at file level, and `end` for inner blocks. A file with a wrong closer is `L002` or `L003` and does not parse, so `fmt` never formats it and never "fixes" a checksum.
 - Comments stay on the line they occupied relative to the following token: a full-line comment is indented to the next statement; a trailing comment stays trailing, with one space before `//`.
 - File ends with exactly one newline. Tabs become spaces. Trailing whitespace is removed.
 - `fmt` is idempotent.
@@ -1221,10 +1287,11 @@ L031: match on Discount is missing a variant
 | `L073` | `types_from_openapi` returned a module `Type` where one record or sum is required |
 | `L074` | `lingua build` found no file-level `main`, or more than one, in the modules it is linking. No binary is written. A `main` with the wrong signature still counts toward this code |
 | `L075` | A file-level `main` has a parameter, or its return type is not `Nothing`. No binary is written. The effect rule stays `L025`. Zero or duplicate `main` stays `L074` |
+| `L076` | Division by zero: the divisor of `/` or `%` is `0`. Compile-time if the divisor is the literal `0`, otherwise a fault in an example, a comptime root, or the native binary. Fault header, not an exception. Still sorted and counted toward the cap |
 
 `L019`, `L036`–`L039`, `L048`, and `L051`–`L054` are unused and reserved.
 
-`L040` and `L042` use the fault header (`fault L040: ...`) and are still sorted with every other diagnostic by file, span, and code. They count toward the cap of 100. An exception report from a built binary is not a compiler diagnostic and does not use that cap.
+`L040`, `L042`, and a runtime `L076` use the fault header (`fault L040: ...`) and are still sorted with every other diagnostic by file, span, and code. They count toward the cap of 100. An exception report from a built binary is not a compiler diagnostic and does not use that cap.
 
 **Missing variant (`L031`).** Sketch, not a normative program:
 
@@ -1289,7 +1356,7 @@ No `help:` line. Rendering is decimal for integers, double-quoted for text, `Nam
 | `while`-assignment does not prove termination | Medium | Fuel 100_000, heap 64 MiB, in-process interpreter only. The emitted binary has no fuel cap: a `while` that assigns can hang at run time, and lingua1 accepts that. `L042` is interpreter-only |
 | `max` / `+` / `*` adoption can rebuild a nominal type after elimination, so `return max(a: 0, b: dollars)` checks as `Cents` | Medium | It is an explicit `max`, not a coercion. Different nominals do not compare or flow into each other without that expression. `L023` covers the variable case |
 | `primitive` looks like an FFI hook | High | Allowlist is one pure math function. Any other `primitive` is `L049`. No dynamic loading |
-| Named closers add tokens and models will mismatch them | Low | That mismatch is the point of the rail (`L002`). Formatter does not rewrite the name |
+| Named closers add tokens and models will mismatch them | Low | That mismatch is the point of the rail (`L002`). A mismatched file does not parse, so the formatter never sees it and cannot rewrite the name |
 | First-parse-error recovery cascades | Low | Cap 100. Semantic passes still report everything after a clean parse |
 | 64-bit overflow fault is not a `Result`, unlike bounds | Low | Stated as an implementation limit, same class as fuel. Samples stay total. A later language version can add checked operators without pretending lingua1 wrapped |
 | Packer header accidentally committed as source | Low | Header is not valid in the sense that `lingua pack` never writes it. A committed header fails parse (`#` is not `//`) |
@@ -1409,10 +1476,14 @@ fn-decl =
     "fn" ident "(" [ param { "," param } [ "," ] ] ")" "->" type-expr newline
     effect
     { newline }
-    example-block { { newline } example-block }
+    fn-examples
     { newline }
     fn-tail
     "end" "fn" ident newline .
+fn-examples =
+    ? predicate: the fn-decl ident is main ? [ example-list ]
+  | example-list .
+example-list = example-block { { newline } example-block } .
 param    = ident ":" type-expr .
 effect   = ( "pure"
            | "reads" "clock" | "reads" "net" | "reads" "fs" | "reads" "catalog"
@@ -1448,7 +1519,8 @@ example-block =
     { example-bind }
     example-result
     "end" newline .
-example-bind = ident ":" { newline } expr newline .
+example-bind = ( ident | "clock" ) ":" { newline } expr newline .
+    (* "clock" is a keyword; a reads clock example binds it *)
 example-result =
     "->" "exception" string newline
   | "->" expr newline .
@@ -1534,7 +1606,7 @@ or-expr  = cmp-expr [ ( "or" "return" [ cmp-expr ] ) | ( "or" "fail" expr ) ] .
 cmp-expr = sum-expr [ cmp-op sum-expr ] .
 cmp-op   = "==" | "!=" | "<" | ">" | "<=" | ">=" .
 sum-expr = mul-expr { ( "+" | "-" ) mul-expr } .
-mul-expr = unary { "*" unary } .
+mul-expr = unary { ( "*" | "/" | "%" ) unary } .
 unary    = [ "-" | "comptime" ] postfix .
 (* "comptime" and "-" do not stack in one unary. Write "comptime" "-" e
    as "comptime" "(" "-" e ")" if both are required. "comptime" binds
@@ -1643,7 +1715,7 @@ The sketch does not typecheck under the rules the sketch itself asked for. The f
 6. **`join(left: collected, right: page.orders)`.** Both parameters are `List<Order>` at the instantiation used here.
 7. **`let c: Cents = int_at_least(n, 0) or return Err(BadQuantity)`.** `int_at_least` synthesizes anonymous `Int at least 0`. A variable of that type does not silently become nominal `Cents`. The annotation is the checking context that adopts it. `let p = int_in(n, 1 through 100) or return ...` needs no annotation: `Percent`'s payload is that same anonymous bound.
 8. **Pagination declares `Order`, `DbError`, `Page`, `PageEnd`, and `resource db`.** The sketch called `db.open_orders` without a signature. `Order` has one field `id: Text` so `Order("a")` is the product constructor. `DbError` has one variant `Unavailable`. The function body and the example result are unchanged.
-9. **`percent`'s body is `primitive`.** No division operator, and a subtraction loop would exceed fuel on large values. Examples on `percent` still run.
+9. **`percent`'s body is `primitive`.** `part * of` can overflow `Int` before `/` runs, and a subtraction loop would exceed fuel on large values. Examples on `percent` still run.
 10. **`next_pow2`, `page_cap`, and `Batch` live in `money.lf`.** The const initializer is a comptime context, so the call is not marked. The bound writes `comptime` anyway, which is redundant and legal. The order totals stay `0`, `1080`, and `0`.
 11. **A package example on `order.lf`.** It is a sibling of the functions, not nested. `->` is a `Bool`. It calls `order_total` after the package is bound. The literal `0` adopts `Cents` on `==`.
 12. **`assert.lf` is the macro.** The function example compares `Expr` trees. The package example splices `assert 0 != 0, "nonzero"` and expects that exception. `quote` is written across lines because a statement quote needs its newline before `)`.
@@ -1916,6 +1988,8 @@ The lingua1 toolchain is `check`, `fmt`, `pack`, `expand`, and `build`. There is
 
 ```text
 lingua --version
+lingua lex FILE
+lingua parse FILE
 lingua check [--source-root PATH] [--refresh | --offline] [PATH ...]
 lingua check --explain L031
 lingua fmt [--check] [--source-root PATH] [PATH ...]
@@ -1938,9 +2012,9 @@ lingua build [--source-root PATH] [--dynamic] [--refresh | --offline] [PATH ...]
 fn main() -> Nothing
 ```
 
-The parameter list is empty and the return type is `Nothing`. A parameter, or any other return type, is `L075`. The effect is `pure` or `reads clock`. Any other effect on `main` is `L025`. `lingua build FILE` links `FILE` and the modules in its import closure. The entry is `main` in `FILE`. A `main` in an imported module is a second `main`. `lingua build DIR` links every module directly in the source root, and `DIR` must be that root. A resource-operation call anywhere in that link set's runtime residue is `L072`, so building a directory that contains `fulfillment.lf` fails even when `main` does not call `open_orders`. Zero `main` functions, or more than one, is `L074`. A `main` with the wrong signature still counts toward `L074`. No binary is written.
+The parameter list is empty and the return type is `Nothing`. A parameter, or any other return type, is `L075`. `main` may have zero examples (see [Example before body](#key-decisions)). The effect is `pure` or `reads clock`. Any other effect on `main` is `L025`. `lingua build FILE` links `FILE` and the modules in its import closure. The entry is `main` in `FILE`. A `main` in an imported module is a second `main`. `lingua build DIR` links every module directly in the source root, and `DIR` must be that root. A resource-operation call anywhere in that link set's runtime residue is `L072`, so building a directory that contains `fulfillment.lf` fails even when `main` does not call `open_orders`. Zero `main` functions, or more than one, is `L074`. A `main` with the wrong signature still counts toward `L074`. No binary is written.
 
-argv and stdin are ignored in v1. `log` writes its text and a newline to stderr and returns `nothing`. `main` returning `Nothing` is process exit 0. An exception is exit 1 and the exception shape. Overflow is exit 1 and `fault L040`. Native `clock.now()` returns Unix seconds since 1970-01-01 00:00:00 UTC as `Int`. It is not scripted and it is not `L072`. Example-time `clock.now` still pops the script, and example-time `log` is still discarded.
+argv and stdin are ignored in v1. `log` writes its text and a newline to stderr and returns `nothing`. `main` returning `Nothing` is process exit 0. An exception is exit 1 and the exception shape. Overflow is exit 1 and `fault L040`. A zero divisor is exit 1 and `fault L076`. Native `clock.now()` returns Unix seconds since 1970-01-01 00:00:00 UTC as `Int`. It is not scripted and it is not `L072`. Example-time `clock.now` still pops the script, and example-time `log` is still discarded.
 
 The PR 18 smoke program is `main.lf`. It is not a fifth acceptance-corpus behavior file. Its import closure is `order.lf` and `money.lf`. `lingua build main.lf` succeeds. `lingua build` of the directory that contains `fulfillment.lf` is `L072`.
 
@@ -1949,9 +2023,6 @@ import order_total, NoDiscount from "order"
 
 fn main() -> Nothing
   pure
-  example "runs"
-    -> nothing
-  end
 
   let total = order_total([], NoDiscount)
   log("ok")
@@ -1961,7 +2032,9 @@ end fn main
 
 `check` on a set of files checks each module and the modules it imports, once. A syntax or type diagnostic skips examples for that module only. `check` is usable in a tree that does not yet contain `build`.
 
-The checker does not expose a stable library API in lingua1. The AST and typed IR below are the internal interface the Rust modules share. Serializing them is not a requirement.
+`lex` and `parse` print the [stage dumps](#compilation-pipeline) for one file to stdout. On a diagnostic they exit 1 and print nothing to stdout.
+
+The checker does not expose a stable library API in lingua1. The AST and typed IR below are the internal interface the Rust modules share. The token stream and the untyped AST have the lossless text forms described in Stage dumps. Serializing the typed IR is not a requirement.
 
 ---
 
@@ -2018,7 +2091,9 @@ Effect = Pure | ReadsClock | ReadsNet | ReadsFs | ReadsCatalog
        | Reads(String) | Writes(String)
 
 Expect = Value(Expr) | Exception { message: String }
-Example { span, label: String, bindings: List<Bind>, expect: Expect }
+Example { span, label: String, bindings: List<Bind>, body: List<Stmt>,
+          expect: Expect }
+    (* body is the stmt-seq of a package example; empty for a function example *)
 Bind    { span, name, value: Expr }
 
 TypeExpr =
@@ -2074,7 +2149,7 @@ Arg      = { span, name: Option<String>, value: Expr }
 Arm      = { span, pattern: Pattern, body: ArmBody }
 ArmKind  = ExprArms | StmtArms
 ArmBody  = ExprArm(Expr) | StmtArm(List<Stmt>)
-BinOp    = Add | Sub | Mul | Eq | Ne | Lt | Gt | Le | Ge
+BinOp    = Add | Sub | Mul | Div | Rem | Eq | Ne | Lt | Gt | Le | Ge
 
 Pattern =
   | Wild(Span)
@@ -2189,6 +2264,7 @@ TirKind =
   | Index { list: TirExpr, index: TirExpr, checked: bool }
   | Neg(TirExpr)
   | Add(TirExpr, TirExpr) | Sub(TirExpr, TirExpr) | Mul(TirExpr, TirExpr)
+  | Div(TirExpr, TirExpr) | Rem(TirExpr, TirExpr)
   | Cmp(CmpOp, TirExpr, TirExpr)
   | Match(TirExpr, List<TirArm>)   (* expression arms *)
   | IntIn(TirExpr, i64, i64) | IntAtLeast(TirExpr, i64)
@@ -2273,7 +2349,7 @@ What it cannot do:
 - Spawn a process, load a shared library, or read the ambient clock during check. `reads clock` on a function pops the example script. `clock.now` in a const is `L025`.
 - Declare a new `primitive`. `L049` rejects anything except the one allowlisted signature.
 - Loop forever inside the interpreter. The while-assignment rule is static and incomplete. The interpreter charges one fuel unit per TIR node, statement, and back-edge, and aborts that root at **100_000** units (`L042`). Fuel does not count socket wait; the timeouts above do. The cap applies to each example, each const, each provider, and each macro. Heap for one root is **64 MiB** (`L047`). Source files are capped at **1 MiB**. A comptime cycle is `L061`, not a hang. The emitted binary has no fuel cap.
-- Turn integer overflow into a wrap-based logic bug silently. Overflow is `L040` and fails that root. It is not an exception.
+- Turn integer overflow into a wrap-based logic bug silently. Overflow is `L040` and fails that root. It is not an exception. A zero divisor is `L076` the same way.
 - Observe `log` output through any Lingua value. Logs are not a channel back into `Result`.
 - Use `--offline` to skip a provider effect and still invent a type. Each missing declaration is `L071`.
 
@@ -2293,7 +2369,7 @@ Lingua is a compiler, not a service. Observability means diagnostics a model and
 - Example failure output includes the label and both rendered values (`expected 1000 got 500`). Rendering is defined with `L043`.
 - A check that performs no provider effect is deterministic: the same sources and the same source root produce the same diagnostics in the same order (file path, span start, code). A check, expand, or pack that runs `reads net` or `reads catalog` depends on the remote result. `--offline` against a fixed `provided/` cache is the deterministic run.
 - Exception and fault reports use the two shapes in [Value errors and exceptions](#value-errors-and-exceptions). `L057` and `L058` carry the same message and the span of the `assert` or `fail`. `L040` stays a fault header, not an exception header.
-- There is no timing metric, no telemetry endpoint, and no log file. `log(...)` inside an example is discarded and is not a compiler log. `lingua check --explain` covers every allocated code, including `L055` through `L075`. An unknown code is exit 2.
+- There is no timing metric, no telemetry endpoint, and no log file. `log(...)` inside an example is discarded and is not a compiler log. `lingua check --explain` covers every allocated code, including `L055` through `L076`. An unknown code is exit 2.
 
 A checker bug that accepts an ill-typed program is a defect in a `lingua1` implementation, not a language change. A checker bug that rejects a program this document marks legal is the same kind of defect.
 
@@ -2342,7 +2418,7 @@ Rollback of a bad checker build is reverting the toolchain binary. `provided/*.l
 
 **Unrecoverable `assert` / `fail` were accepted.** A failed assertion is not a value the caller should handle, and it is not `L040`. `assert`, `fail`, and `or fail` abort the root that is running. An example opts into that path with `-> exception "message"`, exact text, and there is still no `catch`. The cost is a second failure channel that models can confuse with `Result`. The diagnostics keep them apart: `L043` is a value mismatch, `L057` is an unexpected exception, `L059` is a wrong exception message.
 
-**Division in the language so `percent` can be ordinary Lingua.** A `/` operator needs a divide-by-zero rule and a 128-bit intermediate anyway, because `part * of` for `part <= 100` and `of` near `INT_MAX` does not fit in `Int`. A loop that adds `of`, `part` times, is legal Lingua and fails fuel on large inputs. The primitive keeps one pure math function in the runner and keeps division out of the operator table. Cost: `primitive` is a word models might try to abuse. The allowlist makes that `L049`, not an FFI.
+**`percent` as ordinary Lingua with `/`.** lingua1 has `/` and `%`, with a zero divisor as fault `L076`. That is not enough for `percent`, because `part * of` for `part <= 100` and `of` near `INT_MAX` does not fit in `Int`, and `part * of / 100` faults with `L040` on inputs `Cents` allows. A 128-bit intermediate in the operator table was rejected: every other `*` is 64-bit. A loop that adds `of`, `part` times, is legal Lingua and fails fuel on large inputs. The primitive keeps the one wide intermediate in the runner. Cost: `primitive` is a word models might try to abuse. The allowlist makes that `L049`, not an FFI.
 
 **Positional arguments always, or named arguments always.** Always-positional is what the sketch wrote for `max` and `split`, and it is exactly how a `Text` separator swaps with a `Text` body. Always-named is noisier than TypeScript at the call site and would have forced names on `Line("cup", 500, 2)` and `percent(p, sum, half_up)`, where the types already distinguish the slots. The pairwise-distinct rule is the middle: names are required only where a swap would still typecheck. The normative programs grew names on `max`, `split`, and `join` for that reason and nowhere else.
 
@@ -2385,13 +2461,13 @@ Each PR compiles, is reviewable on its own, and leaves `lingua check` (or the su
 
 - **Files/components:** `src/lex`, token definitions, keyword table, string and interpolation scanner, tests.
 - **Depends on:** PR 1.
-- **Changes:** Longest-match tokens with the `>` exception, `//` comments that preserve newline, integer range `L005` including the 20-character rule with leading zeros, a BOM as `L004`, the `wildcard` lexeme `_`, idents that may start with `_` only when another letter, digit, or `_` follows, UTF-8 rejection, the keyword list in this document (including `assert`, `catalog`, `comptime`, `const`, `exception`, `fail`, `provide`, `quote`, `unquote`), structured string holes that call back into the expression parser only after PR 3 (this PR may return hole bodies as raw token spans and let PR 3 parse them). Fixture: token stream of the PR 3 corpus below, not the end-state `money.lf`.
+- **Changes:** Longest-match tokens with the `>` exception, `//` comments that preserve newline, `/` and `%` tokens (`//` is the longer match and starts a comment), integer range `L005` including the 20-character rule with leading zeros, a BOM as `L004`, the `wildcard` lexeme `_`, idents that may start with `_` only when another letter, digit, or `_` follows, UTF-8 rejection, the keyword list in this document (including `assert`, `catalog`, `comptime`, `const`, `exception`, `fail`, `provide`, `quote`, `unquote`), structured string holes that call back into the expression parser only after PR 3 (this PR may return hole bodies as raw token spans and let PR 3 parse them). Fixture: token stream of the PR 3 corpus below, not the end-state `money.lf`. `lingua lex FILE` prints the `.tokens` stage dump, and golden tests compare each fixture against its `.tokens` file.
 
 ### PR 3 — Grammar, parser, untyped AST
 
 - **Files/components:** `src/ast`, `src/parse`, `tests/corpus/{money,order,fulfillment}.lf`, plus small grammar fixtures.
 - **Depends on:** PR 2.
-- **Changes:** The normative EBNF, including slot order (effect, at least one example, body or `primitive`, named closer), `{ newline }` between statements, between examples, and before `fn-tail`, arm-start backtracking, newline discarding inside `()` and `[]` except inside `quote` `( )`, `Ok` / `Err` patterns, `fs.read` and `catalog.columns` primaries, `reads catalog`, `const`, package examples, `comptime` expressions, generative type bodies, `provide` as a statement, `assert`, `fail`, `or fail`, `-> exception`, `quote`, and `unquote`. `L001` / `L002` / `L003`, and recovery to the next `end fn` / `end type` / `end resource`. The checked-in corpus for this PR is `money.lf` through `percent` (no `PowStep`, `next_pow2`, `page_cap`, or `Batch`), `order.lf` without the package example, and `fulfillment.lf`. Separate fixtures, not that corpus snapshot, derive a blank line before `fn-tail`, a `_` pattern, a multi-line `quote`, an `Ok` pattern, `fs.read`, `catalog.columns`, and `provide`. Do not typecheck. `lingua check` on a corpus file prints "parsed" and exits 0 if syntax is clean. `.lf` is the file extension, not a grammar token.
+- **Changes:** The normative EBNF, including slot order (effect, at least one example except on `main`, body or `primitive`, named closer), `{ newline }` between statements, between examples, and before `fn-tail`, arm-start backtracking, newline discarding inside `()` and `[]` except inside `quote` `( )`, `Ok` / `Err` patterns, `fs.read` and `catalog.columns` primaries, `reads catalog`, `const`, package examples, `comptime` expressions, generative type bodies, `provide` as a statement, `assert`, `fail`, `or fail`, `-> exception`, `quote`, and `unquote`. `*`, `/`, and `%` parse at one left-associative level as `BinOp` `Mul`, `Div`, and `Rem` (dump tags `mul`, `div`, `rem`). `L001` / `L002` / `L003`, and recovery to the next `end fn` / `end type` / `end resource`. The checked-in corpus for this PR is `money.lf` through `percent` (no `PowStep`, `next_pow2`, `page_cap`, or `Batch`), `order.lf` without the package example, and `fulfillment.lf`. Separate fixtures, not that corpus snapshot, derive a blank line before `fn-tail`, a `_` pattern, a multi-line `quote`, an `Ok` pattern, `fs.read`, `catalog.columns`, and `provide`. Do not typecheck. `lingua check` on a corpus file prints "parsed" and exits 0 if syntax is clean. `lingua parse FILE` prints the `.ast` stage dump, and golden tests compare each corpus file and fixture against its `.ast` file. `.lf` is the file extension, not a grammar token.
 
 ### PR 4 — Modules, prelude, binder
 
@@ -2409,7 +2485,7 @@ Each PR compiles, is reviewable on its own, and leaves `lingua check` (or the su
 
 - **Files/components:** `src/types/bounds`, `src/types/arith`.
 - **Depends on:** PR 5.
-- **Changes:** Ranges, elimination, literal adoption including unary `-` of an integer literal (`L024` when `-V` is outside the range, not `L023`), `+` `*` `-` static results, overflow left as a dynamic fault for the runner, `max` bound restoration, `int_in` and `int_at_least`, nominal adoption on the forms in the adoption table, indexing (`checked` bit), `length`, `join` instantiation, `split` / `trim` / `lower` signatures including the named-argument requirement. After this PR, `line_subtotal` typechecks. `order_total` and `parse_discount` still need match and `or return` (PR 7). `percent`'s body is accepted as `primitive` with no allowlist yet (PR 9). Effects are not checked yet.
+- **Changes:** Ranges, elimination, literal adoption including unary `-` of an integer literal (`L024` when `-V` is outside the range, not `L023`), `+` `*` `-` `/` `%` static results, including the `/` and `%` bound rules, overflow and a runtime zero divisor (`L076`) left as dynamic faults for the runner, `L076` at compile time for a literal `0` divisor, `max` bound restoration, `int_in` and `int_at_least`, nominal adoption on the forms in the adoption table, indexing (`checked` bit), `length`, `join` instantiation, `split` / `trim` / `lower` signatures including the named-argument requirement. After this PR, `line_subtotal` typechecks. `order_total` and `parse_discount` still need match and `or return` (PR 7). `percent`'s body is accepted as `primitive` with no allowlist yet (PR 9). Effects are not checked yet.
 
 ### PR 7 — Match, `or return`, while-assignment
 
@@ -2427,19 +2503,19 @@ Each PR compiles, is reviewable on its own, and leaves `lingua check` (or the su
 
 - **Files/components:** `src/eval`, `src/primitive`.
 - **Depends on:** PR 8.
-- **Changes:** TIR interpreter, value representation, structural equality, example binding check (`L044`, `L045`), script FIFO and `Ok` wrap, `L041`, fuel 100_000 (`L042`), heap cap (`L047`), overflow `L040`, empty `split` `L046`, `L043` with the label. Allowlist `money.percent` and `L049`. Skip examples when the module has type errors. Example expressions are typechecked in PRs 6–8; this PR runs them. This interpreter is the semantics later PRs reuse for comptime. Function examples of `percent`, `line_subtotal`, `order_total`, `parse_discount`, and `all_open_orders` exit 0. `const`, package examples, `next_pow2`, and `assert.lf` are parsed (PR 3) and become exit 0 in the PRs that typecheck them. `stamped` from the effects section is an extra test, not part of the corpus.
+- **Changes:** TIR interpreter, value representation, structural equality, example binding check (`L044`, `L045`), script FIFO and `Ok` wrap, `L041`, fuel 100_000 (`L042`), heap cap (`L047`), overflow `L040`, zero divisor `L076`, empty `split` `L046`, `L043` with the label. Allowlist `money.percent` and `L049`. Skip examples when the module has type errors. Example expressions are typechecked in PRs 6–8; this PR runs them. This interpreter is the semantics later PRs reuse for comptime. Function examples of `percent`, `line_subtotal`, `order_total`, `parse_discount`, and `all_open_orders` exit 0. `const`, package examples, `next_pow2`, and `assert.lf` are parsed (PR 3) and become exit 0 in the PRs that typecheck them. `stamped` from the effects section is an extra test, not part of the corpus.
 
 ### PR 10 — Diagnostic catalog and `--explain`
 
 - **Files/components:** `src/diagnostics`, catalog text.
 - **Depends on:** PR 9. Phases already emit codes; this PR freezes the text.
-- **Changes:** One formatter for the span block. Sort and cap at 100. `L040` and `L042` use the fault header and still count toward the cap. `lingua check --explain CODE` for every allocated code, including `L055` through `L075`. A known code exits 0. An unknown code exits 2. Later PRs are what emit `L055` and above. Golden files for the three examples in this document: missing `Discount` variant, closer name mismatch on `line_subtotal`, import of `percet` from `money`. That golden export list is `Cents, Rounding, half_up, percent`. It is not the end-state list. PR 14 updates the golden file in the same change that adds `PowStep`, `Go`, `Stop`, `next_pow2`, `page_cap`, and `Batch`.
+- **Changes:** One formatter for the span block. Sort and cap at 100. `L040`, `L042`, and a runtime `L076` use the fault header and still count toward the cap. `lingua check --explain CODE` for every allocated code, including `L055` through `L076`. A known code exits 0. An unknown code exits 2. Later PRs are what emit `L055` and above. Golden files for the three examples in this document: missing `Discount` variant, closer name mismatch on `line_subtotal`, import of `percet` from `money`. That golden export list is `Cents, Rounding, half_up, percent`. It is not the end-state list. PR 14 updates the golden file in the same change that adds `PowStep`, `Go`, `Stop`, `next_pow2`, `page_cap`, and `Batch`.
 
 ### PR 11 — Formatter
 
-- **Files/components:** `src/fmt`.
+- **Files/components:** `src/fmt`, unlex in `src/lex`, unparse beside the parser in `src/parse`.
 - **Depends on:** PR 3. Can land in parallel with PRs 4–10. Must be updated if PR 3's AST changes.
-- **Changes:** Canonical layout from the parse tree, before splice: two-space indent from `end`, blank-line rules, preserve argument names, do not rewrite closer names, preserve newlines inside `quote`, idempotence on the corpus files. `lingua fmt --check` exit codes. Does not typecheck, does not run examples, and does not expand providers.
+- **Changes:** Canonical layout from the parse tree, before splice: two-space indent from `end`, blank-line rules, preserve argument names, closers generated from the opener, preserve newlines inside `quote`, idempotence on the corpus files. Adds both [source generation](#compilation-pipeline) inverses. The printer is unparse (AST to tokens) then unlex (tokens to source). `parse(unparse(a)) == a` (ignoring spans) holds on every parse fixture, and `lex(unlex(t)) == t` holds on every lex fixture. `lingua fmt --check` exit codes. Does not typecheck, does not run examples, and does not expand providers.
 
 ### PR 12 — Context packer
 
@@ -2463,7 +2539,7 @@ Each PR compiles, is reviewable on its own, and leaves `lingua check` (or the su
 
 - **Files/components:** `src/eval` exception path, `src/types` for `assert`, `fail`, `or fail`.
 - **Depends on:** PR 9. Independent of PR 14 and can merge in either order after PR 9.
-- **Changes:** `assert`, `fail`, and `or fail`. Messages are hole-free string literals (`L068`). `-> exception "message"` on function and package examples. `L057`, `L058`, `L059`. `L040` and `L042` stay faults. No `catch`. A small test function with `assert factor != 0, "factor must be non-zero"` covers the expected and unexpected paths. Other examples in the package still run. Bounds stay `Result`. The `assert.lf` package example that expects `"nonzero"` lands in PR 17.
+- **Changes:** `assert`, `fail`, and `or fail`. Messages are hole-free string literals (`L068`). `-> exception "message"` on function and package examples. `L057`, `L058`, `L059`. `L040`, `L042`, and `L076` stay faults. No `catch`. A small test function with `assert factor != 0, "factor must be non-zero"` covers the expected and unexpected paths. Other examples in the package still run. Bounds stay `Result`. The `assert.lf` package example that expects `"nonzero"` lands in PR 17.
 
 ### PR 16 — Generative types and the provider cache
 
@@ -2481,4 +2557,4 @@ Each PR compiles, is reviewable on its own, and leaves `lingua check` (or the su
 
 - **Files/components:** `src/build`, runtime residue for values, `assert` / `fail` printing, overflow faults.
 - **Depends on:** PR 14 and PR 15 (and PR 9 through them). Does not block `lingua check`. Providers and `assert.lf` are not required.
-- **Changes:** `lingua build` runs `check` and, on exit 0, writes `./lingua-out` as one static executable with the Lingua runtime linked in. No shared Lingua library and no dynamic linker. The entry is `fn main() -> Nothing` with effect `pure` or `reads clock`. Zero mains or more than one is `L074` and writes no binary. `lingua build FILE` links that file and its import closure. `lingua build DIR` links every module directly in the source root. argv and stdin are ignored. Native `log` writes stderr. Native `clock.now` is Unix seconds. `lingua build --dynamic` is `L070` and links nothing. The binary's exception and `fault L040` shapes match the interpreter. Fuel is not applied to the binary. A runtime call to `open_orders` is `L072` and writes no binary. The smoke program is `main.lf` in the API section: it imports `order_total` and `NoDiscount`, calls `order_total([], NoDiscount)`, logs `"ok"`, and returns `nothing`. `lingua build main.lf` succeeds. Its closure is `order.lf` and `money.lf`. `lingua build` of the directory that contains `fulfillment.lf` is `L072`. No native re-run of examples. The object code comes from the hand-written assembler in this crate, not from LLVM. The entry's parameter list is empty and the return type is `Nothing` (`L075` otherwise).
+- **Changes:** `lingua build` runs `check` and, on exit 0, writes `./lingua-out` as one static executable with the Lingua runtime linked in. No shared Lingua library and no dynamic linker. The entry is `fn main() -> Nothing` with effect `pure` or `reads clock`. Zero mains or more than one is `L074` and writes no binary. `lingua build FILE` links that file and its import closure. `lingua build DIR` links every module directly in the source root. argv and stdin are ignored. Native `log` writes stderr. Native `clock.now` is Unix seconds. `lingua build --dynamic` is `L070` and links nothing. The binary's exception, `fault L040`, and `fault L076` shapes match the interpreter. Fuel is not applied to the binary. A runtime call to `open_orders` is `L072` and writes no binary. The smoke program is `main.lf` in the API section: it imports `order_total` and `NoDiscount`, calls `order_total([], NoDiscount)`, logs `"ok"`, and returns `nothing`. `lingua build main.lf` succeeds. Its closure is `order.lf` and `money.lf`. `lingua build` of the directory that contains `fulfillment.lf` is `L072`. No native re-run of examples. The object code comes from the hand-written assembler in this crate, not from LLVM. The entry's parameter list is empty and the return type is `Nothing` (`L075` otherwise).
