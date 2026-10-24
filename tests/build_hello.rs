@@ -151,6 +151,6 @@ fn hello_runs() {
         .output()
         .unwrap();
     assert_eq!(String::from_utf8_lossy(&output.stderr), "hello, world\n");
-    assert!(output.stdout.is_empty());
+    assert_eq!(String::from_utf8_lossy(&output.stdout), "");
     assert_eq!(output.status.code(), Some(0));
 }
