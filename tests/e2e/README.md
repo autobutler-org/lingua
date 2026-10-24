@@ -93,6 +93,7 @@ The exception and fault blocks follow `lingua1.md` § Value errors and exception
 | `int_in_text` | `int_in` on text: range ends, leading zeros, `-0`, empty, spaces, `+`, junk, beyond `Int` |
 | `int_at_least` | `int_at_least` on `Int` values including `INT_MIN`/`INT_MAX`, adoption into `Cents` under bare `or return` |
 | `bounded_types` | elimination to wider bounds, `/` and `%` bound synthesis, a loop index as a static list-literal index |
+| `arg_order` | named arguments written out of order evaluate in source order (user functions, constructors, `max`, `split`, `join`); an out-of-order `L040` faults before the later argument logs |
 | `max_bound` | `max` restoring `Cents` (either argument order), named args in any order, extremes |
 | `list_basics` | literals, a trailing comma, a multi-line list, `length`, `join` (with `[]` on either side), `List<List<Int>>` |
 | `list_index` | static literal index, checked index returning `Ok`/`Err` (negative, past the end, `INT_MAX`, empty list) |

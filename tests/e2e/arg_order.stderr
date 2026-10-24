@@ -1,0 +1,20 @@
+arg 1
+arg 3
+diff 2
+arg 2
+arg 1
+pair 1 2
+arg 5
+arg 4
+max 5
+arg ,
+arg x,y
+split 2
+arg 7
+arg 6
+join 2
+fault L040: arithmetic overflow
+  --> arg_order.lf:50:23
+   |
+50 |   log("never {diff(b: top + 1, a: noisy(9))}")
+   |                       ^^^^^^^

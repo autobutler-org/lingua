@@ -148,6 +148,8 @@ fn reaches_end(stmts: &[Stmt], var: &str, assigned: bool) -> Option<bool> {
 /// Arguments in parameter order, by the positional-call rule.
 struct Matched<'e> {
     args: Vec<Option<&'e Expr>>,
+    /// The parameter index of each argument, in source order.
+    order: Vec<usize>,
 }
 
 impl Checker<'_> {
@@ -1484,6 +1486,7 @@ impl Checker<'_> {
     ) -> Option<Matched<'e>> {
         let names: Vec<String> = params.iter().map(|(n, _)| n.clone()).collect();
         let mut out: Vec<Option<&Expr>> = vec![None; params.len()];
+        let mut order = Vec::with_capacity(args.len());
         let mut ok = true;
         let mut position = 0;
         for arg in args {
@@ -1542,6 +1545,7 @@ impl Checker<'_> {
                 ok = false;
             }
             out[i] = Some(&arg.value);
+            order.push(i);
         }
         for (i, slot) in out.iter().enumerate() {
             if slot.is_none() && ok {
@@ -1555,7 +1559,7 @@ impl Checker<'_> {
                 ok = false;
             }
         }
-        ok.then_some(Matched { args: out })
+        ok.then_some(Matched { args: out, order })
     }
 
     fn checked_args(
@@ -1571,6 +1575,48 @@ impl Checker<'_> {
             .map(|(a, (_, t))| a.and_then(|a| self.check(cx, a, t)))
             .collect();
         args.into_iter().collect()
+    }
+
+    // `make` builds the call from `args`, which are in parameter order. Arguments are evaluated
+    // in source order (lingua1.md), so if that would move one with effects past another, the
+    // non-trivial ones are bound to temporaries in source order first.
+    fn in_source_order(
+        &mut self,
+        cx: &FnCx,
+        order: &[usize],
+        args: Vec<TirExpr>,
+        make: impl FnOnce(Vec<TirExpr>) -> TirExpr,
+    ) -> TirExpr {
+        let trivial = |e: &TirExpr| {
+            matches!(
+                e.kind,
+                TirKind::Int(_)
+                    | TirKind::Text(_)
+                    | TirKind::Bool(_)
+                    | TirKind::Nothing
+                    | TirKind::Local(_)
+            )
+        };
+        let moved: Vec<usize> = order
+            .iter()
+            .copied()
+            .filter(|&i| !trivial(&args[i]))
+            .collect();
+        if moved.is_sorted() {
+            return make(args);
+        }
+        let mut args = args;
+        let mut binds = Vec::with_capacity(moved.len());
+        for i in moved {
+            let (ty, span) = (args[i].ty.clone(), args[i].span);
+            let id = self.fresh(cx, "arg", ty.clone(), span);
+            binds.push((
+                id,
+                std::mem::replace(&mut args[i], tx(ty, span, TirKind::Local(id))),
+            ));
+        }
+        let call = make(args);
+        tx(call.ty.clone(), call.span, TirKind::Let(binds, bx(call)))
     }
 
     fn effect_check(
@@ -1644,17 +1690,24 @@ impl Checker<'_> {
                 let sig = self.sigs.get(&id)?.clone();
                 let matched = self.match_args(cx, span, name, &sig.params, args);
                 let effect_ok = self.effect_check(cx, *nspan, name, &sig.effect, sig.module);
-                let args = self.checked_args(cx, &matched?, &sig.params)?;
-                (effect_ok && !self.poisoned.contains(&id))
-                    .then(|| tx(sig.ret.clone(), span, TirKind::Call(id, args)))
+                let matched = matched?;
+                let args = self.checked_args(cx, &matched, &sig.params)?;
+                (effect_ok && !self.poisoned.contains(&id)).then(|| {
+                    self.in_source_order(cx, &matched.order, args, |args| {
+                        tx(sig.ret, span, TirKind::Call(id, args))
+                    })
+                })
             }
             Some(Binding::Type(id)) => match self.symbols[id as usize].kind.clone() {
                 SymbolKind::Type(TypeKind::Product) => {
                     let fields = self.fields.get(&id)?.clone();
                     let matched = self.match_args(cx, span, name, &fields, args)?;
                     let args = self.checked_args(cx, &matched, &fields)?;
-                    (!self.poisoned.contains(&id))
-                        .then(|| tx(Type::Nominal(id), span, TirKind::Record(id, args)))
+                    (!self.poisoned.contains(&id)).then(|| {
+                        self.in_source_order(cx, &matched.order, args, |args| {
+                            tx(Type::Nominal(id), span, TirKind::Record(id, args))
+                        })
+                    })
                 }
                 SymbolKind::Type(TypeKind::Newtype {
                     base: Type::Text, ..
@@ -1770,6 +1823,7 @@ impl Checker<'_> {
         Some(tx(sig.ret, span, TirKind::ResourceCall(op_id, args)))
     }
 
+    #[allow(clippy::too_many_lines)]
     fn prelude_call(
         &mut self,
         cx: &mut FnCx,
@@ -1803,11 +1857,10 @@ impl Checker<'_> {
                     return None;
                 }
                 let args = self.checked_args(cx, &matched, &params)?;
-                Some(tx(
-                    Type::List(Box::new(Type::Text)),
-                    span,
-                    TirKind::Call(id, args),
-                ))
+                let ty = Type::List(Box::new(Type::Text));
+                Some(self.in_source_order(cx, &matched.order, args, |args| {
+                    tx(ty, span, TirKind::Call(id, args))
+                }))
             }
             prelude::LENGTH => {
                 let params = [("list".to_owned(), any_list)];
@@ -1841,7 +1894,9 @@ impl Checker<'_> {
                     lo: a.lo.max(b.lo),
                     hi: a.hi.max(b.hi),
                 };
-                Some(tx(types::of_range(r), span, TirKind::Call(id, args)))
+                Some(self.in_source_order(cx, &matched.order, args, |args| {
+                    tx(types::of_range(r), span, TirKind::Call(id, args))
+                }))
             }
             prelude::JOIN => {
                 let params = [
@@ -1873,7 +1928,9 @@ impl Checker<'_> {
                 let ty = a.ty.clone();
                 let b = self.check(cx, second, &ty)?;
                 let args = if swapped { vec![b, a] } else { vec![a, b] };
-                Some(tx(ty, span, TirKind::Call(id, args)))
+                Some(self.in_source_order(cx, &matched.order, args, |args| {
+                    tx(ty, span, TirKind::Call(id, args))
+                }))
             }
             _ => None,
         }

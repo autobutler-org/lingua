@@ -308,6 +308,13 @@ impl<'a> FnLowerer<'a, '_> {
                 let text = self.expr(text)?;
                 self.b.call("rt.log", &[text])
             }
+            TirKind::Let(binds, body) => {
+                for (id, e) in binds {
+                    let value = self.expr(e)?;
+                    self.bind(*id, value);
+                }
+                self.expr(body)?
+            }
             TirKind::FsRead(_) | TirKind::CatalogColumns(_) | TirKind::ResourceCall(..) => {
                 return Err(internal(
                     "a comptime-only or resource operation reached the runtime residue",

@@ -4,6 +4,8 @@
 //!
 //! Additions to lingua1.md's listing, each needed to lower or report:
 //! - `TirKind::Concat` for text with holes (lingua1.md lowers holes but names no node).
+//! - `TirKind::Let`, which binds temporaries so arguments written out of parameter order are
+//!   still evaluated in source order (lingua1.md, Operator precedence and associativity).
 //! - Spans on `Assert` and `Fail`, for the exception report, and on `TirFn`, for `L077`.
 //! - `Variant.tag`, the variant's declaration index (docs/build.md, Value representation).
 //! - `TirProgram` and `TirModule`, which carry each module's printed path and source text,
@@ -16,6 +18,10 @@
 //! Conventions the backend relies on:
 //! - Call arguments, record fields, and prelude arguments are in declaration order; names are
 //!   resolved away. `split(text: t, separator: s)` is `Call(prelude::SPLIT, [t, s])`.
+//!   When reordering would move an argument that is not a literal or local past another such
+//!   argument, the checker wraps the call in a `Let` that evaluates those arguments in source
+//!   order: `split(separator: f(), text: g())` is
+//!   `Let([(s, f()), (t, g())], Call(prelude::SPLIT, [Local(t), Local(s)]))`.
 //! - Prelude symbols are the fixed ids in [`prelude`]; a symbol table starts with
 //!   [`prelude::symbols`] and appends user symbols after it.
 //! - `log(e)` is `TirKind::Log`, not a `Call` of a prelude symbol.
@@ -254,6 +260,9 @@ pub enum TirKind {
     /// Rejected by `L072` before lowering.
     ResourceCall(SymbolId, Vec<TirExpr>),
     Log(Box<TirExpr>),
+    /// Evaluates each binding in order, binding its local, then the body; the body's value.
+    /// Only the checker's argument temporaries use it.
+    Let(Vec<(SymbolId, TirExpr)>, Box<TirExpr>),
 }
 
 #[derive(Debug, PartialEq)]

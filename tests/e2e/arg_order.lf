@@ -1,0 +1,52 @@
+type Pair
+  first: Int
+  second: Int
+end type Pair
+
+fn noisy(n: Int) -> Int
+  pure
+  example "one"
+    n: 1
+    -> 1
+  end
+
+  log("arg {n}")
+  return n
+end fn noisy
+
+fn noisy_text(t: Text) -> Text
+  pure
+  example "comma"
+    t: ","
+    -> ","
+  end
+
+  log("arg {t}")
+  return t
+end fn noisy_text
+
+fn diff(a: Int, b: Int) -> Int
+  pure
+  example "three minus one"
+    a: 3
+    b: 1
+    -> 2
+  end
+
+  return a - b
+end fn diff
+
+fn main() -> Nothing
+  pure
+
+  log("diff {diff(b: noisy(1), a: noisy(3))}")
+  let p = Pair(second: noisy(2), first: noisy(1))
+  log("pair {p.first} {p.second}")
+  log("max {max(b: noisy(5), a: noisy(4))}")
+  let parts = split(separator: noisy_text(","), text: noisy_text("x,y"))
+  log("split {length(parts)}")
+  log("join {length(join(right: [noisy(7)], left: [noisy(6)]))}")
+  let top: Int = 9223372036854775807
+  log("never {diff(b: top + 1, a: noisy(9))}")
+  return nothing
+end fn main
