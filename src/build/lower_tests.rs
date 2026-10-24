@@ -109,6 +109,77 @@ site.2 fault L040 m.lf:1:1
 }
 
 #[test]
+fn a_returned_call_of_another_function_tail_calls_and_its_group_shares_one_width() {
+    let mut p = Program::default();
+    p.module("m", "");
+    let (wide, narrow) = (p.declare("wide", Type::Int), p.declare("narrow", Type::Int));
+    let n = p.param("n", Type::Int);
+    p.define(
+        narrow,
+        1,
+        vec![n],
+        TirBody::Stmts(vec![ret(call(
+            wide,
+            vec![local(n, Type::Int), local(n, Type::Int)],
+            Type::Int,
+        ))]),
+    );
+    let (first, second) = (p.param("a", Type::Int), p.param("b", Type::Int));
+    p.define(
+        wide,
+        5,
+        vec![first, second],
+        TirBody::Stmts(vec![ret(call(
+            narrow,
+            vec![local(second, Type::Int)],
+            Type::Int,
+        ))]),
+    );
+    let outer = p.declare("outer", Type::Int);
+    let value = p.param("x", Type::Int);
+    p.define(
+        outer,
+        9,
+        vec![value],
+        TirBody::Stmts(vec![ret(add(
+            int(1),
+            call(narrow, vec![local(value, Type::Int)], Type::Int),
+        ))]),
+    );
+    let lowered = lower(&p.finish(outer)).unwrap();
+    assert_eq!(
+        dump(&lowered.functions, &lowered.sites),
+        "fn m.narrow params=2 vregs=4 stack=site.0
+b0:
+  v2 = move v0
+  v3 = move v0
+  v0 = move v2
+  v1 = move v3
+  tailcall m.wide
+
+fn m.wide params=2 vregs=3 stack=site.1
+b0:
+  v2 = move v1
+  v0 = move v2
+  tailcall m.narrow
+
+fn m.outer params=1 vregs=5 stack=site.2
+b0:
+  v1 = const 1
+  v2 = const 0
+  v3 = call m.narrow(v0, v2)
+  v4 = add.chk v1, v3 @site.3
+  ret v4
+
+site.0 fault L077 m.lf:1:1
+site.1 fault L077 m.lf:5:1
+site.2 fault L077 m.lf:9:1
+site.3 fault L040 m.lf:1:1
+"
+    );
+}
+
+#[test]
 fn entry_builds_process_only_when_main_takes_it() {
     let lowered = lower(&main_program("", vec![])).unwrap();
     assert_eq!(

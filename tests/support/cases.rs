@@ -721,6 +721,47 @@ fn deep_recursion() -> Case {
     )
 }
 
+// `down(n)` and `step(left, by)` tail call each other past the evaluator's depth limit; `step`
+// takes more parameters than `down`
+fn mutual_tail_calls() -> Case {
+    let mut p = Program::default();
+    p.module("m", "");
+    let (down, step) = (p.declare("down", Type::Int), p.declare("step", Type::Int));
+    let n = p.param("n", Type::Int);
+    p.define(
+        down,
+        1,
+        vec![n],
+        TirBody::Stmts(vec![
+            if_(
+                cmp(CmpOp::Eq, local(n, Type::Int), int(0)),
+                vec![ret(int(0))],
+                vec![],
+            ),
+            ret(call(step, vec![local(n, Type::Int), int(1)], Type::Int)),
+        ]),
+    );
+    let (left, by) = (p.param("left", Type::Int), p.param("by", Type::Int));
+    p.define(
+        step,
+        6,
+        vec![left, by],
+        TirBody::Stmts(vec![ret(call(
+            down,
+            vec![sub(local(left, Type::Int), local(by, Type::Int))],
+            Type::Int,
+        ))]),
+    );
+    let main = p.declare("main", Type::Nothing);
+    p.define(
+        main,
+        8,
+        vec![],
+        stmts(vec![log_int(call(down, vec![int(5000)], Type::Int))]),
+    );
+    case("mutual_tail_calls", p.finish(main), "0\n", 0)
+}
+
 fn clock() -> Case {
     let now = expr(Type::Int, lingua::tir::TirKind::ClockNow);
     let program = main_program(
@@ -805,6 +846,7 @@ pub fn all() -> Vec<Case> {
         modules_and_percent(),
         process(),
         deep_recursion(),
+        mutual_tail_calls(),
         clock(),
         split_empty_separator(),
         logs(),

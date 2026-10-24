@@ -608,6 +608,11 @@ impl Selector {
                 ]);
             }
             Term::Raise(site) => self.raise(&site_symbol(*site, 0)),
+            Term::TailCall(callee) => self.out.extend([
+                mov(reg(BP), reg(SP)),
+                op(POPQ, Addr::None, reg(BP)),
+                op(JMP, Addr::None, Addr::sym(callee)),
+            ]),
         }
     }
 }
@@ -617,7 +622,8 @@ impl Selector {
 ///
 /// Frame (Lingua ABI): parameter `i` at `16+8i(BP)`, the result slot after the parameters,
 /// vreg `k >= params` at `-8(k-params+1)(BP)`, and the outgoing argument area at `0(SP)`.
-/// Block `i` is label `Li`; `L0` is only emitted when a self tail call jumps to it. A function
+/// Block `i` is label `Li`; `L0` is only emitted when a self tail call jumps to it. A tail
+/// call of another function restores the caller's `BP` and `SP` and jumps to its entry. A function
 /// with a stack site first checks that its frame fits above `rt.stack_limit`; checks and the
 /// stack check branch to out-of-line stubs.
 #[must_use]
@@ -656,10 +662,10 @@ pub fn select(function: &LirFn) -> Vec<Prog> {
         op(SUBQ, Addr::Imm(frame), reg(SP)),
     ]);
     // A self tail call jumps back to the entry block, after the prologue
-    let entry_label = function.blocks.iter().any(|block| match block.term {
-        Term::Jump(to) => to == 0,
-        Term::Branch(_, then, otherwise) => then == 0 || otherwise == 0,
-        Term::Ret(_) | Term::Raise(_) => false,
+    let entry_label = function.blocks.iter().any(|block| match &block.term {
+        Term::Jump(to) => *to == 0,
+        Term::Branch(_, then, otherwise) => *then == 0 || *otherwise == 0,
+        Term::Ret(_) | Term::Raise(_) | Term::TailCall(_) => false,
     });
     for (id, block) in function.blocks.iter().enumerate() {
         if id > 0 || entry_label {

@@ -149,6 +149,10 @@ pub enum Term {
     Ret(Option<VReg>),
     /// Never returns.
     Raise(SiteId),
+    /// Tears down this frame and jumps to the callee's entry, prologue included. The
+    /// parameters already hold its arguments, and both share one incoming area and result
+    /// slot, so the callee returns straight to this function's caller.
+    TailCall(SymName),
 }
 
 /// A Text block: `+0 len: i64`, `+8 bytes`, zero-padded to a multiple of 8.
@@ -320,6 +324,10 @@ impl FnBuilder {
         self.terminate(Term::Raise(site));
     }
 
+    pub fn tail_call(&mut self, f: &str) {
+        self.terminate(Term::TailCall(f.to_owned()));
+    }
+
     /// Runs `then` when `cond != 0`, then continues after it.
     pub fn if_(&mut self, cond: VReg, then: impl FnOnce(&mut Self)) {
         self.if_else(cond, then, |_| {});
@@ -454,7 +462,7 @@ fn dump_fn(out: &mut String, function: &LirFn) {
                 Inst::Call(None, f, a) => writeln!(out, "  call {f}({})", args(a)),
             };
         }
-        let _ = match block.term {
+        let _ = match &block.term {
             Term::Jump(to) => writeln!(out, "  jump b{to}"),
             Term::Branch(c, then, otherwise) => {
                 writeln!(out, "  branch v{c}, b{then}, b{otherwise}")
@@ -462,6 +470,7 @@ fn dump_fn(out: &mut String, function: &LirFn) {
             Term::Ret(Some(v)) => writeln!(out, "  ret v{v}"),
             Term::Ret(None) => writeln!(out, "  ret"),
             Term::Raise(site) => writeln!(out, "  raise site.{site}"),
+            Term::TailCall(f) => writeln!(out, "  tailcall {f}"),
         };
     }
 }
@@ -573,6 +582,10 @@ b3:
                     insts: vec![],
                     term: Term::Raise(2),
                 },
+                Block {
+                    insts: vec![],
+                    term: Term::TailCall("m.g".to_owned()),
+                },
             ],
             stack_site: Some(0),
         };
@@ -619,6 +632,8 @@ b1:
   jump b2
 b2:
   raise site.2
+b3:
+  tailcall m.g
 
 site.0 fault L077 m.lf:1:1
 site.1 fault L076 fault L040 m.lf:3:10

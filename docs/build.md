@@ -159,9 +159,10 @@ Term =
   | Branch(a, then: BlockId, else: BlockId)        (* a != 0 *)
   | Ret(Option<a>)
   | Raise(SiteId)                                  (* exception or fault; never returns *)
+  | TailCall(SymName)                              (* tear down this frame, enter the callee *)
 ```
 
-`Chk(Div)` and `Chk(Rem)` fault `L076` on a zero divisor and `L040` on `INT_MIN / -1` or `INT_MIN % -1`. The site carries the report for both codes, so a `Div` site has two pre-rendered texts (see [Fault sites](#fault-sites)). `Bin`, `Load8`, and `Store8` are not produced by TIR lowering. They exist so the runtime can be written in LIR.
+`Chk(Div)` and `Chk(Rem)` fault `L076` on a zero divisor and `L040` on `INT_MIN / -1` or `INT_MIN % -1`. The site carries the report for both codes, so a `Div` site has two pre-rendered texts (see [Fault sites](#fault-sites)). `TailCall(f)` expects `f`'s arguments already in this function's parameter vregs; `f` shares this function's incoming area and result slot (see Tail calls under [Lowering TIR to LIR](#lowering-tir-to-lir)), so it returns straight to this function's caller. `Bin`, `Load8`, and `Store8` are not produced by TIR lowering. They exist so the runtime can be written in LIR.
 
 #### Lowering TIR to LIR
 
@@ -184,7 +185,7 @@ Lowering walks each `TirFn` in the runtime residue. A function whose body is `Pr
 | `Cmp` on integers or `Bool` | `Cmp` |
 | `Cmp(Eq/Ne)` on `Text` or nominal text | `Call rt.text_eq`, then `Cmp Eq/Ne` against `1` |
 | text with holes (`Concat`) | each part to a `Text` (an `Int` hole through `rt.int_to_text`), build a `List<Text>`, `Call rt.text_concat` |
-| `Call(f, args)` | `Call` |
+| `Call(f, args)` | `Call`, with arguments padded to `f`'s tail-call group width |
 | `IntIn(e, lo, hi)`, `IntAtLeast(e, lo)` | `Call rt.int_in_text` or `rt.int_in_int` with `lo`, `hi` (`INT_MAX` for `at least`) |
 | `ClockNow` | `Call rt.clock_now` |
 | `Log(e)` | `Call rt.log(e)` |
@@ -192,13 +193,16 @@ Lowering walks each `TirFn` in the runtime residue. A function whose body is `Pr
 | `If`, `ForList`, `ForRange`, `WhileIs` | blocks and branches, below |
 | `Return(e)` | `Ret(e)` |
 | `Return(Call(f, args))` in `f` itself | arguments into new vregs in source order, `Move`s into the parameters, `Jump` to the entry block |
+| `Return(Call(g, args))`, `g` another user function | arguments into new vregs in source order, `Move`s into the parameters, `TailCall g` |
 | `Assert(c, m)` | `Branch(c, next, fail)`, `fail` ends in `Raise` of a new exception site |
 | `Fail(m)` | `Raise` of a new exception site |
 | prelude `trim`, `lower`, `split`, `join`, `length`, `max` | `Call rt.trim` and so on. `length` is `Load(v, list, 0)`. `max` is `Cmp` and a branch |
 
 `FsRead`, `CatalogColumns`, `ResourceCall`, `Quote`, and `Unquote` cannot appear in the runtime residue. `lingua1.md` rejects the first three before this point and removes the last two at splice. Lowering treats any of them as an internal compiler error, not a diagnostic.
 
-**Self tail calls.** A `return` of a call to the enclosing function itself reuses the frame instead of calling. The arguments are evaluated in source order into new vregs (through the checker's `Let` when named arguments are out of order), then moved into the parameter vregs, and the block jumps to `blocks[0]`. The jump lands after the prologue, so the stack check runs once per real call and deep tail recursion never faults `L077`. Only a call whose result is returned directly counts: `return 1 + f(n - 1)` still calls. `ponytail:` self tail calls only, because a general tail call would write the callee's arguments into this frame's incoming area, which the caller sized for this function's parameters; reserving that area for the largest tail callee is the upgrade.
+**Tail calls.** A `return` of a call to a user function reuses the frame instead of growing the stack. The arguments are evaluated in source order into new vregs (through the checker's `Let` when named arguments are out of order), so an argument can still read the current parameters, and are then moved into the parameter vregs. A call of the enclosing function itself jumps to `blocks[0]`, after the prologue, so the stack check runs once per real call. A call of another function ends the block in `TailCall`, which tears the frame down and jumps to the callee's entry; its prologue and stack check run at the same depth as this function's did. Either way deep tail recursion, mutual or not, never faults `L077`. Only a call whose result is returned directly counts: `return 1 + g(n - 1)` still calls. Prelude calls are not tail calls.
+
+A tail call leaves the callee's arguments in this function's incoming area, which the caller sized, and the callee writes its result where the caller reads it. So functions joined by tail calls form a group with one width, the largest parameter count among them. Every member takes that many parameters (`params=` in the dump), the words past its own are padding, and every call to a member passes a `const 0` in each padding slot. The result slot is then the same word for every member. Lowering first runs with each function's own width, where a tail call between different widths stays a `Call`, and records the tail calls; if a group needs widening, it lowers again with the group widths. A function in no group keeps its own width, so its LIR is unchanged. `ponytail:` a narrow function in a wide group pays padding at every call; sliding the return address per tail call is the upgrade, and needs callers that do not assume `SP` survives a call.
 
 There are no runtime bound checks on integer subtypes. `lingua1` narrows only through `int_in` and `int_at_least`, which return `Result`, and through static adoption. Overflow checks are the only integer checks the backend inserts.
 
@@ -235,7 +239,7 @@ site.0 fault L077 order.lf:14:1
 site.1 fault L040 order.lf:21:10
 ```
 
-Site lines name the code and the source position so a golden file shows which span each check will report. The report text itself is not printed.
+A `TailCall` prints as `tailcall m.is_odd`. Site lines name the code and the source position so a golden file shows which span each check will report. The report text itself is not printed.
 
 ### Value representation
 
@@ -296,7 +300,7 @@ All Lingua functions, user and runtime, use one convention. Only rt0 and the sys
 | `FP - 8(k-params+1)` | slot of vreg `k`, for `k >= params` |
 | `SP + 0 ..` | this function's outgoing area |
 
-Parameters live in the caller's argument slots and are not copied. The frame size `F` is `8 * (vregs - params) + 8 * (max_call_args + 1)`, rounded up to 16. `SP` is 16-byte aligned at every call on both architectures.
+Parameters live in the caller's argument slots and are not copied. `n` is the callee's `params`, which for a function in a tail-call group is the group's width, so the caller's outgoing area also covers any function the callee tail calls (see Tail calls under [Lowering TIR to LIR](#lowering-tir-to-lir)). The frame size `F` is `8 * (vregs - params) + 8 * (max_call_args + 1)`, rounded up to 16. `SP` is 16-byte aligned at every call on both architectures.
 
 All registers are caller-saved. There are no callee-saved registers in the Lingua ABI, so a shim must save any callee-saved register it uses on the OS side. `X18` is never used on arm64, because darwin reserves it.
 
@@ -324,7 +328,7 @@ arm64:  ADRP rt.stack_limit, X9
 
 `stack_fault` raises the function's stack site, whose report is `fault L077: stack overflow` at the function's header span. `L077` is a new code; see [Proposed amendments](#proposed-amendments-to-lingua1md). Runtime functions on the fault path (`rt.fault`, the write shims) are nosplit: they have no check and run inside the reserve.
 
-`ponytail:` fixed 64 MiB stack, so very deep recursion that is not a self tail call faults with `L077` where Go would grow the stack; segmented or copied stacks are the upgrade and need a stack map, which v1 does not have.
+`ponytail:` fixed 64 MiB stack, so very deep recursion that is not a tail call faults with `L077` where Go would grow the stack; segmented or copied stacks are the upgrade and need a stack map, which v1 does not have.
 
 ### Fault sites
 
@@ -528,6 +532,7 @@ Selection is a function per architecture from `Inst` to `Prog`s. Each `Inst` loa
 | `Cmp` | `CMPQ AX, CX` (Go order: flags from `AX - CX`); `SETcc AL`; `MOVBQZX AL, AX` | `CMP X10, X9`; `CSET cc, X11` |
 | `Call` | store args to `n(SP)`; `CALL f(SB)`; load result | the same with `BL f(SB)` |
 | `Branch` | `TESTQ AX, AX`; `JNE then`; `JMP else` | `CBNZ X9, then`; `B else` |
+| `TailCall(f)` | `MOVQ BP, SP`; `POPQ BP`; `JMP f(SB)` | restore `X29`/`X30` and `RSP`; `B f(SB)` |
 
 The explicit `Div` tests come before the divide on both architectures. On amd64 `IDIV` traps on both cases, and on arm64 `SDIV` returns a value instead of faulting, so neither instruction's own behavior is the Lingua semantics.
 

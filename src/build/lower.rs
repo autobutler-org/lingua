@@ -33,6 +33,11 @@ struct Lowerer<'a> {
     strings: Vec<String>,
     singletons: Vec<RoData>,
     sites: Vec<Site>,
+    /// Each user function's incoming area: its parameter count, or its tail-call group's
+    /// widest. The words past its own parameters are padding.
+    widths: HashMap<SymbolId, u32>,
+    /// `(caller, callee)` for each tail call of another user function.
+    tails: Vec<(SymbolId, SymbolId)>,
 }
 
 impl<'a> Lowerer<'a> {
@@ -112,6 +117,13 @@ impl<'a> Lowerer<'a> {
     fn is_text(&self, ty: &'a Type) -> bool {
         *self.base(ty) == Type::Text
     }
+
+    fn width(&self, id: SymbolId) -> Lowered<u32> {
+        self.widths
+            .get(&id)
+            .copied()
+            .ok_or_else(|| internal(&format!("symbol {id} is not a function in the link set")))
+    }
 }
 
 // Per-function state
@@ -120,7 +132,7 @@ struct FnLowerer<'a, 'p> {
     module: &'a TirModule,
     b: FnBuilder,
     locals: HashMap<SymbolId, VReg>,
-    /// The function being lowered, for self tail calls.
+    /// The function being lowered, for tail calls.
     id: SymbolId,
 }
 
@@ -201,10 +213,21 @@ impl<'a> FnLowerer<'a, '_> {
                 if symbol.kind != SymbolKind::Function {
                     return Err(internal(&format!("call of non-function `{}`", symbol.name)));
                 }
+                let values = self.padded(callee, values)?;
                 return Ok(self.b.call(&function_symbol(symbol), &values));
             }
         };
         Ok(self.b.call(routine, &values))
+    }
+
+    // `values` padded to `callee`'s width; the padding words are never read
+    fn padded(&mut self, callee: SymbolId, mut values: Vec<VReg>) -> Lowered<Vec<VReg>> {
+        let width = self.program.width(callee)? as usize;
+        if values.len() < width {
+            let pad = self.b.konst(0);
+            values.resize(width, pad);
+        }
+        Ok(values)
     }
 
     fn cmp(&mut self, op: tir::CmpOp, a: &'a TirExpr, b: &'a TirExpr) -> Lowered<VReg> {
@@ -330,20 +353,26 @@ impl<'a> FnLowerer<'a, '_> {
         Ok(())
     }
 
-    // `return e`. A returned call of this function itself reuses the frame: the arguments are
-    // evaluated in order into temporaries, moved into the parameters, and the body restarts
-    // at the entry block, after the prologue's stack check. A `Let` is the checker's
+    // `return e`. A returned call of a user function in this function's tail-call group reuses
+    // the frame: the arguments are evaluated in order into temporaries and moved into the
+    // parameters, which the group shares (`Lowerer.widths`). A self call then restarts at the
+    // entry block, after the prologue's stack check; any other call is `TailCall`, which tears
+    // the frame down and enters the callee through its prologue. A `Let` is the checker's
     // source-order binding of the arguments.
-    // ponytail: self tail calls only. A general tail call would have to write the callee's
-    // arguments into this frame's incoming area, which the caller sized for this function's
-    // parameters; reserving that area for the largest tail callee is the upgrade.
     fn ret(&mut self, e: &'a TirExpr) -> Lowered<()> {
         match &e.kind {
             TirKind::Let(binds, body) => {
                 self.binds(binds)?;
                 self.ret(body)
             }
-            TirKind::Call(callee, args) if *callee == self.id => {
+            TirKind::Call(callee, args) if self.program.widths.contains_key(callee) => {
+                if *callee != self.id {
+                    self.program.tails.push((self.id, *callee));
+                }
+                // Not one group yet; `lower` widens the group and lowers again
+                if self.program.width(*callee)? != self.program.width(self.id)? {
+                    return self.ret_value(e);
+                }
                 let temps: Vec<VReg> = self
                     .exprs(args)?
                     .into_iter()
@@ -356,15 +385,22 @@ impl<'a> FnLowerer<'a, '_> {
                 for (param, temp) in (0..).zip(temps) {
                     self.b.mov(param, temp);
                 }
-                self.b.jump(0);
+                if *callee == self.id {
+                    self.b.jump(0);
+                } else {
+                    let name = function_symbol(self.program.symbol(*callee)?);
+                    self.b.tail_call(&name);
+                }
                 Ok(())
             }
-            _ => {
-                let v = self.expr(e)?;
-                self.b.ret(Some(v));
-                Ok(())
-            }
+            _ => self.ret_value(e),
         }
+    }
+
+    fn ret_value(&mut self, e: &'a TirExpr) -> Lowered<()> {
+        let v = self.expr(e)?;
+        self.b.ret(Some(v));
+        Ok(())
     }
 
     fn int_in(&mut self, source: &'a TirExpr, lo: i64, hi: i64) -> Lowered<VReg> {
@@ -624,11 +660,12 @@ fn lower_fn<'a>(
     let symbol = program.symbol(function.id)?;
     let name = function_symbol(symbol);
     let stack = program.fault_site(module, function.span, &["L077"]);
-    let params = u32::try_from(function.params.len()).map_err(|_| internal("too many params"))?;
+    let params = function.params.len();
+    let width = program.width(function.id)?;
     let mut lowerer = FnLowerer {
         program,
         module,
-        b: FnBuilder::new(&name, params, Some(stack)),
+        b: FnBuilder::new(&name, width, Some(stack)),
         locals: function.params.iter().copied().zip(0..).collect(),
         id: function.id,
     };
@@ -652,14 +689,18 @@ fn lower_fn<'a>(
     Ok(lowerer.b.finish())
 }
 
-// rt.entry: `Process` if `main` takes it, `main`, then exit 0
-fn entry(main: &str, takes_process: bool) -> LirFn {
+// rt.entry: `Process` if `main` takes it, `main` (padded to `width`), then exit 0
+fn entry(main: &str, takes_process: bool, width: u32) -> LirFn {
     let mut b = FnBuilder::new("rt.entry", 0, None);
-    let args = if takes_process {
+    let mut args = if takes_process {
         vec![b.call("rt.process", &[])]
     } else {
         Vec::new()
     };
+    if args.len() < width as usize {
+        let pad = b.konst(0);
+        args.resize(width as usize, pad);
+    }
     b.call_void(main, &args);
     let zero = b.konst(0);
     b.call_void("rt.sys_exit", &[zero]);
@@ -673,11 +714,66 @@ fn entry(main: &str, takes_process: bool) -> LirFn {
 /// An internal error for TIR that cannot reach the backend: an unknown symbol, a resource
 /// or comptime-only node, or a primitive other than `money.percent`.
 pub fn lower(program: &TirProgram) -> Lowered<LirProgram> {
+    let own: HashMap<SymbolId, u32> = program
+        .modules
+        .iter()
+        .flat_map(|module| &module.functions)
+        .map(|function| {
+            u32::try_from(function.params.len())
+                .map(|params| (function.id, params))
+                .map_err(|_| internal("too many params"))
+        })
+        .collect::<Lowered<_>>()?;
+    let (lowered, tails) = lower_with(program, own.clone())?;
+    let widths = group_widths(own.clone(), &tails);
+    if widths == own {
+        Ok(lowered)
+    } else {
+        Ok(lower_with(program, widths)?.0)
+    }
+}
+
+// Functions joined by tail calls share one incoming area (docs/build.md, Tail calls): a tail
+// call leaves the callee's arguments in this frame's parameter slots and its result in this
+// function's result slot, so every member takes the group's widest parameter count and each
+// caller reserves that much. Widening the narrow members is a fixpoint over the tail edges.
+// ponytail: a group is as wide as its widest member, so a narrow function in a wide group
+// pays padding at every call; per-edge sliding of the return address is the upgrade, and needs
+// callers that do not assume `SP` survives a call.
+fn group_widths(
+    mut widths: HashMap<SymbolId, u32>,
+    tails: &[(SymbolId, SymbolId)],
+) -> HashMap<SymbolId, u32> {
+    let mut changed = true;
+    while changed {
+        changed = false;
+        for (caller, callee) in tails {
+            let widest = widths[caller].max(widths[callee]);
+            for id in [caller, callee] {
+                if widths[id] != widest {
+                    widths.insert(*id, widest);
+                    changed = true;
+                }
+            }
+        }
+    }
+    widths
+}
+
+// One lowering with the given widths, and the tail calls it found. A tail call across
+// different widths lowers as a call, so a first pass with each function's own width is sound;
+// `lower` runs a second pass only when a group needs widening.
+fn lower_with(
+    program: &TirProgram,
+    widths: HashMap<SymbolId, u32>,
+) -> Lowered<(LirProgram, Vec<(SymbolId, SymbolId)>)> {
     let mut lowerer = Lowerer {
         tir: program,
         strings: Vec::new(),
         singletons: Vec::new(),
         sites: Vec::new(),
+        widths,
+        tails: Vec::new(),
     };
     let mut functions = Vec::new();
     for module in &program.modules {
@@ -694,6 +790,7 @@ pub fn lower(program: &TirProgram) -> Lowered<LirProgram> {
     let entry = entry(
         &function_symbol(lowerer.symbol(program.main)?),
         main.params.len() == 1,
+        lowerer.width(program.main)?,
     );
     let mut rodata: Vec<RoData> = lowerer
         .strings
@@ -711,12 +808,15 @@ pub fn lower(program: &TirProgram) -> Lowered<LirProgram> {
             ));
         }
     }
-    Ok(LirProgram {
-        functions,
-        entry,
-        rodata,
-        sites: lowerer.sites,
-    })
+    Ok((
+        LirProgram {
+            functions,
+            entry,
+            rodata,
+            sites: lowerer.sites,
+        },
+        lowerer.tails,
+    ))
 }
 
 #[cfg(test)]
