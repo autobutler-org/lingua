@@ -1,0 +1,1 @@
+const q = quote(assert 1 != 0, "nonzero")

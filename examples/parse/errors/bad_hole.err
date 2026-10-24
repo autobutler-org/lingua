@@ -1,0 +1,2 @@
+L001: `match` is not allowed in an interpolation hole
+  --> 1:19

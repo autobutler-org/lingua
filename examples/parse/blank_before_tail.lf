@@ -1,0 +1,16 @@
+fn double(n: Int) -> Int
+  pure
+
+  example "two"
+    n: 1
+    -> 2
+  end
+
+  example "zero"
+    n: 0
+    -> 0
+  end
+
+
+  return n + n
+end fn double

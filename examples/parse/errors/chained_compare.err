@@ -1,0 +1,2 @@
+L001: comparison operators do not chain; `a == b == c` is not an expression
+  --> 1:18

@@ -1,0 +1,12 @@
+(module "main_without_example"
+  (imports)
+  (decls
+    (fn "main"
+      (params)
+      (named "Nothing")
+      pure
+      (examples)
+      (statements
+        (expr-stmt
+          (call (name "log") (args (arg nil (text (literal "ok")))) false))
+        (return (nothing))))))

@@ -1,0 +1,7 @@
+const schema_text: Text
+  reads fs
+  = fs.read("openapi.json") or fail "schema unavailable"
+
+const named_text: Text
+  reads fs
+  = fs.read(path: "openapi.json") or fail "schema unavailable"

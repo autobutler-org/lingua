@@ -1,0 +1,15 @@
+(module "fs_read"
+  (imports)
+  (decls
+    (const "schema_text"
+      (named "Text")
+      reads-fs
+      (or-fail
+        (fs-read (text (literal "openapi.json")))
+        (text (literal "schema unavailable"))))
+    (const "named_text"
+      (named "Text")
+      reads-fs
+      (or-fail
+        (fs-read (text (literal "openapi.json")))
+        (text (literal "schema unavailable"))))))

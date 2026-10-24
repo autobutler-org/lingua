@@ -1,0 +1,15 @@
+(module "catalog_columns"
+  (imports)
+  (decls
+    (generative "OrderRow" reads-catalog
+      (body
+        (const "cols" nil
+          (or-fail
+            (catalog-columns (text (literal "orders")))
+            (text (literal "schema unavailable"))))
+        (return
+          (call
+            (name "record_from_columns")
+            (args (arg nil (name "cols")))
+            false))))
+    (const "columns" nil pure (catalog-columns (text (literal "orders"))))))

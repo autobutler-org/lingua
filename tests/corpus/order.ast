@@ -1,0 +1,242 @@
+(module "order"
+  (imports (import (names "Cents" "percent" "half_up") "money"))
+  (decls
+    (product "Line"
+      (fields
+        (field "name" (named "Text"))
+        (field "price" (named "Cents"))
+        (field "quantity" (at-least (named "Int") (int 1)))))
+    (sum "Discount"
+      (variants
+        (variant "NoDiscount" nil)
+        (variant "Percent" (range (named "Int") (int 1) (int 100)))
+        (variant "CentsOff" (named "Cents"))))
+    (fn "line_subtotal"
+      (params (param "line" (named "Line")))
+      (named "Cents")
+      pure
+      (examples
+        (example "two cups"
+          (bindings
+            (binding "line"
+              (call
+                (name "Line")
+                (args
+                  (arg nil (text (literal "cup")))
+                  (arg nil (int 500))
+                  (arg nil (int 2)))
+                false)))
+          (body)
+          (value (int 1000))))
+      (statements
+        (return
+          (binary mul
+            (field (name "line") "price")
+            (field (name "line") "quantity")))))
+    (fn "order_total"
+      (params
+        (param "lines" (apply "List" (args (named "Line"))))
+        (param "discount" (named "Discount")))
+      (named "Cents")
+      pure
+      (examples
+        (example "empty cart"
+          (bindings
+            (binding "lines" (list (items) false))
+            (binding "discount" (name "NoDiscount")))
+          (body)
+          (value (int 0)))
+        (example "percent applies to the sum"
+          (bindings
+            (binding "lines"
+              (list
+                (items
+                  (call
+                    (name "Line")
+                    (args
+                      (arg nil (text (literal "pen")))
+                      (arg nil (int 200))
+                      (arg nil (int 1)))
+                    false)
+                  (call
+                    (name "Line")
+                    (args
+                      (arg nil (text (literal "cup")))
+                      (arg nil (int 500))
+                      (arg nil (int 2)))
+                    false))
+                false))
+            (binding "discount"
+              (call (name "Percent") (args (arg nil (int 10))) false)))
+          (body)
+          (value (int 1080)))
+        (example "cents off cannot go negative"
+          (bindings
+            (binding "lines"
+              (list
+                (items
+                  (call
+                    (name "Line")
+                    (args
+                      (arg nil (text (literal "pen")))
+                      (arg nil (int 200))
+                      (arg nil (int 1)))
+                    false))
+                false))
+            (binding "discount"
+              (call (name "CentsOff") (args (arg nil (int 500))) false)))
+          (body)
+          (value (int 0))))
+      (statements
+        (var "sum" (named "Cents") (int 0))
+        (for-list "line"
+          (name "lines")
+          (body
+            (set "sum" add-assign
+              (call (name "line_subtotal") (args (arg nil (name "line"))) false))))
+        (let "off" nil
+          (match
+            (name "discount")
+            (arms
+              (arm (bind "NoDiscount") (expr-arm (int 0)))
+              (arm
+                (variant-pat "Percent" (bind "p"))
+                (expr-arm
+                  (call
+                    (name "percent")
+                    (args
+                      (arg nil (name "p"))
+                      (arg nil (name "sum"))
+                      (arg nil (name "half_up")))
+                    false)))
+              (arm (variant-pat "CentsOff" (bind "c")) (expr-arm (name "c"))))
+            expr-arms))
+        (return
+          (call
+            (name "max")
+            (args
+              (arg "a" (int 0))
+              (arg "b" (binary sub (name "sum") (name "off"))))
+            false))))
+    (sum "ParseError"
+      (variants
+        (variant "Empty" nil)
+        (variant "BadQuantity" nil)
+        (variant "UnknownDiscount" (named "Text"))))
+    (fn "parse_discount"
+      (params (param "raw" (named "Text")))
+      (apply "Result" (args (named "Discount") (named "ParseError")))
+      pure
+      (examples
+        (example "percent"
+          (bindings (binding "raw" (text (literal "percent:10"))))
+          (body)
+          (value
+            (call
+              (name "Ok")
+              (args
+                (arg nil
+                  (call (name "Percent") (args (arg nil (int 10))) false)))
+              false)))
+        (example "zero is not a percent discount"
+          (bindings (binding "raw" (text (literal "percent:0"))))
+          (body)
+          (value
+            (call (name "Err") (args (arg nil (name "BadQuantity"))) false)))
+        (example "unknown word"
+          (bindings (binding "raw" (text (literal "bogof"))))
+          (body)
+          (value
+            (call
+              (name "Err")
+              (args
+                (arg nil
+                  (call
+                    (name "UnknownDiscount")
+                    (args (arg nil (text (literal "bogof"))))
+                    false)))
+              false))))
+      (statements
+        (let "text" nil
+          (call
+            (name "lower")
+            (args
+              (arg nil (call (name "trim") (args (arg nil (name "raw"))) false)))
+            false))
+        (if
+          (binary eq (name "text") (text))
+          (then
+            (return (call (name "Err") (args (arg nil (name "Empty"))) false)))
+          nil)
+        (expr-stmt
+          (match
+            (call
+              (name "split")
+              (args
+                (arg "text" (name "text"))
+                (arg "separator" (text (literal ":"))))
+              false)
+            (arms
+              (arm
+                (list-pat (lit-text "none"))
+                (stmt-arm
+                  (return
+                    (call
+                      (name "Ok")
+                      (args (arg nil (name "NoDiscount")))
+                      false))))
+              (arm
+                (list-pat (lit-text "percent") (bind "n"))
+                (stmt-arm
+                  (let "p" nil
+                    (or-return
+                      (int-in (name "n") (int 1) (int 100))
+                      (call
+                        (name "Err")
+                        (args (arg nil (name "BadQuantity")))
+                        false)))
+                  (return
+                    (call
+                      (name "Ok")
+                      (args
+                        (arg nil
+                          (call
+                            (name "Percent")
+                            (args (arg nil (name "p")))
+                            false)))
+                      false))))
+              (arm
+                (list-pat (lit-text "off") (bind "n"))
+                (stmt-arm
+                  (let "c"
+                    (named "Cents")
+                    (or-return
+                      (int-at-least (name "n") (int 0))
+                      (call
+                        (name "Err")
+                        (args (arg nil (name "BadQuantity")))
+                        false)))
+                  (return
+                    (call
+                      (name "Ok")
+                      (args
+                        (arg nil
+                          (call
+                            (name "CentsOff")
+                            (args (arg nil (name "c")))
+                            false)))
+                      false))))
+              (arm
+                (wild)
+                (stmt-arm
+                  (return
+                    (call
+                      (name "Err")
+                      (args
+                        (arg nil
+                          (call
+                            (name "UnknownDiscount")
+                            (args (arg nil (name "text")))
+                            false)))
+                      false)))))
+            stmt-arms))))))

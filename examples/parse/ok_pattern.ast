@@ -1,0 +1,21 @@
+(module "ok_pattern"
+  (imports)
+  (decls
+    (fn "unwrap_or_zero"
+      (params (param "r" (apply "Result" (args (named "Int") (named "Text")))))
+      (named "Int")
+      pure
+      (examples
+        (example "ok"
+          (bindings
+            (binding "r" (call (name "Ok") (args (arg nil (int 3))) false)))
+          (body)
+          (value (int 3))))
+      (statements
+        (expr-stmt
+          (match
+            (name "r")
+            (arms
+              (arm (ok-pat (bind "n")) (stmt-arm (return (name "n"))))
+              (arm (err-pat (wild)) (stmt-arm (return (int 0)))))
+            stmt-arms))))))

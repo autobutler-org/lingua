@@ -1,0 +1,30 @@
+(module "quote"
+  (imports)
+  (decls
+    (fn "assert_nonzero"
+      (params (param "value" (named "Expr")))
+      (named "Expr")
+      pure
+      (examples
+        (example "wraps a check"
+          (bindings (binding "value" (quote (quoted-expr (int 1)))))
+          (body)
+          (value
+            (quote
+              (quoted-stmt
+                (assert (binary ne (int 1) (int 0)) (text (literal "nonzero"))))))))
+      (statements
+        (return
+          (quote
+            (quoted-stmt
+              (assert
+                (binary ne (unquote (name "value")) (int 0))
+                (text (literal "nonzero"))))))))
+    (package-example
+      (example "zero is fatal"
+        (bindings)
+        (body
+          (expr-stmt
+            (comptime
+              (call (name "assert_nonzero") (args (arg nil (int 0))) false))))
+        (exception "nonzero")))))

@@ -1,0 +1,4 @@
+fn one() -> Int
+  pure
+  return 1
+end fn one

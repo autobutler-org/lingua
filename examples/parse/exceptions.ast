@@ -1,0 +1,31 @@
+(module "exceptions"
+  (imports)
+  (decls
+    (fn "scale"
+      (params (param "n" (named "Int")) (param "factor" (named "Int")))
+      (named "Int")
+      pure
+      (examples
+        (example "zero factor is a bug"
+          (bindings (binding "n" (int 10)) (binding "factor" (int 0)))
+          (body)
+          (exception "factor must be non-zero")))
+      (statements
+        (assert
+          (binary ne (name "factor") (int 0))
+          (text (literal "factor must be non-zero")))
+        (if
+          (binary lt (name "n") (int 0))
+          (then (fail (text (literal "negative"))))
+          nil)
+        (return (binary mul (name "n") (name "factor")))))
+    (package-example
+      (example "scale works"
+        (bindings)
+        (body
+          (const "x" nil
+            (call
+              (name "scale")
+              (args (arg nil (int 2)) (arg nil (int 3)))
+              false)))
+        (value (binary eq (name "x") (int 6)))))))

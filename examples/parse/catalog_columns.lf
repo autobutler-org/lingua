@@ -1,0 +1,9 @@
+type OrderRow
+  reads catalog
+  comptime
+    const cols = catalog.columns("orders") or fail "schema unavailable"
+    return record_from_columns(cols)
+  end
+end type OrderRow
+
+const columns = catalog.columns(table: "orders")

@@ -4,9 +4,11 @@ use super::location::Location;
 pub struct Token {
     pub kind: TokenKind,
     pub location: Location,
+    // Position just past the token's last character
+    pub end: Location,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum TokenKind {
     Eof,
     Newline,
@@ -21,6 +23,8 @@ pub enum TokenKind {
     Plus,
     Minus,
     Asterisk,
+    Slash,
+    Percent,
     Equals,
     Arrow,
     PlusEquals,
@@ -36,11 +40,11 @@ pub enum TokenKind {
     Keyword(Keyword),
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum StringPart {
     Text(String),
-    // Raw hole source; the parser parses it as `cmp-expr`
-    Hole(String),
+    // Raw hole source and where it starts; the parser parses it as `interp-expr`
+    Hole { source: String, location: Location },
 }
 
 #[derive(Debug, PartialEq, Clone, Copy)]
@@ -92,57 +96,69 @@ pub enum Keyword {
     Err,
 }
 
+const KEYWORDS: [(&str, Keyword); 45] = [
+    ("assert", Keyword::Assert),
+    ("at", Keyword::At),
+    ("catalog", Keyword::Catalog),
+    ("clock", Keyword::Clock),
+    ("comptime", Keyword::Comptime),
+    ("const", Keyword::Const),
+    ("else", Keyword::Else),
+    ("end", Keyword::End),
+    ("example", Keyword::Example),
+    ("exception", Keyword::Exception),
+    ("fail", Keyword::Fail),
+    ("false", Keyword::False),
+    ("fn", Keyword::Fn),
+    ("for", Keyword::For),
+    ("from", Keyword::From),
+    ("fs", Keyword::Fs),
+    ("if", Keyword::If),
+    ("import", Keyword::Import),
+    ("in", Keyword::In),
+    ("int_at_least", Keyword::IntAtLeast),
+    ("int_in", Keyword::IntIn),
+    ("is", Keyword::Is),
+    ("least", Keyword::Least),
+    ("let", Keyword::Let),
+    ("match", Keyword::Match),
+    ("net", Keyword::Net),
+    ("nothing", Keyword::Nothing),
+    ("or", Keyword::Or),
+    ("provide", Keyword::Provide),
+    ("pure", Keyword::Pure),
+    ("quote", Keyword::Quote),
+    ("reads", Keyword::Reads),
+    ("resource", Keyword::Resource),
+    ("return", Keyword::Return),
+    ("set", Keyword::Set),
+    ("through", Keyword::Through),
+    ("true", Keyword::True),
+    ("type", Keyword::Type),
+    ("unquote", Keyword::Unquote),
+    ("until", Keyword::Until),
+    ("var", Keyword::Var),
+    ("while", Keyword::While),
+    ("writes", Keyword::Writes),
+    ("Ok", Keyword::Ok),
+    ("Err", Keyword::Err),
+];
+
 impl Keyword {
     #[must_use]
     pub fn from_spelling(spelling: &str) -> Option<Self> {
-        Some(match spelling {
-            "assert" => Self::Assert,
-            "at" => Self::At,
-            "catalog" => Self::Catalog,
-            "clock" => Self::Clock,
-            "comptime" => Self::Comptime,
-            "const" => Self::Const,
-            "else" => Self::Else,
-            "end" => Self::End,
-            "example" => Self::Example,
-            "exception" => Self::Exception,
-            "fail" => Self::Fail,
-            "false" => Self::False,
-            "fn" => Self::Fn,
-            "for" => Self::For,
-            "from" => Self::From,
-            "fs" => Self::Fs,
-            "if" => Self::If,
-            "import" => Self::Import,
-            "in" => Self::In,
-            "int_at_least" => Self::IntAtLeast,
-            "int_in" => Self::IntIn,
-            "is" => Self::Is,
-            "least" => Self::Least,
-            "let" => Self::Let,
-            "match" => Self::Match,
-            "net" => Self::Net,
-            "nothing" => Self::Nothing,
-            "or" => Self::Or,
-            "provide" => Self::Provide,
-            "pure" => Self::Pure,
-            "quote" => Self::Quote,
-            "reads" => Self::Reads,
-            "resource" => Self::Resource,
-            "return" => Self::Return,
-            "set" => Self::Set,
-            "through" => Self::Through,
-            "true" => Self::True,
-            "type" => Self::Type,
-            "unquote" => Self::Unquote,
-            "until" => Self::Until,
-            "var" => Self::Var,
-            "while" => Self::While,
-            "writes" => Self::Writes,
-            "Ok" => Self::Ok,
-            "Err" => Self::Err,
-            _ => return None,
-        })
+        KEYWORDS
+            .iter()
+            .find(|(candidate, _)| *candidate == spelling)
+            .map(|(_, keyword)| *keyword)
+    }
+
+    #[must_use]
+    pub fn spelling(self) -> &'static str {
+        KEYWORDS
+            .iter()
+            .find(|(_, keyword)| *keyword == self)
+            .map_or("", |(spelling, _)| spelling)
     }
 }
 

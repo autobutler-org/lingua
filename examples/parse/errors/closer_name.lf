@@ -1,0 +1,8 @@
+fn line_subtotal(n: Int) -> Int
+  pure
+  example "one"
+    n: 1
+    -> 1
+  end
+  return n
+end fn parse_discount

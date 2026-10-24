@@ -1,0 +1,47 @@
+type CustomerId = Text
+
+type Cursor = Text
+
+type Order
+  id: Text
+end type Order
+
+type DbError
+  Unavailable
+end type DbError
+
+type PageEnd
+  More(Cursor)
+  Done
+end type PageEnd
+
+type Page
+  orders: List<Order>
+  next: PageEnd
+end type Page
+
+resource db
+  fn open_orders(customer: CustomerId, after: Cursor) -> Result<Page, DbError>
+    reads
+end resource db
+
+fn all_open_orders(customer: CustomerId) -> Result<List<Order>, DbError>
+  reads db
+  example "two pages then Done"
+    db: [
+      Page([Order("a")], More("p2")),
+      Page([Order("b")], Done),
+    ]
+    customer: "c1"
+    -> Ok([Order("a"), Order("b")])
+  end
+
+  var collected: List<Order> = []
+  var next: PageEnd = More("start")
+  while next is More(cursor)
+    let page = db.open_orders(customer, after: cursor) or return
+    set collected = join(left: collected, right: page.orders)
+    set next = page.next
+  end
+  return Ok(collected)
+end fn all_open_orders

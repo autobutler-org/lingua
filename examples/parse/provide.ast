@@ -1,0 +1,53 @@
+(module "provide"
+  (imports)
+  (decls
+    (comptime-block reads-net
+      (body
+        (const "body" nil
+          (or-fail
+            (call
+              (name "http_get")
+              (args
+                (arg nil
+                  (text (literal "https://api.example.com/openapi.json"))))
+              false)
+            (text (literal "schema unavailable"))))
+        (provide "Customer"
+          (call
+            (name "schema")
+            (args
+              (arg "body" (name "body"))
+              (arg "name" (text (literal "Customer"))))
+            false))
+        (provide "Invoice"
+          (call
+            (name "schema")
+            (args
+              (arg "body" (name "body"))
+              (arg "name" (text (literal "Invoice"))))
+            false))))
+    (generative "Customers" reads-net
+      (body
+        (const "body" nil
+          (or-fail
+            (call
+              (name "http_get")
+              (args
+                (arg nil
+                  (text (literal "https://api.example.com/openapi.json"))))
+              false)
+            (text (literal "schema unavailable"))))
+        (return
+          (call
+            (name "schema")
+            (args
+              (arg "body" (name "body"))
+              (arg "name" (text (literal "Customer"))))
+            false))))
+    (provide "Stray"
+      (call
+        (name "schema")
+        (args
+          (arg "body" (text (literal "{}")))
+          (arg "name" (text (literal "Stray"))))
+        false))))

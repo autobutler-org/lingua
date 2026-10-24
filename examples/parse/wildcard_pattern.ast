@@ -1,0 +1,21 @@
+(module "wildcard_pattern"
+  (imports)
+  (decls
+    (fn "is_zero"
+      (params (param "n" (named "Int")))
+      (named "Bool")
+      pure
+      (examples
+        (example "zero"
+          (bindings (binding "n" (int 0)))
+          (body)
+          (value (bool true))))
+      (statements
+        (return
+          (match
+            (name "n")
+            (arms
+              (arm (lit-int 0) (expr-arm (bool true)))
+              (arm (lit-int -1) (expr-arm (bool false)))
+              (arm (wild) (expr-arm (bool false))))
+            expr-arms))))))

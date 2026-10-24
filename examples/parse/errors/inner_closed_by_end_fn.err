@@ -1,0 +1,3 @@
+L003: `end fn` cannot close an `if`
+  --> 9:1
+   = help: legal alternatives: end
