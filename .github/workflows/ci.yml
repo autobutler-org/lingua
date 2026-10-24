@@ -6,11 +6,14 @@ on:
   pull_request:
     branches:
       - main
+  push:
+    branches:
+      - main
 
 # cancel previous runs if new commits are pushed into the same PR
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
