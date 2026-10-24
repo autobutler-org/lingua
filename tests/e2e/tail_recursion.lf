@@ -1,0 +1,35 @@
+fn depth(n: Int, acc: Int) -> Int
+  pure
+  example "three levels"
+    n: 3
+    acc: 0
+    -> 3
+  end
+
+  if n == 0
+    return acc
+  end
+  return depth(n: n - 1, acc: acc + 1)
+end fn depth
+
+fn count(n: Int, acc: Int) -> Int
+  pure
+  example "named arguments out of order"
+    n: 3
+    acc: 0
+    -> 3
+  end
+
+  if n == 0
+    return acc
+  end
+  return count(acc: acc + 1, n: n - 1)
+end fn count
+
+fn main() -> Nothing
+  pure
+
+  log("deep {depth(n: 100000000, acc: 0)}")
+  log("count {count(n: 100000000, acc: 0)}")
+  return nothing
+end fn main

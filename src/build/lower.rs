@@ -120,6 +120,8 @@ struct FnLowerer<'a, 'p> {
     module: &'a TirModule,
     b: FnBuilder,
     locals: HashMap<SymbolId, VReg>,
+    /// The function being lowered, for self tail calls.
+    id: SymbolId,
 }
 
 fn bytes_offset(i: usize) -> Lowered<i32> {
@@ -309,10 +311,7 @@ impl<'a> FnLowerer<'a, '_> {
                 self.b.call("rt.log", &[text])
             }
             TirKind::Let(binds, body) => {
-                for (id, e) in binds {
-                    let value = self.expr(e)?;
-                    self.bind(*id, value);
-                }
+                self.binds(binds)?;
                 self.expr(body)?
             }
             TirKind::FsRead(_) | TirKind::CatalogColumns(_) | TirKind::ResourceCall(..) => {
@@ -321,6 +320,51 @@ impl<'a> FnLowerer<'a, '_> {
                 ));
             }
         })
+    }
+
+    fn binds(&mut self, binds: &'a [(SymbolId, TirExpr)]) -> Lowered<()> {
+        for (id, e) in binds {
+            let value = self.expr(e)?;
+            self.bind(*id, value);
+        }
+        Ok(())
+    }
+
+    // `return e`. A returned call of this function itself reuses the frame: the arguments are
+    // evaluated in order into temporaries, moved into the parameters, and the body restarts
+    // at the entry block, after the prologue's stack check. A `Let` is the checker's
+    // source-order binding of the arguments.
+    // ponytail: self tail calls only. A general tail call would have to write the callee's
+    // arguments into this frame's incoming area, which the caller sized for this function's
+    // parameters; reserving that area for the largest tail callee is the upgrade.
+    fn ret(&mut self, e: &'a TirExpr) -> Lowered<()> {
+        match &e.kind {
+            TirKind::Let(binds, body) => {
+                self.binds(binds)?;
+                self.ret(body)
+            }
+            TirKind::Call(callee, args) if *callee == self.id => {
+                let temps: Vec<VReg> = self
+                    .exprs(args)?
+                    .into_iter()
+                    .map(|value| {
+                        let temp = self.b.fresh();
+                        self.b.mov(temp, value);
+                        temp
+                    })
+                    .collect();
+                for (param, temp) in (0..).zip(temps) {
+                    self.b.mov(param, temp);
+                }
+                self.b.jump(0);
+                Ok(())
+            }
+            _ => {
+                let v = self.expr(e)?;
+                self.b.ret(Some(v));
+                Ok(())
+            }
+        }
     }
 
     fn int_in(&mut self, source: &'a TirExpr, lo: i64, hi: i64) -> Lowered<VReg> {
@@ -472,10 +516,7 @@ impl<'a> FnLowerer<'a, '_> {
                 let var = self.local(*id)?;
                 self.b.mov(var, v);
             }
-            TirStmt::Return(e) => {
-                let v = self.expr(e)?;
-                self.b.ret(Some(v));
-            }
+            TirStmt::Return(e) => self.ret(e)?,
             TirStmt::Assert {
                 cond,
                 message,
@@ -589,6 +630,7 @@ fn lower_fn<'a>(
         module,
         b: FnBuilder::new(&name, params, Some(stack)),
         locals: function.params.iter().copied().zip(0..).collect(),
+        id: function.id,
     };
     match &function.body {
         TirBody::Primitive if name == "money.percent" && params == 3 => {

@@ -617,8 +617,9 @@ impl Selector {
 ///
 /// Frame (Lingua ABI): parameter `i` at `16+8i(BP)`, the result slot after the parameters,
 /// vreg `k >= params` at `-8(k-params+1)(BP)`, and the outgoing argument area at `0(SP)`.
-/// Block `i` is label `Li`. A function with a stack site first checks that its frame fits
-/// above `rt.stack_limit`; checks and the stack check branch to out-of-line stubs.
+/// Block `i` is label `Li`; `L0` is only emitted when a self tail call jumps to it. A function
+/// with a stack site first checks that its frame fits above `rt.stack_limit`; checks and the
+/// stack check branch to out-of-line stubs.
 #[must_use]
 pub fn select(function: &LirFn) -> Vec<Prog> {
     let params = function.params;
@@ -654,8 +655,14 @@ pub fn select(function: &LirFn) -> Vec<Prog> {
         mov(reg(SP), reg(BP)),
         op(SUBQ, Addr::Imm(frame), reg(SP)),
     ]);
+    // A self tail call jumps back to the entry block, after the prologue
+    let entry_label = function.blocks.iter().any(|block| match block.term {
+        Term::Jump(to) => to == 0,
+        Term::Branch(_, then, otherwise) => then == 0 || otherwise == 0,
+        Term::Ret(_) | Term::Raise(_) => false,
+    });
     for (id, block) in function.blocks.iter().enumerate() {
-        if id > 0 {
+        if id > 0 || entry_label {
             let label = LabelId::try_from(id).unwrap_or(LabelId::MAX);
             s.out.push(op(LABEL, Addr::Label(label), Addr::None));
         }
