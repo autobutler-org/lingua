@@ -1,0 +1,8 @@
+fn main(process: Process) -> Nothing
+  pure
+
+  let count = length(process.args)
+  log("{count} args on thread {process.thread.name}")
+  log("parallelism {process.parallelism}")
+  return nothing
+end fn main
