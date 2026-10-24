@@ -11,8 +11,9 @@ const PT_INTERP: u32 = 3;
 const PT_GNU_STACK: u32 = 0x6474_e551;
 
 fn hello_image() -> Vec<u8> {
-    let source = include_bytes!("e2e/hello.lf");
-    build::build(&parse_source(source, "hello").unwrap()).unwrap()
+    let source = include_str!("e2e/hello.lf");
+    let module = parse_source(source.as_bytes(), "hello").unwrap();
+    build::build(&module, "hello.lf", source).unwrap()
 }
 
 fn u16_at(image: &[u8], at: usize) -> u16 {
@@ -66,10 +67,10 @@ fn hello_is_a_static_amd64_exec() {
 
     let phdrs = phdrs(&image);
     let kinds: Vec<u32> = phdrs.iter().map(|phdr| phdr.kind).collect();
-    assert_eq!(kinds, [PT_LOAD, PT_LOAD, PT_GNU_STACK]);
+    assert_eq!(kinds, [PT_LOAD, PT_LOAD, PT_LOAD, PT_GNU_STACK]);
     assert!(!kinds.contains(&PT_INTERP) && !kinds.contains(&PT_DYNAMIC));
 
-    let (text, rodata, stack) = (&phdrs[0], &phdrs[1], &phdrs[2]);
+    let (text, rodata, data, stack) = (&phdrs[0], &phdrs[1], &phdrs[2], &phdrs[3]);
     assert_eq!(
         (text.flags, text.offset, text.vaddr),
         (5, 0, BASE),
@@ -77,6 +78,14 @@ fn hello_is_a_static_amd64_exec() {
     );
     assert_eq!(rodata.flags, 4, "rodata R");
     assert_eq!(stack.flags, 6, "stack R+W, not executable");
+    assert_eq!(data.flags, 6, ".bss R+W");
+    assert_eq!(
+        (data.filesz, data.memsz),
+        (0, 32),
+        "four .bss words, no file bytes"
+    );
+    assert_eq!(data.vaddr % 0x1000, 0);
+    assert!(rodata.vaddr + rodata.memsz <= data.vaddr);
     for load in [text, rodata] {
         assert_eq!(load.vaddr % 0x1000, load.offset % 0x1000);
         assert_eq!(load.filesz, load.memsz);

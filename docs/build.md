@@ -183,7 +183,7 @@ Lowering walks each `TirFn` in the runtime residue. A function whose body is `Pr
 | `Neg` | `Neg` with a new site |
 | `Cmp` on integers or `Bool` | `Cmp` |
 | `Cmp(Eq/Ne)` on `Text` or nominal text | `Call rt.text_eq`, then `Cmp Eq/Ne` against `1` |
-| text with holes | each part to a `Text` (an `Int` hole through `rt.int_to_text`), build a `List<Text>`, `Call rt.text_concat` |
+| text with holes (`Concat`) | each part to a `Text` (an `Int` hole through `rt.int_to_text`), build a `List<Text>`, `Call rt.text_concat` |
 | `Call(f, args)` | `Call` |
 | `IntIn(e, lo, hi)`, `IntAtLeast(e, lo)` | `Call rt.int_in_text` or `rt.int_in_int` with `lo`, `hi` (`INT_MAX` for `at least`) |
 | `ClockNow` | `Call rt.clock_now` |
@@ -290,7 +290,7 @@ All Lingua functions, user and runtime, use one convention. Only rt0 and the sys
 | `FP + 16 + 8i` | argument `i` (caller's outgoing area) |
 | `FP + 8` | return address |
 | `FP + 0` | caller's `FP` |
-| `FP - 8(k+1)` | slot of vreg `k`, for `k >= params` |
+| `FP - 8(k-params+1)` | slot of vreg `k`, for `k >= params` |
 | `SP + 0 ..` | this function's outgoing area |
 
 Parameters live in the caller's argument slots and are not copied. The frame size `F` is `8 * (vregs - params) + 8 * (max_call_args + 1)`, rounded up to 16. `SP` is 16-byte aligned at every call on both architectures.
@@ -336,7 +336,9 @@ Site {
 ReportKind = Exception | Fault(code)                   (* L040, L046, L047, L076, L077 *)
 ```
 
-At build time, the backend calls the same Rust functions the interpreter uses to render an exception or a fault for a span, and stores each result as a rodata block in the Text layout: `{len, bytes}`. The text is exactly what the interpreter writes to stderr for that root, including the trailing newline. The file path in the report is the one the checker prints for that module, fixed at build time.
+At build time, the backend calls the same Rust functions the interpreter uses to render an exception or a fault for a span (`src/report.rs`), and stores each result as a rodata block in the Text layout: `{len, bytes}`. The text is exactly what the interpreter writes to stderr for that root, including the trailing newline. The file path in the report is the one the checker prints for that module, fixed at build time.
+
+The shapes are `lingua1.md`'s, byte for byte: an exception is the header, the `-->` line, and the source line with carets under the span's first line; a fault is the header and the `-->` line only, as `lingua1.md` shows it. A match that falls off its last arm raises an `internal` site whose report names the match's position.
 
 A `Raise(site)` jumps to a per-function out-of-line stub that loads the report address into the first scratch register and jumps to `rt.fault`. `rt.fault` writes the block to fd 2 and exits with status 1. A `Div` or `Rem` site has two stubs, one per code.
 
@@ -354,12 +356,15 @@ The span is the TIR node's span. A spliced node already has the call-site span (
 
 ### Runtime
 
-The runtime is built by Rust functions in `src/build/runtime` that return `LirFn`s. It is added to every program and trimmed by reachability like user code.
+The runtime is built by Rust functions in `src/build/runtime.rs` that return `LirFn`s. It is added to every program and trimmed by reachability like user code. `ponytail:` reachability is not implemented yet, so every runtime routine is linked into every binary (about 10 KiB); add the walk under [Linker](#linker) when size matters.
+
+Lowering adds `rt.entry`, which builds `Process` with `rt.process` when `main` takes one, calls `main`, and exits 0. rt0 calls it after switching stacks, so rt0 does not depend on `main`'s signature.
 
 | Routine | Signature (words) | Notes |
 |---|---|---|
 | `rt.alloc` | `(bytes) -> ptr` | bump allocator above |
-| `rt.fault` | `(report)` | nosplit; writes, exits 1. Takes its argument in the first scratch register, not the stack, because it is entered by `JMP` |
+| `rt.fault` | `(report)` | per-target `Prog`; takes its argument in the first scratch register, not the stack, because it is entered by `JMP`. Aligns `SP` and calls `rt.die` |
+| `rt.die` | `(report)` | writes the report to fd 2, exits 1. Also called directly by `rt.alloc` (`site.oom`) and `rt.split` |
 | `rt.write_all` | `(fd, ptr, len)` | nosplit; loops until all bytes are written, retries `EINTR` |
 | `rt.log` | `(text) -> 0` | writes the bytes and `"\n"` to fd 2 |
 | `rt.clock_now` | `() -> i64` | `clock_gettime(CLOCK_REALTIME)`, returns `tv_sec` |
@@ -368,7 +373,7 @@ The runtime is built by Rust functions in `src/build/runtime` that return `LirFn
 | `rt.int_to_text` | `(n) -> text` | decimal, `-` only if negative, handles `INT_MIN` |
 | `rt.trim` | `(text) -> text` | strips U+0020, U+0009, U+000A, U+000D from both ends |
 | `rt.lower` | `(text) -> text` | bytes `A`–`Z` to `a`–`z` |
-| `rt.split` | `(text, sep, site) -> list` | empty `sep` raises `site` (`L046`) |
+| `rt.split` | `(text, sep, report) -> list` | empty `sep` dies with `report`, the address of the call's `L046` site report |
 | `rt.join` | `(left, right) -> list` | new list, both element runs copied |
 | `rt.list_index` | `(list, i) -> Result` | `Ok(elem)` or `Err(OutOfRange)` |
 | `rt.int_in_text` | `(text, lo, hi) -> Result` | `lingua1.md` `int_in` table: optional `-`, digits, no spaces |
@@ -402,7 +407,7 @@ Each target supplies rt0 and one shim per system operation, written as `Prog` li
 | `rt.sys_clock(buf)` | `clock_gettime(0, buf)` | `clock_gettime` | `_clock_gettime` |
 | `rt.sys_getpid() -> n` | `getpid` | `getpid` | `_getpid` |
 | `rt.sys_gettid() -> n` | `gettid` | `gettid` (glibc 2.30 or later) | `_pthread_threadid_np(0, buf)` |
-| `rt.sys_ncpu() -> n` | `sched_getaffinity(0, 128, buf)`, popcount | `sched_getaffinity`, popcount | `_sysctlbyname("hw.activecpu", buf, &len, 0, 0)` |
+| `rt.sys_getaffinity(buf) -> n` | `sched_getaffinity(0, 128, buf)`; the popcount is LIR (`rt.ncpu`) | `sched_getaffinity` | `_sysctlbyname("hw.activecpu", buf, &len, 0, 0)` |
 
 `mmap` is called as `mmap(0, size, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANON, -1, 0)`. `MAP_ANON` is `0x20` on Linux and `0x1000` on darwin. A failed `sched_getaffinity` gives a parallelism of 1, because `Process.parallelism` is at least 1.
 
@@ -505,7 +510,7 @@ The dump syntax is Go's: sources first, destination last, `(SB)` for symbols, of
 
 #### Instruction selection
 
-Selection is a function per architecture from `Inst` to `Prog`s. Each `Inst` loads its operands from their slots into scratch registers, computes, and stores. A parameter's slot is `FP + 16 + 8i`; any other vreg's slot is `FP - 8(k+1)`.
+Selection is a function per architecture from `Inst` to `Prog`s. Each `Inst` loads its operands from their slots into scratch registers, computes, and stores. A parameter's slot is `FP + 16 + 8i`; any other vreg's slot is `FP - 8(k-params+1)`. Block `i` is label `Li`.
 
 | LIR | amd64 | arm64 |
 |---|---|---|
@@ -517,7 +522,7 @@ Selection is a function per architecture from `Inst` to `Prog`s. Each `Inst` loa
 | `Chk(Div)` | test `CX` zero, test `AX = INT_MIN` and `CX = -1`; `CQO`; `IDIVQ CX` | the same two tests; `SDIV X10, X9, X11` |
 | `Chk(Rem)` | as `Div`, result in `DX` | `SDIV`, then `MSUB X10, X9, X11, X11` |
 | `Neg` | `NEGQ AX`; `JOS stub` | `NEGS X9, X11`; `BVS stub` |
-| `Cmp` | `CMPQ CX, AX`; `SETcc AL`; `MOVBQZX AL, AX` | `CMP X10, X9`; `CSET cc, X11` |
+| `Cmp` | `CMPQ AX, CX` (Go order: flags from `AX - CX`); `SETcc AL`; `MOVBQZX AL, AX` | `CMP X10, X9`; `CSET cc, X11` |
 | `Call` | store args to `n(SP)`; `CALL f(SB)`; load result | the same with `BL f(SB)` |
 | `Branch` | `TESTQ AX, AX`; `JNE then`; `JMP else` | `CBNZ X9, then`; `B else` |
 
@@ -668,7 +673,7 @@ The linker takes every reachable function's encoded bytes and relocations, the r
 |---|---|---|
 | text | R+X | file headers, code |
 | rodata | R | Text blocks, variant singletons, site reports, `os`/`arch` strings |
-| data | R+W | `.bss`: `rt.heap_ptr`, `rt.heap_end`, `rt.stack_limit`, `rt.argc`, `rt.argv`. A dynamic binary adds the import slots (`.got` or `__DATA_CONST,__got`), read-only after load |
+| data | R+W | `.bss`: `rt.heap_ptr`, `rt.heap_end`, `rt.stack_limit`, `rt.argp` (the entry `SP`, at `argc`, then `argv`). A dynamic binary adds the import slots (`.got` or `__DATA_CONST,__got`), read-only after load |
 
 Relocations are resolved after layout, when every symbol has an address. A displacement that does not fit its field is an internal error.
 
@@ -786,8 +791,10 @@ Proposed module layout:
 
 ```text
 src/build/mod.rs          driver: link set, L072/L074/L075, target choice, write
-src/build/lir.rs          LIR types, lowering from TIR, dump
-src/build/runtime/        rt.* routines as LIR builders
+src/build/lir.rs          LIR types, the builder, dump
+src/build/lower.rs        lowering from TIR, sites
+src/build/runtime.rs      rt.* routines as LIR builders
+src/build/lir_eval.rs     test-only LIR evaluator
 src/build/prog.rs         Prog, Addr, As generic range, dump
 src/build/arch/amd64.rs   selection and encoding table
 src/build/arch/arm64.rs   selection and encoding table
@@ -852,6 +859,7 @@ The link-mode wording in `lingua1.md` already matches this design: static by def
 3. **Native `L046` and `L047` shapes.** A runtime empty `split` separator in the binary is `fault L046: split on an empty separator` with the `split` call's span, exit 1. Heap exhaustion in the binary is `fault L047: out of memory` with no span, exit 1.
 4. **`lingua lir FILE` and `lingua asm [--target OS/ARCH] FILE`**, added to the stage-dump table and to the CLI listing. Not lossless; there is no reader.
 5. **argv encoding.** A `Process.program` or `Process.args` entry that is not valid UTF-8 has each invalid sequence replaced with U+FFFD.
+6. **Typed IR additions** (`src/tir.rs`): `TirKind::Concat` for text with holes, spans on `Assert`, `Fail`, and `TirFn`, a `tag` on variant symbols, and `TirProgram`/`TirModule` carrying each module's printed path and source text for pre-rendered reports.
 
 ---
 

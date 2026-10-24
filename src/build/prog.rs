@@ -43,7 +43,12 @@ pub enum Addr {
         name: SymName,
         off: i32,
     },
+    /// A branch target in this function, defined by a `LABEL` Prog.
+    Label(LabelId),
 }
+
+/// A label, numbered per function.
+pub type LabelId = u32;
 
 impl Addr {
     #[must_use]
@@ -90,6 +95,7 @@ impl Prog {
             Addr::Mem { base, off } => Some(format!("{off}({})", reg_name(*base))),
             Addr::Sym { name, off: 0 } => Some(format!("{name}(SB)")),
             Addr::Sym { name, off } => Some(format!("{name}{off:+}(SB)")),
+            Addr::Label(label) => Some(format!("L{label}")),
         };
         let operands: Vec<String> = [
             addr(&self.from),
@@ -165,10 +171,12 @@ mod tests {
             Prog::new(MOVQ, Addr::Mem { base: 1, off: -8 }, Addr::Reg(0)),
             Prog::new(MOVQ, Addr::Reg(0), Addr::Mem { base: 1, off: 0 }),
             Prog::new(RET, Addr::None, Addr::None),
+            Prog::new(LABEL, Addr::Label(3), Addr::None),
+            Prog::new(JMP, Addr::None, Addr::Label(3)),
         ];
         assert_eq!(
             dump(&progs, op_name, reg_name),
-            "TEXT f(SB)\n  MOVQ  $-2, AX\n  MOVQ  CX, AX, CX\n  MOVQ  msg+8(SB), CX\n  MOVQ  msg-8(SB), CX\n  MOVQ  -8(CX), AX\n  MOVQ  AX, 0(CX)\n  RET\n"
+            "TEXT f(SB)\n  MOVQ  $-2, AX\n  MOVQ  CX, AX, CX\n  MOVQ  msg+8(SB), CX\n  MOVQ  msg-8(SB), CX\n  MOVQ  -8(CX), AX\n  MOVQ  AX, 0(CX)\n  RET\nLABEL L3\n  JMP   L3\n"
         );
     }
 }

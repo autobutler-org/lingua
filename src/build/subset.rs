@@ -3,11 +3,15 @@
 //!
 //! Accepted: one file, no imports, exactly one `fn main() -> Nothing` that is `pure`, whose
 //! body is `log("literal")` statements ending in `return nothing`. Examples are ignored, since
-//! they do not run natively. Anything else is a diagnostic.
+//! they do not run natively. Anything else is a diagnostic. The backend itself takes all of
+//! runtime TIR; only this front door is narrow.
 
 use crate::ast::{Arg, Decl, Effect, Expr, FnBody, Module, Span, Stmt, TextPart, TypeExpr};
 use crate::parse::Diagnostic;
-use crate::tir::{TirExpr, TirFn, TirKind, TirStmt};
+use crate::tir::{
+    Symbol, SymbolId, SymbolKind, TirBody, TirExpr, TirFn, TirKind, TirModule, TirProgram, TirStmt,
+    Type, prelude,
+};
 
 /// The code for a construct that is legal Lingua but not built yet. Not an `L` code.
 const NOT_YET: &str = "error";
@@ -103,10 +107,12 @@ fn log_call(span: Span, expr: &Expr) -> Result<TirStmt, Diagnostic> {
         })
         .collect::<Result<String, _>>()?;
     let arg = TirExpr {
+        ty: Type::Text,
         span: *text_span,
         kind: TirKind::Text(text),
     };
     Ok(TirStmt::Expr(TirExpr {
+        ty: Type::Nothing,
         span: expr.span(),
         kind: TirKind::Log(Box::new(arg)),
     }))
@@ -133,6 +139,7 @@ fn body(span: Span, stmts: &[Stmt], diagnostics: &mut Vec<Diagnostic>) -> Vec<Ti
             } => {
                 returned = true;
                 Ok(TirStmt::Return(TirExpr {
+                    ty: Type::Nothing,
                     span: *span,
                     kind: TirKind::Nothing,
                 }))
@@ -156,7 +163,10 @@ fn body(span: Span, stmts: &[Stmt], diagnostics: &mut Vec<Diagnostic>) -> Vec<Ti
     out
 }
 
-fn main_fn(module: &Module, decl: &Decl, diagnostics: &mut Vec<Diagnostic>) -> Option<TirFn> {
+// `main`'s symbol, right after the prelude
+const MAIN: SymbolId = prelude::END;
+
+fn main_fn(decl: &Decl, diagnostics: &mut Vec<Diagnostic>) -> Option<TirFn> {
     let Decl::Function {
         span,
         params,
@@ -209,18 +219,24 @@ fn main_fn(module: &Module, decl: &Decl, diagnostics: &mut Vec<Diagnostic>) -> O
         return None;
     };
     Some(TirFn {
-        name: format!("{}.main", module.key),
-        body: body(*span, stmts, diagnostics),
+        id: MAIN,
+        span: *span,
+        effect: Effect::Pure,
+        params: Vec::new(),
+        ret: Type::Nothing,
+        body: TirBody::Stmts(body(*span, stmts, diagnostics)),
+        examples: Vec::new(),
     })
 }
 
-/// Checks that `module` is in the subset and returns its `main` as TIR.
+/// Checks that `module` (read from `path`, with text `source`) is in the subset and returns
+/// it as a one-module TIR program.
 ///
 /// # Errors
 /// Every diagnostic found, sorted by position: `L074` for zero or several mains, `L075` for
 /// a wrong signature, `L025` for a wrong effect, `L012`/`L018` for return paths, and
 /// `error: lingua build ...` for legal Lingua that is not built yet.
-pub fn check(module: &Module) -> Result<TirFn, Vec<Diagnostic>> {
+pub fn check(module: &Module, path: &str, source: &str) -> Result<TirProgram, Vec<Diagnostic>> {
     let mut diagnostics: Vec<Diagnostic> = module
         .imports
         .iter()
@@ -243,7 +259,7 @@ pub fn check(module: &Module) -> Result<TirFn, Vec<Diagnostic>> {
                         Some("keep one `main` and rename or delete the others"),
                     ));
                 }
-                mains.push(main_fn(module, decl, &mut diagnostics));
+                mains.push(main_fn(decl, &mut diagnostics));
             }
             _ => diagnostics.push(not_yet(
                 decl_span(decl),
@@ -260,7 +276,26 @@ pub fn check(module: &Module) -> Result<TirFn, Vec<Diagnostic>> {
         ));
     }
     if let (true, Some(main)) = (diagnostics.is_empty(), mains.into_iter().next().flatten()) {
-        Ok(main)
+        let mut symbols = prelude::symbols();
+        symbols.push(Symbol {
+            name: "main".to_owned(),
+            kind: SymbolKind::Function,
+            ty: Type::Nothing,
+            effect: Some(Effect::Pure),
+            mutable: false,
+            span: main.span,
+            module: module.key.clone(),
+        });
+        Ok(TirProgram {
+            symbols,
+            modules: vec![TirModule {
+                key: module.key.clone(),
+                path: path.to_owned(),
+                source: source.to_owned(),
+                functions: vec![main],
+            }],
+            main: MAIN,
+        })
     } else {
         diagnostics.sort_by_key(|d| (d.location.line, d.location.column, d.code));
         Err(diagnostics)
@@ -272,9 +307,9 @@ mod tests {
     use super::*;
     use crate::parse::parse_source;
 
-    fn run(source: &str) -> Result<TirFn, Vec<String>> {
+    fn run(source: &str) -> Result<TirProgram, Vec<String>> {
         let module = parse_source(source.as_bytes(), "hello").expect("test source parses");
-        check(&module).map_err(|diagnostics| {
+        check(&module, "hello.lf", source).map_err(|diagnostics| {
             diagnostics
                 .iter()
                 .map(|d| {
@@ -287,9 +322,11 @@ mod tests {
         })
     }
 
-    fn texts(main: &TirFn) -> Vec<Option<&str>> {
-        main.body
-            .iter()
+    fn texts(program: &TirProgram) -> Vec<Option<&str>> {
+        let TirBody::Stmts(body) = &program.modules[0].functions[0].body else {
+            panic!("main is primitive");
+        };
+        body.iter()
             .map(|stmt| match stmt {
                 TirStmt::Expr(TirExpr {
                     kind: TirKind::Log(arg),
@@ -310,7 +347,12 @@ mod tests {
     #[test]
     fn accepts_logs_then_return_nothing() {
         let main = run("fn main() -> Nothing\n  pure\n\n  log(\"hello, world\")\n  log(\"a\\tb\")\n  return nothing\nend fn main\n").unwrap();
-        assert_eq!(main.name, "hello.main");
+        let symbol = &main.symbols[main.main as usize];
+        assert_eq!(
+            (symbol.module.as_str(), symbol.name.as_str()),
+            ("hello", "main")
+        );
+        assert_eq!(main.modules[0].path, "hello.lf");
         assert_eq!(texts(&main), [Some("hello, world"), Some("a\tb"), None]);
     }
 
