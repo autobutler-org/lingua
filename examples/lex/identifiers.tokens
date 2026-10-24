@@ -1,0 +1,11 @@
+1:1 Identifier("order_total")
+1:13 Identifier("_foo")
+1:18 Identifier("__")
+1:21 Wildcard
+1:23 Identifier("x1")
+1:26 Identifier("Cents")
+1:31 Newline
+2:1 Wildcard
+2:3 Equals
+2:5 Identifier("half_up")
+2:12 Newline

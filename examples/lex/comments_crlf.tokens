@@ -1,0 +1,16 @@
+1:1 Keyword(Let)
+1:5 Identifier("a")
+1:7 Equals
+1:9 Integer(1)
+1:30 Newline
+2:22 Newline
+3:1 Keyword(Let)
+3:5 Identifier("b")
+3:7 Equals
+3:9 Integer(2)
+3:10 Newline
+4:1 Keyword(Let)
+4:5 Identifier("c")
+4:7 Equals
+4:9 Integer(3)
+4:10 Newline
