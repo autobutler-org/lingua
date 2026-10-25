@@ -46,7 +46,7 @@ fn passing_examples_check_silently() {
     std::fs::write(dir.join("cups.lf"), source.replace("-> 1000", "-> 500")).unwrap();
     let output = lingua(&dir, &["check", "cups.lf"]);
     assert_eq!(output.status.code(), Some(0));
-    assert!(output.stderr.is_empty());
+    assert_eq!(String::from_utf8_lossy(&output.stderr), "");
 }
 
 #[test]

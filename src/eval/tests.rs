@@ -385,7 +385,10 @@ fn a_module_with_errors_skips_its_examples() {
 fn examples_call_across_modules_and_log_is_discarded() {
     let money = "type Cents = Int at least 0\n\nfn double(c: Cents) -> Cents\n  pure\n  example \"two\"\n    c: 1\n    -> 2\n  end\n\n  log(\"doubling {c}\")\n  return c + c\nend fn double\n";
     let order = "import Cents, double from \"money\"\n\nfn quad(c: Cents) -> Cents\n  pure\n  example \"four\"\n    c: 2\n    -> 8\n  end\n\n  return double(double(c))\nend fn quad\n";
-    assert!(diagnostics_of(&[("money.lf", money), ("order.lf", order)]).is_empty());
+    assert_eq!(
+        diagnostics_of(&[("money.lf", money), ("order.lf", order)]),
+        [] as [Diagnostic; 0]
+    );
 }
 
 #[test]
@@ -399,7 +402,10 @@ fn percent_is_the_allowlisted_primitive() {
         .unwrap()
     };
     let money = corpus("money.lf");
-    assert!(diagnostics_of(&[("money.lf", &money)]).is_empty());
+    assert_eq!(
+        diagnostics_of(&[("money.lf", &money)]),
+        [] as [Diagnostic; 0]
+    );
     let wrong = money.replace("-> 120", "-> 121");
     assert_eq!(
         diagnostics_of(&[("money.lf", &wrong)])
