@@ -9,6 +9,7 @@ use crate::ast::Span;
 pub fn fault_summary(code: &str) -> &'static str {
     match code {
         "L040" => "arithmetic overflow",
+        "L042" => "fuel exceeded (100_000 steps)",
         "L046" => "split on an empty separator",
         "L047" => "out of memory",
         "L076" => "division by zero",

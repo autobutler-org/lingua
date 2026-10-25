@@ -28,8 +28,9 @@ flags for check and build:
   --refresh, --offline
                       provider cache policy (no provider runs until comptime lands)
 
-Examples do not run yet, and comptime code (`const`, `comptime`, generative types, macros,
-package examples) is reported as not supported yet.";
+Function examples run on the interpreter during check and build; a failing one is a
+diagnostic. Comptime code (`const`, `comptime`, generative types, macros, package examples)
+is reported as not supported yet.";
 
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();

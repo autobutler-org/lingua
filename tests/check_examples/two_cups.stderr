@@ -1,0 +1,5 @@
+L043: example "two cups" expected 1000 got 500
+  --> two_cups.lf:11:5
+   |
+11 |     -> 1000
+   |     ^^^^^^^
