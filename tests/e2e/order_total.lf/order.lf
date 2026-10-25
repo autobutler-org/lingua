@@ -52,6 +52,10 @@ fn order_total(lines: List<Line>, discount: Discount) -> Cents
   return max(a: 0, b: sum - off)
 end fn order_total
 
+example "empty cart totals zero"
+  -> order_total([], NoDiscount) == 0
+end
+
 type ParseError
   Empty
   BadQuantity

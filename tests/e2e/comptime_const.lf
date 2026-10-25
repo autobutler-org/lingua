@@ -1,0 +1,78 @@
+type Step
+  Go(Int)
+  Stop(Int)
+end type Step
+
+type Pair
+  name: Text
+  count: Int
+end type Pair
+
+fn next_pow2(n: Int at least 1) -> Int at least 1
+  pure
+  example "one hundred"
+    n: 100
+    -> 128
+  end
+
+  var state: Step = Go(1)
+  while state is Go(p)
+    if p >= n
+      set state = Stop(p)
+    else
+      set state = Go(p + p)
+    end
+  end
+  return match state
+    Stop(p) -> max(a: 1, b: p)
+    Go(_) -> 1
+  end
+end fn next_pow2
+
+fn squares(n: Int) -> List<Int>
+  pure
+  example "three"
+    n: 3
+    -> [0, 1, 4]
+  end
+
+  var out: List<Int> = []
+  for i in 0 until n
+    set out = join(left: out, right: [i * i])
+  end
+  return out
+end fn squares
+
+const page_cap: Int at least 1 = next_pow2(100)
+
+const greeting = "hello from comptime"
+
+const table: List<Int> = squares(5)
+
+const pair = Pair("cups", next_pow2(3))
+
+const parsed = int_in("42", 1 through 100)
+
+type Batch = Int in 1 through comptime next_pow2(100)
+
+fn main() -> Nothing
+  pure
+
+  log("page_cap {page_cap}")
+  log(greeting)
+  for x in table
+    log("square {x}")
+  end
+  log("pair {pair.name} {pair.count}")
+  match parsed
+    Ok(n) -> log("parsed {n}")
+    Err(_) -> log("parse failed")
+  end
+  const folded = next_pow2(1000)
+  log("folded {folded}")
+  let marked = comptime next_pow2(5) + 1
+  log("marked {marked}")
+  let batch: Batch = 128
+  log("batch {batch}")
+  return nothing
+end fn main

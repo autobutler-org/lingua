@@ -21,3 +21,45 @@ fn percent(part: Int in 1 through 100, of: Cents, round: Rounding) -> Cents
 
   primitive
 end fn percent
+
+type PowStep
+  Go(Int)
+  Stop(Int)
+end type PowStep
+
+fn next_pow2(n: Int at least 1) -> Int at least 1
+  pure
+  example "one stays one"
+    n: 1
+    -> 1
+  end
+  example "three rounds to four"
+    n: 3
+    -> 4
+  end
+  example "four stays four"
+    n: 4
+    -> 4
+  end
+  example "one hundred rounds to one twenty eight"
+    n: 100
+    -> 128
+  end
+
+  var state: PowStep = Go(1)
+  while state is Go(p)
+    if p >= n
+      set state = Stop(p)
+    else
+      set state = Go(p + p)
+    end
+  end
+  return match state
+    Stop(p) -> max(a: 1, b: p)
+    Go(_) -> 1
+  end
+end fn next_pow2
+
+const page_cap: Int at least 1 = next_pow2(100)
+
+type Batch = Int in 1 through comptime next_pow2(100)

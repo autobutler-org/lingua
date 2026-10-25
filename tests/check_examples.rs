@@ -55,4 +55,5 @@ fn help_no_longer_says_examples_do_not_run() {
     let help = String::from_utf8_lossy(&output.stdout);
     assert!(!help.contains("Examples do not run yet"), "{help}");
     assert!(help.contains("Function examples run"), "{help}");
+    assert!(help.contains("then package examples"), "{help}");
 }

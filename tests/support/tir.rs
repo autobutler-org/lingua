@@ -48,6 +48,7 @@ impl Program {
             path: format!("{key}.lf"),
             source: source.to_owned(),
             functions: Vec::new(),
+            examples: Vec::new(),
         });
     }
 

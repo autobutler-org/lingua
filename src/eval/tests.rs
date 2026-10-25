@@ -474,3 +474,124 @@ end fn down
         ["L047: example \"forever\" exceeded the call depth limit of 10000"]
     );
 }
+
+const DOUBLE: &str = "fn double(n: Int) -> Int
+  pure
+  example \"two\"
+    n: 2
+    -> 4
+  end
+
+  return n + n
+end fn double
+
+";
+
+#[test]
+fn folded_consts_reach_function_examples() {
+    let source = format!(
+        "{DOUBLE}const four = double(2)
+
+fn plus_four(n: Int) -> Int
+  pure
+  example \"one\"
+    n: 1
+    -> 5
+  end
+
+  const eight = double(four)
+  return n + eight - four + comptime double(0)
+end fn plus_four
+"
+    );
+    assert_eq!(codes(&source), [""; 0]);
+    assert_eq!(
+        summaries(&source.replace("-> 5", "-> 6")),
+        ["L043: example \"one\" expected 6 got 5"]
+    );
+}
+
+#[test]
+fn package_examples_run_after_function_examples() {
+    let passing = format!(
+        "{DOUBLE}example \"doubles\"
+  const two = 2
+  -> double(two) == 4
+end
+
+example \"fails\"
+  fail \"boom\"
+  -> exception \"boom\"
+end
+"
+    );
+    assert_eq!(codes(&passing), [""; 0]);
+    let summaries_of = |example: &str| summaries(&format!("{DOUBLE}{example}"));
+    assert_eq!(
+        summaries_of("example \"false\"\n  -> double(2) == 5\nend\n"),
+        ["L056: package example \"false\" evaluated to false: double(2) == 5"]
+    );
+    assert_eq!(
+        summaries_of("example \"raises\"\n  fail \"boom\"\n  -> true\nend\n"),
+        ["L057: example \"raises\" expected a value but raised exception \"boom\" at m.lf:12:3"]
+    );
+    assert_eq!(
+        summaries_of("example \"quiet\"\n  -> exception \"boom\"\nend\n"),
+        [
+            "L059: package example \"quiet\" expected exception \"boom\" but finished without raising"
+        ]
+    );
+    assert_eq!(
+        summaries_of("example \"other\"\n  fail \"bang\"\n  -> exception \"boom\"\nend\n"),
+        ["L059: example \"other\" expected exception \"boom\" got exception \"bang\""]
+    );
+}
+
+#[test]
+fn comptime_roots_fault_and_raise() {
+    let spin = "type Step
+  More(Int)
+  Done
+end type Step
+
+fn spin(n: Int) -> Int
+  pure
+  example \"stops\"
+    n: 0
+    -> 0
+  end
+
+  var next: Step = More(n)
+  if n == 0
+    set next = Done
+  end
+  while next is More(k)
+    set next = More(k)
+  end
+  return n
+end fn spin
+
+";
+    assert_eq!(codes(&format!("{spin}const s = spin(1)\n")), ["L042"]);
+    assert_eq!(
+        codes(&format!("{spin}type T = Int in 1 through spin(1)\n")),
+        ["L042"]
+    );
+    let raising = "fn picky(n: Int) -> Int
+  pure
+  example \"fine\"
+    n: 1
+    -> 1
+  end
+
+  assert n == 1, \"not one\"
+  return n
+end fn picky
+
+const p = picky(2)
+";
+    assert_eq!(
+        summaries(raising),
+        ["L058: exception \"not one\" aborted the comptime evaluation of `p` at m.lf:8:3"]
+    );
+}

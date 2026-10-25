@@ -1,0 +1,274 @@
+fn comptime_const.next_pow2 params=1 vregs=33 stack=site.0
+b0:
+  v1 = const 1
+  v2 = const 0
+  v3 = const 16
+  v4 = call rt.alloc(v3)
+  store v4, 0, v2
+  store v4, 8, v1
+  v5 = move v4
+  jump b1
+b1:
+  v6 = load v5, 0
+  v7 = const 0
+  v8 = eq v6, v7
+  branch v8, b2, b3
+b2:
+  v9 = load v5, 8
+  v10 = move v9
+  v11 = ge v10, v0
+  branch v11, b4, b5
+b3:
+  v20 = load v5, 0
+  v21 = const 1
+  v22 = eq v20, v21
+  branch v22, b9, b8
+b4:
+  v12 = const 1
+  v13 = const 16
+  v14 = call rt.alloc(v13)
+  store v14, 0, v12
+  store v14, 8, v10
+  v5 = move v14
+  jump b6
+b5:
+  v15 = add.chk v10, v10 @site.1
+  v16 = const 0
+  v17 = const 16
+  v18 = call rt.alloc(v17)
+  store v18, 0, v16
+  store v18, 8, v15
+  v5 = move v18
+  jump b6
+b6:
+  jump b1
+b7:
+  ret v19
+b8:
+  v28 = load v5, 0
+  v29 = const 0
+  v30 = eq v28, v29
+  branch v30, b14, b13
+b9:
+  v23 = load v5, 8
+  v24 = move v23
+  v25 = const 1
+  v27 = ge v25, v24
+  branch v27, b10, b11
+b10:
+  v26 = move v25
+  jump b12
+b11:
+  v26 = move v24
+  jump b12
+b12:
+  v19 = move v26
+  jump b7
+b13:
+  raise site.2
+b14:
+  v31 = load v5, 8
+  v32 = const 1
+  v19 = move v32
+  jump b7
+
+fn comptime_const.squares params=1 vregs=16 stack=site.3
+b0:
+  v1 = const 8
+  v2 = call rt.alloc(v1)
+  v3 = const 0
+  store v2, 0, v3
+  v4 = move v2
+  v5 = const 0
+  v6 = move v0
+  v7 = move v5
+  jump b1
+b1:
+  v8 = lt v7, v6
+  branch v8, b2, b3
+b2:
+  v9 = move v7
+  v10 = mul.chk v9, v9 @site.4
+  v11 = const 16
+  v12 = call rt.alloc(v11)
+  v13 = const 1
+  store v12, 0, v13
+  store v12, 8, v10
+  v14 = call rt.join(v4, v12)
+  v4 = move v14
+  v15 = const 1
+  v7 = add v7, v15
+  jump b1
+b3:
+  ret v4
+
+fn comptime_const.main params=0 vregs=105 stack=site.5
+b0:
+  v0 = addr str.0
+  v1 = const 128
+  v2 = call rt.int_to_text(v1)
+  v3 = const 24
+  v4 = call rt.alloc(v3)
+  v5 = const 2
+  store v4, 0, v5
+  store v4, 8, v0
+  store v4, 16, v2
+  v6 = call rt.text_concat(v4)
+  v7 = call rt.log(v6)
+  v8 = addr str.1
+  v9 = call rt.log(v8)
+  v10 = const 0
+  v11 = const 1
+  v12 = const 4
+  v13 = const 9
+  v14 = const 16
+  v15 = const 48
+  v16 = call rt.alloc(v15)
+  v17 = const 5
+  store v16, 0, v17
+  store v16, 8, v10
+  store v16, 16, v11
+  store v16, 24, v12
+  store v16, 32, v13
+  store v16, 40, v14
+  v18 = move v16
+  v19 = load v18, 0
+  v20 = const 0
+  v21 = move v20
+  jump b1
+b1:
+  v22 = lt v21, v19
+  branch v22, b2, b3
+b2:
+  v23 = const 3
+  v24 = shl v21, v23
+  v25 = add v18, v24
+  v26 = load v25, 8
+  v27 = addr str.2
+  v28 = call rt.int_to_text(v26)
+  v29 = const 24
+  v30 = call rt.alloc(v29)
+  v31 = const 2
+  store v30, 0, v31
+  store v30, 8, v27
+  store v30, 16, v28
+  v32 = call rt.text_concat(v30)
+  v33 = call rt.log(v32)
+  v34 = const 1
+  v21 = add v21, v34
+  jump b1
+b3:
+  v35 = addr str.3
+  v36 = addr str.4
+  v37 = const 4
+  v38 = const 16
+  v39 = call rt.alloc(v38)
+  store v39, 0, v36
+  store v39, 8, v37
+  v40 = load v39, 0
+  v41 = addr str.5
+  v42 = addr str.4
+  v43 = const 4
+  v44 = const 16
+  v45 = call rt.alloc(v44)
+  store v45, 0, v42
+  store v45, 8, v43
+  v46 = load v45, 8
+  v47 = call rt.int_to_text(v46)
+  v48 = const 40
+  v49 = call rt.alloc(v48)
+  v50 = const 4
+  store v49, 0, v50
+  store v49, 8, v35
+  store v49, 16, v40
+  store v49, 24, v41
+  store v49, 32, v47
+  v51 = call rt.text_concat(v49)
+  v52 = call rt.log(v51)
+  v54 = const 42
+  v55 = const 0
+  v56 = const 16
+  v57 = call rt.alloc(v56)
+  store v57, 0, v55
+  store v57, 8, v54
+  v58 = load v57, 0
+  v59 = const 0
+  v60 = eq v58, v59
+  branch v60, b6, b5
+b4:
+  v76 = addr str.8
+  v77 = const 1024
+  v78 = call rt.int_to_text(v77)
+  v79 = const 24
+  v80 = call rt.alloc(v79)
+  v81 = const 2
+  store v80, 0, v81
+  store v80, 8, v76
+  store v80, 16, v78
+  v82 = call rt.text_concat(v80)
+  v83 = call rt.log(v82)
+  v84 = const 8
+  v85 = const 1
+  v86 = add.chk v84, v85 @site.7
+  v87 = move v86
+  v88 = addr str.9
+  v89 = call rt.int_to_text(v87)
+  v90 = const 24
+  v91 = call rt.alloc(v90)
+  v92 = const 2
+  store v91, 0, v92
+  store v91, 8, v88
+  store v91, 16, v89
+  v93 = call rt.text_concat(v91)
+  v94 = call rt.log(v93)
+  v95 = const 128
+  v96 = move v95
+  v97 = addr str.10
+  v98 = call rt.int_to_text(v96)
+  v99 = const 24
+  v100 = call rt.alloc(v99)
+  v101 = const 2
+  store v100, 0, v101
+  store v100, 8, v97
+  store v100, 16, v98
+  v102 = call rt.text_concat(v100)
+  v103 = call rt.log(v102)
+  v104 = const 0
+  ret v104
+b5:
+  v70 = load v57, 0
+  v71 = const 1
+  v72 = eq v70, v71
+  branch v72, b8, b7
+b6:
+  v61 = load v57, 8
+  v62 = move v61
+  v63 = addr str.6
+  v64 = call rt.int_to_text(v62)
+  v65 = const 24
+  v66 = call rt.alloc(v65)
+  v67 = const 2
+  store v66, 0, v67
+  store v66, 8, v63
+  store v66, 16, v64
+  v68 = call rt.text_concat(v66)
+  v69 = call rt.log(v68)
+  v53 = move v69
+  jump b4
+b7:
+  raise site.6
+b8:
+  v73 = load v57, 8
+  v74 = addr str.7
+  v75 = call rt.log(v74)
+  v53 = move v75
+  jump b4
+
+site.0 fault L077 comptime_const.lf:11:1
+site.1 fault L040 comptime_const.lf:23:22
+site.2 internal comptime_const.lf:26:10
+site.3 fault L077 comptime_const.lf:32:1
+site.4 fault L040 comptime_const.lf:41:39
+site.5 fault L077 comptime_const.lf:58:1
+site.6 internal comptime_const.lf:67:3
+site.7 fault L040 comptime_const.lf:73:16

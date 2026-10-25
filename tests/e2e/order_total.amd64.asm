@@ -23,6 +23,197 @@ LABEL L1
   LEAQ  site.0(SB), AX
   JMP   rt.fault(SB)
 
+TEXT money.next_pow2(SB)
+  LEAQ  -288(SP), R11
+  CMPQ  R11, rt.stack_limit(SB)
+  JCS   L15
+  PUSHQ BP
+  MOVQ  SP, BP
+  SUBQ  $272, SP
+  MOVQ  $1, AX
+  MOVQ  AX, -8(BP)
+  MOVQ  $0, AX
+  MOVQ  AX, -16(BP)
+  MOVQ  $16, AX
+  MOVQ  AX, -24(BP)
+  MOVQ  -24(BP), AX
+  MOVQ  AX, 0(SP)
+  CALL  rt.alloc(SB)
+  MOVQ  8(SP), AX
+  MOVQ  AX, -32(BP)
+  MOVQ  -32(BP), AX
+  MOVQ  -16(BP), CX
+  MOVQ  CX, 0(AX)
+  MOVQ  -32(BP), AX
+  MOVQ  -8(BP), CX
+  MOVQ  CX, 8(AX)
+  MOVQ  -32(BP), AX
+  MOVQ  AX, -40(BP)
+  JMP   L1
+LABEL L1
+  MOVQ  -40(BP), AX
+  MOVQ  0(AX), AX
+  MOVQ  AX, -48(BP)
+  MOVQ  $0, AX
+  MOVQ  AX, -56(BP)
+  MOVQ  -48(BP), AX
+  MOVQ  -56(BP), CX
+  CMPQ  AX, CX
+  SETEQ AX
+  MOVBQZX AX, AX
+  MOVQ  AX, -64(BP)
+  MOVQ  -64(BP), AX
+  TESTQ AX, AX
+  JNE   L2
+  JMP   L3
+LABEL L2
+  MOVQ  -40(BP), AX
+  MOVQ  8(AX), AX
+  MOVQ  AX, -72(BP)
+  MOVQ  -72(BP), AX
+  MOVQ  AX, -80(BP)
+  MOVQ  -80(BP), AX
+  MOVQ  16(BP), CX
+  CMPQ  AX, CX
+  SETGE AX
+  MOVBQZX AX, AX
+  MOVQ  AX, -88(BP)
+  MOVQ  -88(BP), AX
+  TESTQ AX, AX
+  JNE   L4
+  JMP   L5
+LABEL L3
+  MOVQ  -40(BP), AX
+  MOVQ  0(AX), AX
+  MOVQ  AX, -160(BP)
+  MOVQ  $1, AX
+  MOVQ  AX, -168(BP)
+  MOVQ  -160(BP), AX
+  MOVQ  -168(BP), CX
+  CMPQ  AX, CX
+  SETEQ AX
+  MOVBQZX AX, AX
+  MOVQ  AX, -176(BP)
+  MOVQ  -176(BP), AX
+  TESTQ AX, AX
+  JNE   L9
+  JMP   L8
+LABEL L4
+  MOVQ  $1, AX
+  MOVQ  AX, -96(BP)
+  MOVQ  $16, AX
+  MOVQ  AX, -104(BP)
+  MOVQ  -104(BP), AX
+  MOVQ  AX, 0(SP)
+  CALL  rt.alloc(SB)
+  MOVQ  8(SP), AX
+  MOVQ  AX, -112(BP)
+  MOVQ  -112(BP), AX
+  MOVQ  -96(BP), CX
+  MOVQ  CX, 0(AX)
+  MOVQ  -112(BP), AX
+  MOVQ  -80(BP), CX
+  MOVQ  CX, 8(AX)
+  MOVQ  -112(BP), AX
+  MOVQ  AX, -40(BP)
+  JMP   L6
+LABEL L5
+  MOVQ  -80(BP), AX
+  MOVQ  -80(BP), CX
+  ADDQ  CX, AX
+  JOS   L16
+  MOVQ  AX, -120(BP)
+  MOVQ  $0, AX
+  MOVQ  AX, -128(BP)
+  MOVQ  $16, AX
+  MOVQ  AX, -136(BP)
+  MOVQ  -136(BP), AX
+  MOVQ  AX, 0(SP)
+  CALL  rt.alloc(SB)
+  MOVQ  8(SP), AX
+  MOVQ  AX, -144(BP)
+  MOVQ  -144(BP), AX
+  MOVQ  -128(BP), CX
+  MOVQ  CX, 0(AX)
+  MOVQ  -144(BP), AX
+  MOVQ  -120(BP), CX
+  MOVQ  CX, 8(AX)
+  MOVQ  -144(BP), AX
+  MOVQ  AX, -40(BP)
+  JMP   L6
+LABEL L6
+  JMP   L1
+LABEL L7
+  MOVQ  -152(BP), AX
+  MOVQ  AX, 24(BP)
+  MOVQ  BP, SP
+  POPQ  BP
+  RET
+LABEL L8
+  MOVQ  -40(BP), AX
+  MOVQ  0(AX), AX
+  MOVQ  AX, -224(BP)
+  MOVQ  $0, AX
+  MOVQ  AX, -232(BP)
+  MOVQ  -224(BP), AX
+  MOVQ  -232(BP), CX
+  CMPQ  AX, CX
+  SETEQ AX
+  MOVBQZX AX, AX
+  MOVQ  AX, -240(BP)
+  MOVQ  -240(BP), AX
+  TESTQ AX, AX
+  JNE   L14
+  JMP   L13
+LABEL L9
+  MOVQ  -40(BP), AX
+  MOVQ  8(AX), AX
+  MOVQ  AX, -184(BP)
+  MOVQ  -184(BP), AX
+  MOVQ  AX, -192(BP)
+  MOVQ  $1, AX
+  MOVQ  AX, -200(BP)
+  MOVQ  -200(BP), AX
+  MOVQ  -192(BP), CX
+  CMPQ  AX, CX
+  SETGE AX
+  MOVBQZX AX, AX
+  MOVQ  AX, -216(BP)
+  MOVQ  -216(BP), AX
+  TESTQ AX, AX
+  JNE   L10
+  JMP   L11
+LABEL L10
+  MOVQ  -200(BP), AX
+  MOVQ  AX, -208(BP)
+  JMP   L12
+LABEL L11
+  MOVQ  -192(BP), AX
+  MOVQ  AX, -208(BP)
+  JMP   L12
+LABEL L12
+  MOVQ  -208(BP), AX
+  MOVQ  AX, -152(BP)
+  JMP   L7
+LABEL L13
+  LEAQ  site.3(SB), AX
+  JMP   rt.fault(SB)
+LABEL L14
+  MOVQ  -40(BP), AX
+  MOVQ  8(AX), AX
+  MOVQ  AX, -248(BP)
+  MOVQ  $1, AX
+  MOVQ  AX, -256(BP)
+  MOVQ  -256(BP), AX
+  MOVQ  AX, -152(BP)
+  JMP   L7
+LABEL L15
+  LEAQ  site.1(SB), AX
+  JMP   rt.fault(SB)
+LABEL L16
+  LEAQ  site.2(SB), AX
+  JMP   rt.fault(SB)
+
 TEXT order.line_subtotal(SB)
   LEAQ  -48(SP), R11
   CMPQ  R11, rt.stack_limit(SB)
@@ -47,10 +238,10 @@ TEXT order.line_subtotal(SB)
   POPQ  BP
   RET
 LABEL L1
-  LEAQ  site.1(SB), AX
+  LEAQ  site.4(SB), AX
   JMP   rt.fault(SB)
 LABEL L2
-  LEAQ  site.2(SB), AX
+  LEAQ  site.5(SB), AX
   JMP   rt.fault(SB)
 
 TEXT order.order_total(SB)
@@ -213,7 +404,7 @@ LABEL L8
   MOVQ  AX, -120(BP)
   JMP   L4
 LABEL L9
-  LEAQ  site.5(SB), AX
+  LEAQ  site.8(SB), AX
   JMP   rt.fault(SB)
 LABEL L10
   MOVQ  24(BP), AX
@@ -239,13 +430,13 @@ LABEL L13
   POPQ  BP
   RET
 LABEL L14
-  LEAQ  site.3(SB), AX
+  LEAQ  site.6(SB), AX
   JMP   rt.fault(SB)
 LABEL L15
-  LEAQ  site.4(SB), AX
+  LEAQ  site.7(SB), AX
   JMP   rt.fault(SB)
 LABEL L16
-  LEAQ  site.6(SB), AX
+  LEAQ  site.9(SB), AX
   JMP   rt.fault(SB)
 
 TEXT order.parse_discount(SB)
@@ -316,7 +507,7 @@ LABEL L2
 LABEL L3
   LEAQ  str.1(SB), AX
   MOVQ  AX, -96(BP)
-  LEAQ  site.8(SB), AX
+  LEAQ  site.11(SB), AX
   MOVQ  AX, -104(BP)
   MOVQ  -24(BP), AX
   MOVQ  AX, 0(SP)
@@ -537,7 +728,7 @@ LABEL L13
   MOVQ  AX, -264(BP)
   JMP   L11
 LABEL L14
-  LEAQ  site.9(SB), AX
+  LEAQ  site.12(SB), AX
   JMP   rt.fault(SB)
 LABEL L15
   MOVQ  -288(BP), AX
@@ -716,7 +907,7 @@ LABEL L21
   MOVQ  AX, -520(BP)
   JMP   L19
 LABEL L22
-  LEAQ  site.10(SB), AX
+  LEAQ  site.13(SB), AX
   JMP   rt.fault(SB)
 LABEL L23
   MOVQ  -544(BP), AX
@@ -745,10 +936,10 @@ LABEL L23
   POPQ  BP
   RET
 LABEL L24
-  LEAQ  site.11(SB), AX
+  LEAQ  site.14(SB), AX
   JMP   rt.fault(SB)
 LABEL L25
-  LEAQ  site.7(SB), AX
+  LEAQ  site.10(SB), AX
   JMP   rt.fault(SB)
 
 TEXT main.apply_code(SB)
@@ -855,7 +1046,7 @@ LABEL L3
   MOVQ  AX, -8(BP)
   JMP   L1
 LABEL L4
-  LEAQ  site.13(SB), AX
+  LEAQ  site.16(SB), AX
   JMP   rt.fault(SB)
 LABEL L5
   MOVQ  -16(BP), AX
@@ -895,7 +1086,7 @@ LABEL L5
   MOVQ  AX, -8(BP)
   JMP   L1
 LABEL L6
-  LEAQ  site.12(SB), AX
+  LEAQ  site.15(SB), AX
   JMP   rt.fault(SB)
 
 TEXT main.main(SB)
@@ -1695,5 +1886,5 @@ LABEL L3
   POPQ  BP
   RET
 LABEL L4
-  LEAQ  site.14(SB), AX
+  LEAQ  site.17(SB), AX
   JMP   rt.fault(SB)

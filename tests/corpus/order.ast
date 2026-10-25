@@ -118,6 +118,19 @@
               (arg "a" (int 0))
               (arg "b" (binary sub (name "sum") (name "off"))))
             false))))
+    (package-example
+      (example "empty cart totals zero"
+        (bindings)
+        (body)
+        (value
+          (binary eq
+            (call
+              (name "order_total")
+              (args
+                (arg nil (list (items) false))
+                (arg nil (name "NoDiscount")))
+              false)
+            (int 0)))))
     (sum "ParseError"
       (variants
         (variant "Empty" nil)
