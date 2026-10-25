@@ -22,6 +22,35 @@ pub(super) struct FnCx {
     pub scopes: Vec<Vec<(String, SymbolId)>>,
     /// Inside a function example's inputs or expected value.
     pub example: bool,
+    /// A comptime context: a `const` initializer, a bound, a `comptime` operand, or a package
+    /// example. A runtime local here is `L060`, and `let` or `var` is `L062`.
+    pub comptime: bool,
+}
+
+impl FnCx {
+    /// A comptime root at file level in module `m`.
+    pub(super) fn root(m: usize, effect: Effect) -> Self {
+        FnCx {
+            m,
+            effect,
+            ret: Type::Nothing,
+            scopes: vec![Vec::new()],
+            example: false,
+            comptime: true,
+        }
+    }
+
+    /// A comptime context inside this one, seeing the same locals.
+    pub(super) fn comptime(&self) -> Self {
+        FnCx {
+            m: self.m,
+            effect: self.effect.clone(),
+            ret: self.ret.clone(),
+            scopes: self.scopes.clone(),
+            example: self.example,
+            comptime: true,
+        }
+    }
 }
 
 pub(super) fn tx(ty: Type, span: Span, kind: TirKind) -> TirExpr {
@@ -278,6 +307,7 @@ impl Checker<'_> {
                     .collect(),
             ],
             example: false,
+            comptime: false,
         };
         let body = match body {
             FnBody::Primitive => TirBody::Primitive,
@@ -317,6 +347,7 @@ impl Checker<'_> {
             ret: sig.ret.clone(),
             scopes: vec![Vec::new()],
             example: true,
+            comptime: false,
         };
         let resource = match &sig.effect {
             Effect::Reads(r) | Effect::Writes(r) => Some(r.clone()),
@@ -387,6 +418,7 @@ impl Checker<'_> {
             kind: ExampleKind::Function,
             inputs,
             script,
+            body: Vec::new(),
             expect,
         })
     }
@@ -491,7 +523,7 @@ impl Checker<'_> {
     }
 
     #[allow(clippy::too_many_lines)]
-    fn stmt(&mut self, cx: &mut FnCx, stmt: &Stmt) -> (Option<TirStmt>, bool) {
+    pub(super) fn stmt(&mut self, cx: &mut FnCx, stmt: &Stmt) -> (Option<TirStmt>, bool) {
         let m = cx.m;
         match stmt {
             Stmt::Let {
@@ -507,6 +539,16 @@ impl Checker<'_> {
                 init,
             } => {
                 let mutable = matches!(stmt, Stmt::Var { .. });
+                if cx.comptime {
+                    let keyword = if mutable { "var" } else { "let" };
+                    self.report_help(
+                        m,
+                        "L062",
+                        word_at(*span, keyword.len()),
+                        format!("`{keyword}` in a comptime context"),
+                        "bind it with `const`".into(),
+                    );
+                }
                 let value = match ty {
                     Some(ty) => self
                         .resolve_type(m, ty)
@@ -527,6 +569,11 @@ impl Checker<'_> {
                 let name_span = find_word(self.source(m), at, name);
                 let ty = value.as_ref().map_or(Type::Nothing, |(_, t)| t.clone());
                 let id = self.bind_local(cx, name, name_span, ty, mutable);
+                if cx.comptime {
+                    // `L062` above already explains every use
+                    self.poisoned.insert(id);
+                    return (None, false);
+                }
                 if let Some((e, _)) = value {
                     (Some(TirStmt::Let(id, e)), false)
                 } else {
@@ -534,8 +581,13 @@ impl Checker<'_> {
                     (None, false)
                 }
             }
-            Stmt::Const { span, .. } => {
-                self.not_yet(m, *span, "`const` (it needs the comptime interpreter)");
+            Stmt::Const {
+                span,
+                name,
+                ty,
+                init,
+            } => {
+                self.inner_const(cx, *span, name, ty.as_ref(), init);
                 (None, false)
             }
             Stmt::Set {
@@ -562,7 +614,7 @@ impl Checker<'_> {
                         return (None, false);
                     }
                 };
-                if self.poisoned.contains(&id) {
+                if self.is_poisoned(id) {
                     let _ = self.synth(cx, value);
                     return (None, false);
                 }
@@ -572,6 +624,11 @@ impl Checker<'_> {
                     AssignOp::AddAssign => self.add_assign(cx, *span, id, &ty, value),
                 };
                 (e.map(|e| TirStmt::Set(id, e)), false)
+            }
+            Stmt::Return { span, .. } if cx.comptime => {
+                let summary = "`return` in a package example: there is no function to return from";
+                self.report(m, "L012", word_at(*span, "return".len()), summary.into());
+                (None, true)
             }
             Stmt::Return { value, .. } => {
                 let ret = cx.ret.clone();
@@ -811,7 +868,7 @@ impl Checker<'_> {
                 None
             }
         }
-        .filter(|id| !self.poisoned.contains(id));
+        .filter(|id| !self.is_poisoned(*id));
         let ty = id.map(|id| self.sym_ty(id));
         let variants = ty.as_ref().and_then(|t| self.sum_variants(t));
         if let (Some(t), None) = (&ty, &variants) {
@@ -1149,6 +1206,11 @@ impl Checker<'_> {
             Expr::Match(span, scrutinee, arms, ArmKind::ExprArms) => {
                 self.match_expr(cx, *span, scrutinee, arms, Some(t))
             }
+            Expr::Comptime(_, inner) if cx.comptime || cx.example => self.check(cx, inner, t),
+            Expr::Comptime(_, inner) => {
+                let root = self.check(&mut cx.comptime(), inner, t)?;
+                self.fold(cx.m, &root, "a `comptime` expression")
+            }
             _ => {
                 let s = self.synth(cx, e)?;
                 let adoption = match e {
@@ -1313,9 +1375,10 @@ impl Checker<'_> {
             Expr::Field(span, base, field) => self.field(cx, *span, base, field),
             Expr::Index(span, list, index) => self.index(cx, *span, list, index),
             Expr::Binary(span, op, a, b) => self.binary(cx, *span, *op, a, b),
-            Expr::Comptime(span, _) => {
-                self.not_yet(m, *span, "`comptime` (it needs the comptime interpreter)");
-                None
+            Expr::Comptime(_, inner) if cx.comptime || cx.example => self.synth(cx, inner),
+            Expr::Comptime(_, inner) => {
+                let root = self.synth(&mut cx.comptime(), inner)?;
+                self.fold(m, &root, "a `comptime` expression")
             }
             Expr::Quote(span, _) | Expr::Unquote(span, _) => {
                 self.not_yet(
@@ -1348,6 +1411,11 @@ impl Checker<'_> {
                     self.report(m, "L025", *span, "`clock.now()` needs `reads clock`".into());
                     return None;
                 }
+                if cx.comptime {
+                    let summary = "`clock.now()` is a runtime value; a comptime context cannot read the clock";
+                    self.report(m, "L060", *span, summary.into());
+                    return None;
+                }
                 Some(tx(Type::Int, *span, TirKind::ClockNow))
             }
             Expr::FsRead(span, _) | Expr::CatalogColumns(span, _) => {
@@ -1357,17 +1425,58 @@ impl Checker<'_> {
         }
     }
 
+    // Resolves the type `id` names, or that variant `id` belongs to, before a use reads its
+    // fields or payloads
+    fn ensure_parent(&mut self, id: SymbolId) -> bool {
+        match self.symbols[id as usize].kind {
+            SymbolKind::Variant { parent, .. } => self.ensure(parent),
+            _ => self.ensure(id),
+        }
+    }
+
+    // A use of a folded const: its value at `span`, or quietly nothing when it did not fold
+    fn const_use(&self, id: SymbolId, span: Span) -> Option<TirExpr> {
+        let value = self.consts.get(&id);
+        if value.is_none() {
+            self.hit_poison.set(true);
+        }
+        value.map(|v| TirExpr { span, ..v.clone() })
+    }
+
+    #[allow(clippy::too_many_lines)]
     fn name(&mut self, cx: &mut FnCx, span: Span, name: &str) -> Option<TirExpr> {
         let m = cx.m;
         match self.resolve_name(cx, name) {
             Some(Binding::Local(id)) => {
-                if self.poisoned.contains(&id) {
+                if self.is_poisoned(id) {
+                    return None;
+                }
+                if self.consts.contains_key(&id) {
+                    return self.const_use(id, span);
+                }
+                if cx.comptime {
+                    self.report_help(
+                        m,
+                        "L060",
+                        span,
+                        format!(
+                            "`{name}` is a runtime value; a comptime context needs a comptime value"
+                        ),
+                        "bind it with `const`, or move the computation out of the comptime context"
+                            .into(),
+                    );
                     return None;
                 }
                 Some(tx(self.sym_ty(id), span, TirKind::Local(id)))
             }
+            Some(Binding::Const(id)) => {
+                if !self.ensure(id) {
+                    return None;
+                }
+                self.const_use(id, span)
+            }
             Some(Binding::Variant(id)) => {
-                if self.poisoned.contains(&id) {
+                if self.is_poisoned(id) || !self.ensure_parent(id) {
                     return None;
                 }
                 let SymbolKind::Variant {
@@ -1639,6 +1748,18 @@ impl Checker<'_> {
             return false;
         }
         if may_call(&cx.effect, cx.m, effect, module) {
+            if cx.comptime && *effect != Effect::Pure {
+                self.report(
+                    cx.m,
+                    "L060",
+                    span,
+                    format!(
+                        "`{what}` is `{}`, which needs a runtime resource; a comptime context can call only `pure` functions",
+                        effect_text(effect)
+                    ),
+                );
+                return false;
+            }
             return true;
         }
         let summary = format!(
@@ -1687,23 +1808,27 @@ impl Checker<'_> {
             }
             Some(Binding::PreludeFn(id)) => self.prelude_call(cx, span, id, name, args),
             Some(Binding::Function(id)) => {
+                if !self.ensure(id) {
+                    return None;
+                }
                 let sig = self.sigs.get(&id)?.clone();
                 let matched = self.match_args(cx, span, name, &sig.params, args);
                 let effect_ok = self.effect_check(cx, *nspan, name, &sig.effect, sig.module);
                 let matched = matched?;
                 let args = self.checked_args(cx, &matched, &sig.params)?;
-                (effect_ok && !self.poisoned.contains(&id)).then(|| {
+                (effect_ok && !self.is_poisoned(id)).then(|| {
                     self.in_source_order(cx, &matched.order, args, |args| {
                         tx(sig.ret, span, TirKind::Call(id, args))
                     })
                 })
             }
+            Some(Binding::Type(id) | Binding::Variant(id)) if !self.ensure_parent(id) => None,
             Some(Binding::Type(id)) => match self.symbols[id as usize].kind.clone() {
                 SymbolKind::Type(TypeKind::Product) => {
                     let fields = self.fields.get(&id)?.clone();
                     let matched = self.match_args(cx, span, name, &fields, args)?;
                     let args = self.checked_args(cx, &matched, &fields)?;
-                    (!self.poisoned.contains(&id)).then(|| {
+                    (!self.is_poisoned(id)).then(|| {
                         self.in_source_order(cx, &matched.order, args, |args| {
                             tx(Type::Nominal(id), span, TirKind::Record(id, args))
                         })
@@ -1747,7 +1872,7 @@ impl Checker<'_> {
                     return None;
                 };
                 let Some(payload) = payload else {
-                    if self.poisoned.contains(&id) {
+                    if self.is_poisoned(id) {
                         return None;
                     }
                     self.report(
@@ -1778,7 +1903,9 @@ impl Checker<'_> {
                 );
                 None
             }
-            Some(Binding::Local(_) | Binding::Builtin(_) | Binding::Resource(_)) => {
+            Some(
+                Binding::Local(_) | Binding::Builtin(_) | Binding::Resource(_) | Binding::Const(_),
+            ) => {
                 self.report(m, "L020", *nspan, format!("`{name}` is not a function"));
                 None
             }
@@ -1808,7 +1935,7 @@ impl Checker<'_> {
         let matched = self.match_args(cx, span, &what, &sig.params, args);
         let effect_ok = self.effect_check(cx, rspan, &what, &sig.effect, sig.module);
         let args = self.checked_args(cx, &matched?, &sig.params)?;
-        if !effect_ok || self.poisoned.contains(&op_id) {
+        if !effect_ok || self.is_poisoned(op_id) {
             return None;
         }
         let d = self.diag(
@@ -2289,11 +2416,9 @@ impl Checker<'_> {
         hi: Option<&Expr>,
     ) -> Option<TirExpr> {
         let src = self.synth(cx, source);
-        let locals: Vec<String> = cx.scopes.iter().flatten().map(|(n, _)| n.clone()).collect();
-        let runtime = |n: &str| locals.iter().any(|l| l == n);
-        let lo_v = self.fold_bound(cx.m, lo, &runtime);
+        let lo_v = self.fold_bound(cx.m, lo, &cx.scopes);
         let hi_v = match hi {
-            Some(hi) => self.fold_bound(cx.m, hi, &runtime),
+            Some(hi) => self.fold_bound(cx.m, hi, &cx.scopes),
             None => Some(i64::MAX),
         };
         let (src, lo_v, hi_v) = (src?, lo_v?, hi_v?);

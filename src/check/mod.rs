@@ -1,16 +1,19 @@
 //! The binder and typechecker (docs/lingua1.md, Module and file model, Name resolution, Types,
 //! Effects): a package of parsed modules in, the typed IR in `crate::tir` out.
 //!
-//! Function examples are typechecked against the signature, then run on `crate::eval` when
-//! their module and its imports checked clean.
+//! Comptime roots (`const`, `comptime`, bounds) fold on `crate::eval` as the checker reaches
+//! them; each use of a folded value is literal TIR. Function examples, then package examples,
+//! run on the same interpreter when their module and its imports checked clean.
 //!
-//! Out of scope until the comptime interpreter exists, and reported as
-//! `error: ... not supported yet` rather than guessed at: comptime evaluation (`const`,
-//! `comptime`, a bound that is not integer literal arithmetic), generative types and
-//! providers, `quote` / `unquote`, and package examples.
+//! Out of scope until their PRs, and reported per declaration as
+//! `error: ... not supported yet` rather than guessed at: generative types, package
+//! `comptime` blocks, effectful consts and the provider cache, and `quote` / `unquote`. Such a
+//! diagnostic does not stop the module's examples, only those of functions whose check had a
+//! diagnostic or met the unsupported declaration, and of examples that call them.
 
 mod body;
 mod catalog;
+mod comptime;
 mod decl;
 mod package;
 mod pattern;
@@ -24,7 +27,7 @@ use std::path::PathBuf;
 
 use crate::ast::Span;
 use crate::report;
-use crate::tir::{SymbolKind, TirModule, TirProgram, Type};
+use crate::tir::{SymbolId, SymbolKind, TirModule, TirProgram, Type};
 
 pub use catalog::explain;
 pub use package::Options;
@@ -140,6 +143,8 @@ pub struct Checked {
     pub requested: Vec<String>,
     /// Resource operation calls in each module's residue, for `L072`.
     resource_calls: Vec<(String, Diagnostic)>,
+    /// Functions whose examples do not run (see the module docs).
+    skip: HashSet<SymbolId>,
 }
 
 /// `lingua check`: loads `paths` (default `.`) and their import closure and typechecks them.
@@ -149,14 +154,19 @@ pub struct Checked {
 pub fn check(paths: &[PathBuf], options: &Options) -> Result<Checked, Error> {
     let loaded = package::load(paths, options)?;
     let mut diagnostics = loaded.diagnostics.clone();
-    let (checked, more) = decl::check_package(&loaded);
+    // Comptime roots and examples may recurse deeper than the main thread's stack allows
+    let (checked, more) = crate::eval::on_big_stack(|| {
+        let (checked, mut more) = decl::check_package(&loaded);
+        let runnable = runnable(&loaded, &more);
+        more.extend(crate::eval::run_examples(
+            &checked.symbols,
+            &checked.modules,
+            &checked.skip,
+            &|module| runnable.contains(&module.key),
+        ));
+        (checked, more)
+    });
     diagnostics.extend(more);
-    let runnable = runnable(&loaded, &diagnostics);
-    diagnostics.extend(crate::eval::run_examples(
-        &checked.symbols,
-        &checked.modules,
-        &|module| runnable.contains(&module.key),
-    ));
     if diagnostics.is_empty() {
         Ok(checked)
     } else {
@@ -164,19 +174,20 @@ pub fn check(paths: &[PathBuf], options: &Options) -> Result<Checked, Error> {
     }
 }
 
-// The modules whose examples run: those with no diagnostic whose imports all run too, since a
-// function with a diagnostic may be missing from the residue. Sources come imports first, so
-// one pass sees every import before its importer.
-// ponytail: a temporary "not yet" (`const`, a package example) skips the whole module's
-// examples, where lingua1.md's PR 14 asks for per declaration; narrow it once those
-// declarations stop poisoning the bodies that use them.
+// The modules whose examples run: those with no diagnostic but a "not yet" one, whose imports
+// all run too, since a function with a diagnostic may be missing from the residue. Sources
+// come imports first, so one pass sees every import before its importer. `diagnostics` must
+// include the loader's.
 fn runnable(loaded: &package::Loaded, diagnostics: &[Diagnostic]) -> HashSet<String> {
     let mut out = HashSet::new();
     for source in &loaded.sources {
         let Some(module) = &source.module else {
             continue;
         };
-        if diagnostics.iter().all(|d| d.path != source.path)
+        if diagnostics
+            .iter()
+            .chain(&loaded.diagnostics)
+            .all(|d| d.path != source.path || d.code == NOT_YET)
             && module.imports.iter().all(|i| out.contains(&i.path))
         {
             out.insert(source.key.clone());

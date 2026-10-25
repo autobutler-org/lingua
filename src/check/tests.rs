@@ -126,6 +126,27 @@ fn l010_unknown_export_lists_the_exports() {
 }
 
 #[test]
+fn l010_help_lists_the_end_state_money_exports() {
+    let money = std::fs::read_to_string(
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/corpus/money.lf"),
+    )
+    .unwrap();
+    let root = package(&[
+        ("money.lf", &money),
+        ("order.lf", "import percet from \"money\"\n"),
+    ]);
+    let Err(Error::Diagnostics(d)) = check(&[root], &Options::default()) else {
+        panic!()
+    };
+    assert_eq!(
+        d[0].help.as_deref(),
+        Some(
+            "legal alternatives: Cents, Rounding, half_up, percent, PowStep, Go, Stop, next_pow2, page_cap, Batch"
+        )
+    );
+}
+
+#[test]
 fn l011_unknown_names_fields_and_types() {
     accepts(&main("  let x = 1\n  log(\"{x}\")"));
     rejects(&main("  log(\"{y}\")"), "L011");
@@ -503,10 +524,148 @@ fn l076_literal_zero_divisor() {
     rejects(&main("  let n = 1\n  let q = n / 0"), "L076");
 }
 
+// A pure function the comptime tests fold: `double(n)` is `n + n`
+const DOUBLE: &str = "fn double(n: Int) -> Int\n  pure\n  example \"two\"\n    n: 2\n    -> 4\n  end\n\n  return n + n\nend fn double\n\n";
+
 #[test]
-fn comptime_constructs_are_not_supported_yet() {
-    rejects("const x = 1\n", super::NOT_YET);
-    rejects(&main("  let x = comptime 1"), super::NOT_YET);
+fn consts_and_comptime_fold() {
+    // File-level, imported, inner, a `comptime` call, and a bound, each folding a user call
+    accepts(&format!(
+        "{DOUBLE}const four = double(2)\n\n{}",
+        main("  let x: Int = four + 1")
+    ));
+    accepts(&format!(
+        "{DOUBLE}{}",
+        main("  const six = double(3)\n  let x = six + comptime double(4)")
+    ));
+    accepts(&format!(
+        "{DOUBLE}type Small = Int in 1 through comptime double(4)\n\n{}",
+        main("  let s: Small = 8")
+    ));
+    rejects(
+        &format!(
+            "{DOUBLE}type Small = Int in 1 through double(4)\n\n{}",
+            main("  let s: Small = 9")
+        ),
+        "L024",
+    );
+    // A const declared after its use, and a bound that calls a function declared after it
+    accepts(&format!(
+        "{}\nconst late: Int = 3\n",
+        main("  let x = late")
+    ));
+    accepts(&format!(
+        "type Small = Int in 1 through double(4)\n\n{DOUBLE}"
+    ));
+    // A body checked for a bound uses a sum declared after both
+    accepts(
+        "type Small = Int in 1 through pick()\n\nfn pick() -> Int\n  pure\n  example \"e\"\n    -> 4\n  end\n\n  return match Go(4)\n    Go(n) -> n\n    Stop -> 1\n  end\nend fn pick\n\ntype Step\n  Go(Int)\n  Stop\nend type Step\n",
+    );
+    assert_eq!(
+        codes_of(&[
+            ("a.lf", &format!("{DOUBLE}const four: Int = double(2)\n")),
+            (
+                "b.lf",
+                &format!("import four from \"a\"\n\n{}", main("  let x = four"))
+            )
+        ]),
+        Vec::<&str>::new()
+    );
+    // The declared type checks the initializer
+    rejects("const t: Text = 1\n", "L020");
+}
+
+#[test]
+fn l025_const_effects() {
+    rejects("const x\n  reads clock\n  = 1\n", "L025");
+    rejects("const x\n  writes db\n  = 1\n", "L025");
+    // A pure const cannot call a `reads clock` function
+    rejects(
+        "fn now() -> Int\n  reads clock\n  example \"e\"\n    clock: [1]\n    -> 1\n  end\n\n  return clock.now()\nend fn now\n\nconst t = now()\n",
+        "L025",
+    );
+    // A provider effect is a per-declaration \"not yet\" until the provider cache lands
+    rejects("const x\n  reads net\n  = 1\n", super::NOT_YET);
+}
+
+#[test]
+fn l060_runtime_values_in_comptime_contexts() {
+    rejects(
+        &format!("{DOUBLE}{}", main("  let n = 1\n  const m = double(n)")),
+        "L060",
+    );
+    rejects(
+        &format!(
+            "{DOUBLE}{}",
+            main("  let n = 1\n  let m = comptime double(n)")
+        ),
+        "L060",
+    );
+    rejects(
+        "fn now() -> Int\n  reads clock\n  example \"e\"\n    clock: [1]\n    -> 1\n  end\n\n  const t = clock.now()\n  return t\nend fn now\n",
+        "L060",
+    );
+}
+
+#[test]
+fn l061_comptime_cycles() {
+    rejects("const a: Int = b\nconst b: Int = a\n", "L061");
+    rejects("const a: Int = a + 1\n", "L061");
+    rejects(
+        "const a: Int = f()\n\nfn f() -> Int\n  pure\n  example \"e\"\n    -> 1\n  end\n\n  return a\nend fn f\n",
+        "L061",
+    );
+    let root = package(&[("m.lf", "const a: Int = b\nconst b: Int = a\n")]);
+    let Err(Error::Diagnostics(d)) = check(&[root], &Options::default()) else {
+        panic!()
+    };
+    assert_eq!(d[0].summary, "comptime dependency cycle: `a` -> `b` -> `a`");
+}
+
+#[test]
+fn l062_let_and_var_in_a_comptime_context() {
+    rejects("example \"e\"\n  let x = 1\n  -> x == 1\nend\n", "L062");
+    rejects("example \"e\"\n  var x = 1\n  -> x == 1\nend\n", "L062");
+    accepts("example \"e\"\n  const x = 1\n  -> x == 1\nend\n");
+    // Not inside an ordinary function a comptime root calls
+    accepts(&format!(
+        "{DOUBLE}const six = twice(3)\n\nfn twice(n: Int) -> Int\n  pure\n  example \"e\"\n    n: 1\n    -> 2\n  end\n\n  let m = double(n)\n  return m\nend fn twice\n"
+    ));
+}
+
+#[test]
+fn package_example_rules() {
+    rejects("example \"e\"\n  -> 1\nend\n", "L055");
+    rejects("example \"e\"\n  return 1\n  -> true\nend\n", "L012");
+    // May call pure functions, not `reads` ones
+    accepts(&format!(
+        "{DOUBLE}example \"e\"\n  -> double(2) == 4\nend\n"
+    ));
+    rejects(
+        "fn now() -> Int\n  reads clock\n  example \"e\"\n    clock: [1]\n    -> 1\n  end\n\n  return clock.now()\nend fn now\n\nexample \"e\"\n  -> now() == 1\nend\n",
+        "L025",
+    );
+}
+
+#[test]
+fn comptime_constructs_still_not_supported_are_per_declaration() {
+    let generative =
+        "type Customers\n  pure\n  comptime\n    return 1\n  end\nend type Customers\n\n";
+    // The rest of the module still checks and runs its examples
+    let wrong =
+        "fn one() -> Int\n  pure\n  example \"e\"\n    -> 2\n  end\n\n  return 1\nend fn one\n";
+    assert_eq!(
+        codes(&format!("{generative}{wrong}")),
+        [super::NOT_YET, "L043"]
+    );
+    // ...but not the examples of a function that leans on an unsupported declaration, or of
+    // one that calls such a function
+    let url = "const url: Text\n  reads net\n  = \"x\"\n\n";
+    let leans = "fn two() -> Int\n  pure\n  example \"e\"\n    -> 3\n  end\n\n  log(url)\n  return 2\nend fn two\n\nfn three() -> Int\n  pure\n  example \"e\"\n    -> 0\n  end\n\n  return two() + 1\nend fn three\n\n";
+    assert_eq!(
+        codes(&format!("{url}{leans}{wrong}")),
+        [super::NOT_YET, "L043"]
+    );
 }
 
 #[test]

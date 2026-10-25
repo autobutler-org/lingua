@@ -13,7 +13,7 @@
 #[cfg(test)]
 mod tests;
 
-use std::collections::{HashMap, VecDeque};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::rc::Rc;
 
 use crate::ast::Span;
@@ -37,8 +37,9 @@ const DEPTH: usize = 10_000;
 /// The runner's thread stack, sized so `DEPTH` nested calls fit.
 const STACK: usize = 256 << 20;
 
+/// A runtime value. The checker turns a folded comptime value back into literal TIR.
 #[derive(Debug, Clone, PartialEq)]
-enum Value {
+pub(crate) enum Value {
     Int(i64),
     Text(Rc<str>),
     Bool(bool),
@@ -59,11 +60,23 @@ struct At {
 #[derive(Debug)]
 enum Stop {
     Return(Value),
-    Exception { message: String, at: At },
-    Fault { code: &'static str, at: At },
-    Script { resource: String, at: At },
+    Exception {
+        message: String,
+        at: At,
+    },
+    Fault {
+        code: &'static str,
+        at: At,
+    },
+    Script {
+        resource: String,
+        at: At,
+    },
     Heap(At),
     Depth(At),
+    /// A call of a function this run was not given: unchecked, or skipped because its check
+    /// had a diagnostic.
+    Missing(SymbolId),
     Internal(String),
 }
 
@@ -75,10 +88,20 @@ const NOWHERE: Span = Span {
     end: crate::lex::Location { line: 0, column: 0 },
 };
 
+/// A module's printed path and source text, for reports.
+#[derive(Clone, Copy)]
+pub(crate) struct File<'a> {
+    pub path: &'a str,
+    pub source: &'a str,
+}
+
+/// The functions a run may call, each with the index of its module's [`File`].
+pub(crate) type Functions<'a> = HashMap<SymbolId, (usize, &'a TirFn)>;
+
 struct Machine<'a> {
     symbols: &'a [Symbol],
-    modules: &'a [TirModule],
-    functions: HashMap<SymbolId, (usize, &'a TirFn)>,
+    files: Vec<File<'a>>,
+    functions: Functions<'a>,
     fuel: u64,
     heap: usize,
     depth: usize,
@@ -95,15 +118,28 @@ fn internal(what: &str) -> Stop {
 }
 
 impl<'a> Machine<'a> {
-    fn new(symbols: &'a [Symbol], modules: &'a [TirModule]) -> Self {
+    // The machine for `modules`, without the functions in `skip`
+    fn new(symbols: &'a [Symbol], modules: &'a [TirModule], skip: &HashSet<SymbolId>) -> Self {
         let functions = modules
             .iter()
             .enumerate()
             .flat_map(|(m, module)| module.functions.iter().map(move |f| (f.id, (m, f))))
+            .filter(|(id, _)| !skip.contains(id))
             .collect();
+        let files = modules
+            .iter()
+            .map(|module| File {
+                path: &module.path,
+                source: &module.source,
+            })
+            .collect();
+        Machine::with(symbols, files, functions)
+    }
+
+    fn with(symbols: &'a [Symbol], files: Vec<File<'a>>, functions: Functions<'a>) -> Self {
         Machine {
             symbols,
-            modules,
+            files,
             functions,
             fuel: FUEL,
             heap: 0,
@@ -433,10 +469,7 @@ impl<'a> Machine<'a> {
     }
 
     fn call_fn(&mut self, span: Span, id: SymbolId, args: Vec<Value>) -> Eval<Value> {
-        let &(m, f) = self
-            .functions
-            .get(&id)
-            .ok_or_else(|| internal(&format!("call of unknown function {id}")))?;
+        let &(m, f) = self.functions.get(&id).ok_or(Stop::Missing(id))?;
         if self.depth >= DEPTH {
             return Err(Stop::Depth(self.at(span)));
         }
@@ -643,6 +676,23 @@ fn parse_int(text: &str) -> Option<i128> {
     Some(if negative { -magnitude } else { magnitude })
 }
 
+// The source text `span` covers on its first line
+fn snippet(source: &str, span: Span) -> String {
+    let line = source
+        .lines()
+        .nth(span.start.line.saturating_sub(1))
+        .unwrap_or("");
+    let end = if span.end.line == span.start.line {
+        span.end.column
+    } else {
+        usize::MAX
+    };
+    line.chars()
+        .skip(span.start.column.saturating_sub(1))
+        .take(end.saturating_sub(span.start.column))
+        .collect()
+}
+
 // A text value as a Lingua literal
 fn quote(text: &str) -> String {
     let mut out = String::from('"');
@@ -689,8 +739,8 @@ fn arrow_span(source: &str, ex: &TirExample) -> Span {
 
 impl Machine<'_> {
     fn diagnostic(&self, code: &'static str, at: At, summary: String) -> Diagnostic {
-        let module = &self.modules[at.module];
-        Diagnostic::new(code, summary, &module.path).at(&module.source, at.span)
+        let file = self.files[at.module];
+        Diagnostic::new(code, summary, file.path).at(file.source, at.span)
     }
 
     // Runs one function example in module `m`; `None` when it passes
@@ -701,7 +751,7 @@ impl Machine<'_> {
         let label = &ex.label;
         let arrow = At {
             module: m,
-            span: arrow_span(&self.modules[m].source, ex),
+            span: arrow_span(self.files[m].source, ex),
         };
         let summary = match (result, &ex.expect) {
             (Ok(got), TirExpect::Value(e)) => {
@@ -738,16 +788,83 @@ impl Machine<'_> {
                 ),
             ),
             (Err(Stop::Exception { message, at }), TirExpect::Value(_)) => {
-                let module = &self.modules[at.module];
                 let summary = format!(
-                    "example \"{label}\" expected a value but raised exception \"{message}\" at {}:{}:{}",
-                    module.path, at.span.start.line, at.span.start.column
+                    "example \"{label}\" expected a value but raised exception \"{message}\" at {}",
+                    self.place(at)
                 );
                 ("L057", summary)
             }
+            // It calls a function whose check had a diagnostic, which already explains it
+            (Err(Stop::Missing(_)), _) => return None,
             (Err(stop), _) => return Some(self.stopped(label, arrow, stop)),
         };
         Some(self.diagnostic(summary.0, arrow, summary.1))
+    }
+
+    // `path:line:column` of `at`
+    fn place(&self, at: At) -> String {
+        let file = self.files[at.module];
+        format!(
+            "{}:{}:{}",
+            file.path, at.span.start.line, at.span.start.column
+        )
+    }
+
+    // Runs one package example in module `m`: its statements, then the arrow; `None` when it
+    // passes
+    fn package_example(&mut self, m: usize, ex: &TirExample) -> Option<Diagnostic> {
+        self.reset(m, FUEL);
+        let mut env = Env::new();
+        let label = &ex.label;
+        let arrow = At {
+            module: m,
+            span: arrow_span(self.files[m].source, ex),
+        };
+        let ran = self
+            .block(&ex.body, &mut env)
+            .and_then(|()| match &ex.expect {
+                TirExpect::Value(e) => self.eval(e, &mut env).map(Some),
+                TirExpect::Exception { .. } => Ok(None),
+            });
+        let (code, summary) = match (ran, &ex.expect) {
+            (Ok(Some(Value::Bool(true))) | Err(Stop::Missing(_)), _) => return None,
+            (Ok(Some(_)), TirExpect::Value(e)) => (
+                "L056",
+                format!(
+                    "package example \"{label}\" evaluated to false: {}",
+                    snippet(self.files[m].source, e.span)
+                ),
+            ),
+            (Ok(_), TirExpect::Exception { message }) => (
+                "L059",
+                format!(
+                    "package example \"{label}\" expected exception \"{message}\" but finished without raising"
+                ),
+            ),
+            (Err(Stop::Exception { message: got, .. }), TirExpect::Exception { message })
+                if got == *message =>
+            {
+                return None;
+            }
+            (Err(Stop::Exception { message: got, .. }), TirExpect::Exception { message }) => (
+                "L059",
+                format!(
+                    "example \"{label}\" expected exception \"{message}\" got exception \"{got}\""
+                ),
+            ),
+            (Err(Stop::Exception { message, at }), TirExpect::Value(_)) => (
+                "L057",
+                format!(
+                    "example \"{label}\" expected a value but raised exception \"{message}\" at {}",
+                    self.place(at)
+                ),
+            ),
+            (Err(stop), _) => return Some(self.stopped(label, arrow, stop)),
+            (Ok(None), TirExpect::Value(_)) => {
+                return Some(self.stopped(label, arrow, internal("no arrow value")));
+            }
+        };
+        Some(self.diagnostic(code, arrow, summary))
     }
 
     // The script, the inputs in source order, then the call
@@ -774,8 +891,8 @@ impl Machine<'_> {
     fn stopped(&self, label: &str, arrow: At, stop: Stop) -> Diagnostic {
         match stop {
             Stop::Fault { code, at } => {
-                let module = &self.modules[at.module];
-                Diagnostic::fault(code, &module.path, &module.source, at.span)
+                let file = self.files[at.module];
+                Diagnostic::fault(code, file.path, file.source, at.span)
             }
             Stop::Script { resource, at } => self.diagnostic(
                 "L041",
@@ -792,7 +909,7 @@ impl Machine<'_> {
                 at,
                 format!("example \"{label}\" exceeded the call depth limit of {DEPTH}"),
             ),
-            Stop::Exception { .. } | Stop::Return(_) => self.diagnostic(
+            Stop::Exception { .. } | Stop::Return(_) | Stop::Missing(_) => self.diagnostic(
                 crate::check::NOT_YET,
                 arrow,
                 format!("internal error: example \"{label}\" stopped unexpectedly; this is a bug in lingua"),
@@ -807,37 +924,101 @@ impl Machine<'_> {
 }
 
 /// Runs every function example in the modules `runnable` accepts, in link order and then
-/// source order, and returns a diagnostic for each one that fails.
+/// source order, then their package examples the same way, and returns a diagnostic for each
+/// one that fails. The functions in `skip` and every example that reaches one do not run.
+/// Call it from [`on_big_stack`].
 pub(crate) fn run_examples(
     symbols: &[Symbol],
     modules: &[TirModule],
-    runnable: &(dyn Fn(&TirModule) -> bool + Sync),
+    skip: &HashSet<SymbolId>,
+    runnable: &dyn Fn(&TirModule) -> bool,
 ) -> Vec<Diagnostic> {
-    let run = || {
-        let mut machine = Machine::new(symbols, modules);
-        let mut out = Vec::new();
-        for (m, module) in modules.iter().enumerate().filter(|(_, m)| runnable(m)) {
-            for f in &module.functions {
-                for ex in &f.examples {
-                    if ex.kind == ExampleKind::Function {
-                        out.extend(machine.example(m, f, ex));
-                    }
+    let mut machine = Machine::new(symbols, modules, skip);
+    let run: Vec<(usize, &TirModule)> = modules
+        .iter()
+        .enumerate()
+        .filter(|(_, m)| runnable(m))
+        .collect();
+    let mut out = Vec::new();
+    for &(m, module) in &run {
+        for f in module.functions.iter().filter(|f| !skip.contains(&f.id)) {
+            for ex in &f.examples {
+                if ex.kind == ExampleKind::Function {
+                    out.extend(machine.example(m, f, ex));
                 }
             }
         }
-        out
-    };
-    // A deep recursion needs more stack than the main thread has
-    std::thread::scope(|scope| {
-        match std::thread::Builder::new()
-            .stack_size(STACK)
-            .spawn_scoped(scope, run)
-        {
-            Ok(handle) => handle
-                .join()
-                .unwrap_or_else(|panic| std::panic::resume_unwind(panic)),
-            Err(_) => run(),
+    }
+    for &(m, module) in &run {
+        for ex in &module.examples {
+            out.extend(machine.package_example(m, ex));
         }
+    }
+    out
+}
+
+/// Why a comptime root has no value.
+pub(crate) enum Unfolded {
+    /// It called a function it was not given; check that one and fold again.
+    Missing(SymbolId),
+    Failed(Box<Diagnostic>),
+}
+
+/// Evaluates the comptime root `root` in module `m` with fuel `100_000`: a `const` initializer,
+/// a bound, or a `comptime` expression, which `what` names for `L058`. Call it from
+/// [`on_big_stack`].
+///
+/// # Errors
+/// A missing function, or the root's fault (`L040`, `L042`, `L076`, `L046`), exception
+/// (`L058`), or limit (`L047`).
+pub(crate) fn fold(
+    symbols: &[Symbol],
+    files: Vec<File<'_>>,
+    functions: Functions<'_>,
+    m: usize,
+    root: &TirExpr,
+    what: &str,
+) -> Result<Value, Unfolded> {
+    let mut machine = Machine::with(symbols, files, functions);
+    machine.reset(m, FUEL);
+    let at = machine.at(root.span);
+    let failed = match machine.eval(root, &mut Env::new()) {
+        Ok(v) => return Ok(v),
+        Err(Stop::Missing(id)) => return Err(Unfolded::Missing(id)),
+        Err(Stop::Exception {
+            message,
+            at: raised,
+        }) => {
+            let summary = format!(
+                "exception \"{message}\" aborted the comptime evaluation of {what} at {}",
+                machine.place(raised)
+            );
+            machine.diagnostic("L058", at, summary)
+        }
+        Err(Stop::Heap(at)) => machine.diagnostic(
+            "L047",
+            at,
+            format!("the comptime evaluation of {what} exceeded the 64 MiB heap limit"),
+        ),
+        Err(Stop::Depth(at)) => machine.diagnostic(
+            "L047",
+            at,
+            format!("the comptime evaluation of {what} exceeded the call depth limit of {DEPTH}"),
+        ),
+        Err(stop) => machine.stopped(what, at, stop),
+    };
+    Err(Unfolded::Failed(Box::new(failed)))
+}
+
+/// Runs `f` on a thread with a stack deep enough for the interpreter's `DEPTH` nested calls.
+pub(crate) fn on_big_stack<T: Send>(f: impl FnOnce() -> T + Send) -> T {
+    std::thread::scope(|scope| {
+        std::thread::Builder::new()
+            .stack_size(STACK)
+            .spawn_scoped(scope, f)
+            .expect("the interpreter's thread starts")
+            .join()
+            .unwrap_or_else(|panic| std::panic::resume_unwind(panic))
     })
 }
 
@@ -846,7 +1027,7 @@ pub(crate) fn run_examples(
 #[cfg(test)]
 pub(crate) fn run_main(program: &crate::tir::TirProgram, fuel: u64) -> Option<String> {
     let run = || {
-        let mut machine = Machine::new(&program.symbols, &program.modules);
+        let mut machine = Machine::new(&program.symbols, &program.modules, &HashSet::new());
         let &(m, f) = machine.functions.get(&program.main)?;
         if !f.params.is_empty() {
             return None;

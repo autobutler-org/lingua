@@ -10,6 +10,11 @@
 //! - `Variant.tag`, the variant's declaration index (docs/build.md, Value representation).
 //! - `TirProgram` and `TirModule`, which carry each module's printed path and source text,
 //!   so fault and exception reports can be rendered at build time.
+//! - `TirModule.examples` and `TirExample.body`, for package examples.
+//!
+//! A folded `const` or `comptime` expression is not a node: the checker replaces each use with
+//! the value as literal TIR (`Int`, `Text`, `List`, `Record`, `Variant`), so the interpreter and
+//! lowering see an ordinary literal.
 //!
 //! Omitted: `Quote` and `Unquote` (comptime IR only; they never reach the runtime residue,
 //! and the comptime interpreter will add them with its `QuoteBody`), and the `Expr`/`Type`
@@ -122,6 +127,8 @@ pub struct TirModule {
     pub source: String,
     /// The runtime residue, in source order.
     pub functions: Vec<TirFn>,
+    /// Package examples, in source order.
+    pub examples: Vec<TirExample>,
 }
 
 #[derive(Debug, PartialEq)]
@@ -150,6 +157,8 @@ pub struct TirExample {
     pub inputs: Vec<(SymbolId, TirExpr)>,
     /// The resource or clock list.
     pub script: Option<TirExpr>,
+    /// A package example's statements; empty for a function example.
+    pub body: Vec<TirStmt>,
     pub expect: TirExpect,
 }
 
@@ -165,7 +174,7 @@ pub enum TirExpect {
     Exception { message: String },
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum TirStmt {
     /// `let` and `var`; `Symbol.mutable` tells them apart.
     Let(SymbolId, TirExpr),
@@ -198,7 +207,7 @@ pub enum TirStmt {
     Expr(TirExpr),
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct TirExpr {
     pub ty: Type,
     pub span: Span,
@@ -215,7 +224,7 @@ pub enum CmpOp {
     Ge,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum TirKind {
     Int(i64),
     Text(String),
@@ -265,14 +274,14 @@ pub enum TirKind {
     Let(Vec<(SymbolId, TirExpr)>, Box<TirExpr>),
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct TirArm {
     pub span: Span,
     pub pat: TirPat,
     pub body: TirArmBody,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum TirArmBody {
     Expr(TirExpr),
     Stmts(Vec<TirStmt>),

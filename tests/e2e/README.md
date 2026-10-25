@@ -113,7 +113,8 @@ The exception and fault blocks follow `lingua1.md` § Value errors and exception
 | `text_equality` | `==`/`!=` on text, case sensitivity, no Unicode normalization |
 | `process_fields` | `main(process: Process)`: `os`, `arch`, no `args`, `program` base name, `thread.name`, `pid`, `thread.id`, `parallelism` |
 | `main_param_name` | the `Process` parameter can have any name |
+| `comptime_const` | file-level consts folded at check time and emitted as literals (`Int`, `Text`, `List<Int>`, a record, a `Result`), an inner `const`, a `comptime` call, a `comptime` bound |
 | `layout` | comments, blank lines, multi-line calls with trailing commas, an example on `main`, `//` inside a string |
-| `order_total` | **package**: corpus `money.lf` (the `percent` primitive) and `order.lf`, imported by `main.lf`; order totals, `percent` rounding, `parse_discount` |
+| `order_total` | **package**: end-state corpus `money.lf` (the `percent` primitive, `next_pow2`, `page_cap`, `Batch`) and `order.lf` (with its package example), imported by `main.lf`; order totals, `percent` rounding, `parse_discount` |
 | `geometry` | **package**: three modules, transitive imports, importing a sum also binds its constructors |
 | `config` | **package**: imported nominal types and error sum, bare `or return` across modules, `Host(...)` wrap, `int_in` adopting `Port` |

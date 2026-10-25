@@ -1,15 +1,25 @@
 //! Declarations: the prelude, each module's file-level names and imports (`L010`, `L017`),
-//! type expressions, signatures, and the `primitive` allowlist (`L049`). Bodies are
-//! `body.rs`.
+//! type expressions, signatures, file-level consts, and the `primitive` allowlist (`L049`).
+//! Bodies are `body.rs`; folding comptime roots is `comptime.rs`.
+//!
+//! Declarations resolve on demand (docs/lingua1.md, Compilation pipeline, Work items): a use
+//! of a type, function, or const declared later in the module resolves it first, and a
+//! comptime root that calls a function checks that body first. Each item in progress is on
+//! `Checker.stack`; meeting one again is `L061`.
 
+use std::cell::Cell;
 use std::collections::{HashMap, HashSet};
 
+use super::body::FnCx;
 use super::package::Loaded;
 use super::types::{self, FULL};
 use super::{Checked, Diagnostic, NOT_YET};
 use crate::ast::{Decl, Effect, Expr, FnBody, Span, TypeExpr};
 use crate::lex::Location;
-use crate::tir::{Range, Symbol, SymbolId, SymbolKind, TirFn, TirModule, Type, TypeKind, prelude};
+use crate::tir::{
+    Range, Symbol, SymbolId, SymbolKind, TirExpr, TirFn, TirKind, TirModule, Type, TypeKind,
+    prelude,
+};
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(super) enum Builtin {
@@ -31,6 +41,8 @@ pub(super) enum Binding {
     PreludeFn(SymbolId),
     Log,
     Resource(SymbolId),
+    /// A file-level `const`.
+    Const(SymbolId),
     Local(SymbolId),
     /// A prelude name that only comptime code can use.
     Comptime,
@@ -69,6 +81,29 @@ pub(super) struct Checker<'a> {
     pub poisoned: HashSet<SymbolId>,
     pub resource_calls: Vec<(String, Diagnostic)>,
     pub prelude: Vec<(&'static str, Binding)>,
+    /// Where each type, function, const, and resource is declared: module and decl index.
+    pub decl_of: HashMap<SymbolId, (usize, usize)>,
+    pub decl_ids: HashMap<(usize, usize), SymbolId>,
+    pub resolved: HashSet<SymbolId>,
+    /// The items being resolved, checked, or evaluated, outermost first.
+    pub stack: Vec<Item>,
+    /// Checked function bodies and the module of each.
+    pub bodies: HashMap<SymbolId, (usize, TirFn)>,
+    pub checked: HashSet<SymbolId>,
+    /// Functions whose check had a diagnostic or met a poisoned name: their examples do not
+    /// run, and comptime code cannot call them.
+    pub tainted: HashSet<SymbolId>,
+    /// Folded consts, file-level and inner, as literal TIR.
+    pub consts: HashMap<SymbolId, crate::tir::TirExpr>,
+    /// Set when a use meets a poisoned name, which reports nothing more.
+    pub hit_poison: Cell<bool>,
+}
+
+/// A work item on the comptime stack.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(super) enum Item {
+    Decl(SymbolId),
+    Body(SymbolId),
 }
 
 const COMPTIME_PRELUDE: [&str; 19] = [
@@ -222,6 +257,15 @@ impl<'a> Checker<'a> {
             poisoned: HashSet::new(),
             resource_calls: Vec::new(),
             prelude: prelude_names(),
+            decl_of: HashMap::new(),
+            decl_ids: HashMap::new(),
+            resolved: HashSet::new(),
+            stack: Vec::new(),
+            bodies: HashMap::new(),
+            checked: HashSet::new(),
+            tainted: HashSet::new(),
+            consts: HashMap::new(),
+            hit_poison: Cell::new(false),
         }
     }
 
@@ -300,11 +344,24 @@ impl<'a> Checker<'a> {
 
     /// A file-level name: the module's own declarations and imports, then the prelude.
     pub fn lookup(&self, m: usize, name: &str) -> Option<Binding> {
-        self.mods[m]
+        let found = self.mods[m]
             .names
             .get(name)
             .copied()
-            .or_else(|| self.prelude_binding(name))
+            .or_else(|| self.prelude_binding(name));
+        if found == Some(Binding::Poison) {
+            self.hit_poison.set(true);
+        }
+        found
+    }
+
+    /// Whether `id` is poisoned; a use of it reports nothing more.
+    pub fn is_poisoned(&self, id: SymbolId) -> bool {
+        let poisoned = self.poisoned.contains(&id);
+        if poisoned {
+            self.hit_poison.set(true);
+        }
+        poisoned
     }
 
     /// Every file-level name visible in `m`, for `L011` help.
@@ -421,28 +478,27 @@ impl<'a> Checker<'a> {
         }
     }
 
-    /// Folds a comptime bound: integer literal arithmetic. `runtime` says whether a name is a
-    /// runtime value in scope (`L060`).
+    /// Folds a comptime bound to an integer. Literal arithmetic folds here; anything else is
+    /// typechecked as a comptime root over `scopes` (a runtime local there is `L060`) and
+    /// evaluated with its own fuel.
     pub fn fold_bound(
         &mut self,
         m: usize,
         e: &Expr,
-        runtime: &dyn Fn(&str) -> bool,
+        scopes: &[Vec<(String, SymbolId)>],
     ) -> Option<i64> {
         match e {
             Expr::IntLit(_, v) => Some(*v),
             Expr::UnaryNeg(span, inner) => {
-                let v = self.fold_bound(m, inner, runtime)?;
+                let v = self.fold_bound(m, inner, scopes)?;
                 v.checked_neg().or_else(|| {
                     self.report(m, "L040", *span, "arithmetic overflow in a bound".into());
                     None
                 })
             }
             Expr::Binary(span, op, a, b) => {
-                let (a, b) = (
-                    self.fold_bound(m, a, runtime)?,
-                    self.fold_bound(m, b, runtime)?,
-                );
+                let (a, b) = (self.fold_bound(m, a, scopes), self.fold_bound(m, b, scopes));
+                let (a, b) = (a?, b?);
                 if matches!(op, crate::ast::BinOp::Div | crate::ast::BinOp::Rem) && b == 0 {
                     self.report(m, "L076", *span, "division by zero in a bound".into());
                     return None;
@@ -469,37 +525,24 @@ impl<'a> Checker<'a> {
                     None
                 }
             }
-            Expr::Name(span, name) if runtime(name) => {
-                self.report_help(
-                    m,
-                    "L060",
-                    *span,
-                    format!("`{name}` is a runtime value; a bound must be a comptime value"),
-                    "add `comptime`, or move the value into a comptime context".into(),
-                );
-                None
-            }
-            Expr::Name(span, name) => {
-                if self.lookup(m, name).is_none() {
-                    let help = alternatives(&self.visible(m));
-                    self.report_help(m, "L011", *span, format!("unknown name `{name}`"), help);
-                } else if self.lookup(m, name) != Some(Binding::Poison) {
-                    self.not_yet(m, *span, &format!("evaluating `{name}` at compile time"));
+            _ => {
+                let mut cx = FnCx::root(m, Effect::Pure);
+                cx.scopes = scopes.to_vec();
+                let root = self.synth(&mut cx, e)?;
+                if !types::is_int(&self.symbols, &root.ty) {
+                    let shown = self.show(&root.ty);
+                    self.report(
+                        m,
+                        "L020",
+                        e.span(),
+                        format!("a bound must be an integer expression, not `{shown}`"),
+                    );
+                    return None;
                 }
-                None
-            }
-            Expr::Comptime(span, _) | Expr::Call(span, ..) => {
-                self.not_yet(m, *span, "comptime evaluation in a bound");
-                None
-            }
-            other => {
-                self.report(
-                    m,
-                    "L020",
-                    other.span(),
-                    "a bound must be an integer expression".into(),
-                );
-                None
+                match self.fold(m, &root, "a bound")?.kind {
+                    TirKind::Int(v) => Some(v),
+                    _ => None,
+                }
             }
         }
     }
@@ -522,7 +565,6 @@ impl<'a> Checker<'a> {
 
     /// The type a type expression names.
     pub fn resolve_type(&mut self, m: usize, ty: &TypeExpr) -> Option<Type> {
-        let no_runtime = |_: &str| false;
         match ty {
             TypeExpr::Named(span, name) => match self.lookup(m, name) {
                 Some(Binding::Builtin(b)) => match b {
@@ -540,7 +582,7 @@ impl<'a> Checker<'a> {
                         None
                     }
                 },
-                Some(Binding::Type(id)) => Some(Type::Nominal(id)),
+                Some(Binding::Type(id)) => self.ensure(id).then_some(Type::Nominal(id)),
                 Some(Binding::Comptime) => {
                     self.not_yet(m, *span, &format!("the comptime type `{name}`"));
                     None
@@ -593,14 +635,14 @@ impl<'a> Checker<'a> {
             }
             TypeExpr::AtLeast(_, base, lo) => {
                 let base_ok = self.bound_base(m, base);
-                let lo = self.fold_bound(m, lo, &no_runtime)?;
+                let lo = self.fold_bound(m, lo, &[])?;
                 base_ok?;
                 Some(types::of_range(Range { lo, hi: i64::MAX }))
             }
             TypeExpr::Range(span, base, lo, hi) => {
                 let base_ok = self.bound_base(m, base);
-                let lo = self.fold_bound(m, lo, &no_runtime);
-                let hi = self.fold_bound(m, hi, &no_runtime);
+                let lo = self.fold_bound(m, lo, &[]);
+                let hi = self.fold_bound(m, hi, &[]);
                 let (lo, hi) = (lo?, hi?);
                 base_ok?;
                 if lo > hi {
@@ -635,7 +677,8 @@ impl<'a> Checker<'a> {
         let Some(module) = &self.loaded.sources[m].module else {
             return;
         };
-        for decl in &module.decls {
+        for (i, decl) in module.decls.iter().enumerate() {
+            let first = self.symbols.len();
             match decl {
                 Decl::Alias { span, name, .. } | Decl::Product { span, name, .. } => {
                     let kind = if matches!(decl, Decl::Product { .. }) {
@@ -711,17 +754,12 @@ impl<'a> Checker<'a> {
                     self.export(m, name, Binding::Poison);
                 }
                 Decl::Const { span, name, .. } => {
-                    self.not_yet(m, *span, "`const` (it needs the comptime interpreter)");
-                    self.declare(m, name, Binding::Poison, *span);
-                    self.export(m, name, Binding::Poison);
+                    let id = self.push_symbol(name, SymbolKind::Const, Type::Nothing, m, *span);
+                    self.declare(m, name, Binding::Const(id), *span);
+                    self.export(m, name, Binding::Const(id));
                 }
-                Decl::PackageExample { span, .. } => {
-                    self.not_yet(
-                        m,
-                        *span,
-                        "a package example (package examples do not run yet)",
-                    );
-                }
+                // Checked after the bodies, in `check_package`
+                Decl::PackageExample { .. } => {}
                 Decl::ComptimeBlock { span, .. } => {
                     self.not_yet(
                         m,
@@ -738,170 +776,310 @@ impl<'a> Checker<'a> {
                     );
                 }
             }
+            // The declaration's own symbol is the first it pushed
+            if matches!(
+                decl,
+                Decl::Alias { .. }
+                    | Decl::Product { .. }
+                    | Decl::Sum { .. }
+                    | Decl::Function { .. }
+                    | Decl::Const { .. }
+                    | Decl::Resource { .. }
+            ) && let Ok(id) = SymbolId::try_from(first)
+            {
+                self.decl_of.insert(id, (m, i));
+                self.decl_ids.insert((m, i), id);
+            }
         }
     }
 
-    // Second pass: resolve types and signatures
-    #[allow(clippy::too_many_lines)]
+    /// Resolves the declaration of `id` now if it has not been; `false` when it is part of a
+    /// comptime cycle (`L061`). A product or sum met again is a recursive type, not a cycle.
+    pub fn ensure(&mut self, id: SymbolId) -> bool {
+        if self.resolved.contains(&id) {
+            return true;
+        }
+        let Some(&(m, i)) = self.decl_of.get(&id) else {
+            return true;
+        };
+        if self.stack.contains(&Item::Decl(id)) {
+            if matches!(
+                self.symbols[id as usize].kind,
+                SymbolKind::Type(TypeKind::Product | TypeKind::Sum)
+            ) {
+                return true;
+            }
+            self.cycle(Item::Decl(id));
+            return false;
+        }
+        let Some(module) = &self.loaded.sources[m].module else {
+            return true;
+        };
+        self.stack.push(Item::Decl(id));
+        self.resolve_decl(m, &module.decls[i]);
+        self.stack.pop();
+        self.resolved.insert(id);
+        true
+    }
+
+    /// `L061` for `again`, which is already on the stack: the stack from it to the top, then
+    /// `again`, at the declaration that repeats.
+    pub fn cycle(&mut self, again: Item) {
+        let id = |item: &Item| match *item {
+            Item::Decl(id) | Item::Body(id) => id,
+        };
+        let from = self.stack.iter().position(|i| *i == again).unwrap_or(0);
+        let names: Vec<String> = self.stack[from..]
+            .iter()
+            .chain([&again])
+            .map(|item| format!("`{}`", self.symbols[id(item) as usize].name))
+            .collect();
+        let symbol = &self.symbols[id(&again) as usize];
+        let (name, span) = (symbol.name.clone(), symbol.span);
+        let m = self.decl_of.get(&id(&again)).map_or(0, |&(m, _)| m);
+        let span = find_word(self.source(m), span, &name);
+        let summary = format!("comptime dependency cycle: {}", names.join(" -> "));
+        self.report(m, "L061", span, summary);
+    }
+
+    // Second pass: resolve types, signatures, and consts, in source order unless a use
+    // resolved one sooner
     fn resolve(&mut self, m: usize) {
         let Some(module) = &self.loaded.sources[m].module else {
             return;
         };
-        for decl in &module.decls {
-            match decl {
-                Decl::Alias { name, ty, .. } => self.alias(m, name, ty),
-                Decl::Product { name, fields, .. } => {
-                    let Some(Binding::Type(id)) = self.mods[m].names.get(name).copied() else {
-                        continue;
-                    };
-                    let mut list: Vec<(String, Type)> = Vec::new();
-                    for f in fields {
-                        let ty = self.resolve_type(m, &f.ty);
-                        if list.iter().any(|(n, _)| *n == f.name) {
-                            let span = find_word(self.source(m), f.span, &f.name);
-                            self.report(
-                                m,
-                                "L017",
-                                span,
-                                format!("field `{}` is declared twice", f.name),
-                            );
-                            continue;
-                        }
-                        match ty {
-                            Some(ty) => list.push((f.name.clone(), ty)),
-                            None => {
-                                self.poisoned.insert(id);
-                            }
-                        }
-                    }
-                    self.fields.insert(id, list);
+        for (i, decl) in module.decls.iter().enumerate() {
+            match self.decl_ids.get(&(m, i)) {
+                Some(&id) => {
+                    self.ensure(id);
                 }
-                Decl::Sum { name, variants, .. } => {
-                    let Some(Binding::Type(id)) = self.mods[m].names.get(name).copied() else {
-                        continue;
-                    };
-                    let ids = self.variants.get(&id).cloned().unwrap_or_default();
-                    for (v, vid) in variants.iter().zip(ids) {
-                        let Some(payload_expr) = &v.payload else {
-                            continue;
-                        };
-                        let payload = self.resolve_type(m, payload_expr);
-                        if payload.is_none() {
-                            self.poisoned.insert(vid);
-                        }
-                        if let SymbolKind::Variant { payload: p, .. } =
-                            &mut self.symbols[vid as usize].kind
-                        {
-                            *p = payload;
-                        }
-                    }
-                }
-                Decl::Function {
-                    span,
-                    name,
-                    params,
-                    ret,
-                    effect,
-                    body,
-                    ..
-                } => {
-                    let Some(Binding::Function(id)) = self.mods[m].names.get(name).copied() else {
-                        continue;
-                    };
-                    self.check_effect(m, *span, effect);
-                    let mut sig = Sig {
-                        params: Vec::new(),
-                        ids: Vec::new(),
-                        ret: Type::Nothing,
-                        effect: effect.clone(),
-                        module: m,
-                    };
-                    let mut ok = true;
-                    for p in params {
-                        let ty = self.resolve_type(m, &p.ty);
-                        let pspan = find_word(self.source(m), p.span, &p.name);
-                        if sig.params.iter().any(|(n, _)| *n == p.name) {
-                            self.report(
-                                m,
-                                "L013",
-                                pspan,
-                                format!("parameter `{}` is declared twice", p.name),
-                            );
-                        } else if self.lookup(m, &p.name).is_some() {
-                            self.report(
-                                m,
-                                "L013",
-                                pspan,
-                                format!("parameter `{}` shadows a visible name", p.name),
-                            );
-                        }
-                        let ty = ty.unwrap_or_else(|| {
-                            ok = false;
-                            Type::Nothing
-                        });
-                        let pid =
-                            self.push_symbol(&p.name, SymbolKind::Param, ty.clone(), m, p.span);
-                        if !ok {
-                            self.poisoned.insert(pid);
-                        }
-                        sig.params.push((p.name.clone(), ty));
-                        sig.ids.push(pid);
-                    }
-                    match self.resolve_type(m, ret) {
-                        Some(ty) => sig.ret = ty,
-                        None => ok = false,
-                    }
-                    if !ok {
-                        self.poisoned.insert(id);
-                    }
-                    self.symbols[id as usize].ty = sig.ret.clone();
-                    if matches!(body, FnBody::Primitive) && ok && !self.is_percent(m, name, &sig) {
+                None => self.resolve_decl(m, decl),
+            }
+        }
+    }
+
+    #[allow(clippy::too_many_lines)]
+    fn resolve_decl(&mut self, m: usize, decl: &Decl) {
+        match decl {
+            Decl::Alias { name, ty, .. } => self.alias(m, name, ty),
+            Decl::Product { name, fields, .. } => {
+                let Some(Binding::Type(id)) = self.mods[m].names.get(name).copied() else {
+                    return;
+                };
+                let mut list: Vec<(String, Type)> = Vec::new();
+                for f in fields {
+                    let ty = self.resolve_type(m, &f.ty);
+                    if list.iter().any(|(n, _)| *n == f.name) {
+                        let span = find_word(self.source(m), f.span, &f.name);
                         self.report(
                             m,
-                            "L049",
-                            *span,
-                            format!(
-                                "`primitive` is allowed only on `money.percent`, not `{}.{name}`",
-                                self.key(m)
-                            ),
+                            "L017",
+                            span,
+                            format!("field `{}` is declared twice", f.name),
                         );
-                    }
-                    self.sigs.insert(id, sig);
-                }
-                Decl::Resource { name, op, .. } => {
-                    let Some(Binding::Resource(id)) = self.mods[m].names.get(name).copied() else {
                         continue;
-                    };
-                    let op_id = self.resource_ops[&id];
-                    let mut sig = Sig {
-                        params: Vec::new(),
-                        ids: Vec::new(),
-                        ret: Type::Nothing,
-                        effect: match op.effect {
-                            crate::ast::ResourceEffect::Read => Effect::Reads(name.clone()),
-                            crate::ast::ResourceEffect::Write => Effect::Writes(name.clone()),
-                        },
-                        module: m,
-                    };
-                    let mut ok = true;
-                    for p in &op.params {
-                        match self.resolve_type(m, &p.ty) {
-                            Some(ty) => sig.params.push((p.name.clone(), ty)),
-                            None => ok = false,
+                    }
+                    match ty {
+                        Some(ty) => list.push((f.name.clone(), ty)),
+                        None => {
+                            self.poisoned.insert(id);
                         }
                     }
-                    match self.resolve_type(m, &op.ret) {
-                        Some(ty) => sig.ret = ty,
+                }
+                self.fields.insert(id, list);
+            }
+            Decl::Sum { name, variants, .. } => {
+                let Some(Binding::Type(id)) = self.mods[m].names.get(name).copied() else {
+                    return;
+                };
+                let ids = self.variants.get(&id).cloned().unwrap_or_default();
+                for (v, vid) in variants.iter().zip(ids) {
+                    let Some(payload_expr) = &v.payload else {
+                        continue;
+                    };
+                    let payload = self.resolve_type(m, payload_expr);
+                    if payload.is_none() {
+                        self.poisoned.insert(vid);
+                    }
+                    if let SymbolKind::Variant { payload: p, .. } =
+                        &mut self.symbols[vid as usize].kind
+                    {
+                        *p = payload;
+                    }
+                }
+            }
+            Decl::Function {
+                span,
+                name,
+                params,
+                ret,
+                effect,
+                body,
+                ..
+            } => {
+                let Some(Binding::Function(id)) = self.mods[m].names.get(name).copied() else {
+                    return;
+                };
+                self.check_effect(m, *span, effect);
+                let mut sig = Sig {
+                    params: Vec::new(),
+                    ids: Vec::new(),
+                    ret: Type::Nothing,
+                    effect: effect.clone(),
+                    module: m,
+                };
+                let mut ok = true;
+                for p in params {
+                    let ty = self.resolve_type(m, &p.ty);
+                    let pspan = find_word(self.source(m), p.span, &p.name);
+                    if sig.params.iter().any(|(n, _)| *n == p.name) {
+                        self.report(
+                            m,
+                            "L013",
+                            pspan,
+                            format!("parameter `{}` is declared twice", p.name),
+                        );
+                    } else if self.lookup(m, &p.name).is_some() {
+                        self.report(
+                            m,
+                            "L013",
+                            pspan,
+                            format!("parameter `{}` shadows a visible name", p.name),
+                        );
+                    }
+                    let ty = ty.unwrap_or_else(|| {
+                        ok = false;
+                        Type::Nothing
+                    });
+                    let pid = self.push_symbol(&p.name, SymbolKind::Param, ty.clone(), m, p.span);
+                    if !ok {
+                        self.poisoned.insert(pid);
+                    }
+                    sig.params.push((p.name.clone(), ty));
+                    sig.ids.push(pid);
+                }
+                match self.resolve_type(m, ret) {
+                    Some(ty) => sig.ret = ty,
+                    None => ok = false,
+                }
+                if !ok {
+                    self.poisoned.insert(id);
+                }
+                self.symbols[id as usize].ty = sig.ret.clone();
+                if matches!(body, FnBody::Primitive) && ok && !self.is_percent(m, name, &sig) {
+                    self.report(
+                        m,
+                        "L049",
+                        *span,
+                        format!(
+                            "`primitive` is allowed only on `money.percent`, not `{}.{name}`",
+                            self.key(m)
+                        ),
+                    );
+                }
+                self.sigs.insert(id, sig);
+            }
+            Decl::Resource { name, op, .. } => {
+                let Some(Binding::Resource(id)) = self.mods[m].names.get(name).copied() else {
+                    return;
+                };
+                let op_id = self.resource_ops[&id];
+                let mut sig = Sig {
+                    params: Vec::new(),
+                    ids: Vec::new(),
+                    ret: Type::Nothing,
+                    effect: match op.effect {
+                        crate::ast::ResourceEffect::Read => Effect::Reads(name.clone()),
+                        crate::ast::ResourceEffect::Write => Effect::Writes(name.clone()),
+                    },
+                    module: m,
+                };
+                let mut ok = true;
+                for p in &op.params {
+                    match self.resolve_type(m, &p.ty) {
+                        Some(ty) => sig.params.push((p.name.clone(), ty)),
                         None => ok = false,
                     }
-                    if !ok {
-                        self.poisoned.insert(op_id);
-                    }
-                    self.symbols[op_id as usize].ty = sig.ret.clone();
-                    self.symbols[op_id as usize].effect = Some(sig.effect.clone());
-                    self.sigs.insert(op_id, sig);
                 }
-                _ => {}
+                match self.resolve_type(m, &op.ret) {
+                    Some(ty) => sig.ret = ty,
+                    None => ok = false,
+                }
+                if !ok {
+                    self.poisoned.insert(op_id);
+                }
+                self.symbols[op_id as usize].ty = sig.ret.clone();
+                self.symbols[op_id as usize].effect = Some(sig.effect.clone());
+                self.sigs.insert(op_id, sig);
+            }
+            Decl::Const {
+                span,
+                name,
+                ty,
+                effect,
+                init,
+            } => {
+                if let Some(Binding::Const(id)) = self.mods[m].names.get(name).copied() {
+                    self.file_const(m, id, *span, ty.as_ref(), effect, init);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    // A file-level const: pure, or a provider effect that is not supported yet; its value is
+    // folded now
+    fn file_const(
+        &mut self,
+        m: usize,
+        id: SymbolId,
+        span: Span,
+        ty: Option<&TypeExpr>,
+        effect: &Effect,
+        init: &Expr,
+    ) {
+        match effect {
+            Effect::Pure => {}
+            Effect::ReadsNet | Effect::ReadsFs | Effect::ReadsCatalog => {
+                self.not_yet(
+                    m,
+                    span,
+                    "an effectful `const` (provider effects need the provider cache)",
+                );
+                self.poisoned.insert(id);
+                return;
+            }
+            _ => {
+                self.report(
+                    m,
+                    "L025",
+                    span,
+                    "a `const` may be `pure`, `reads net`, `reads fs`, or `reads catalog`".into(),
+                );
+                self.poisoned.insert(id);
+                return;
+            }
+        }
+        let name = self.symbols[id as usize].name.clone();
+        let mut cx = FnCx::root(m, Effect::Pure);
+        let declared = ty.map(|t| self.resolve_type(m, t));
+        let tir = match declared {
+            Some(None) => None,
+            Some(Some(t)) => self
+                .check(&mut cx, init, &t)
+                .map(|e| TirExpr { ty: t, ..e }),
+            None => self.synth(&mut cx, init),
+        };
+        let value = tir.and_then(|e| {
+            self.symbols[id as usize].ty = e.ty.clone();
+            self.fold(m, &e, &format!("`{name}`"))
+        });
+        match value {
+            Some(v) => {
+                self.consts.insert(id, v);
+            }
+            None => {
+                self.poisoned.insert(id);
             }
         }
     }
@@ -995,7 +1173,8 @@ impl<'a> Checker<'a> {
     }
 }
 
-/// Checks every loaded module: declarations in import order, then bodies.
+/// Checks every loaded module: declarations in import order, then bodies and package
+/// examples. A comptime root reached along the way resolves and checks what it needs first.
 pub(super) fn check_package(loaded: &Loaded) -> (Checked, Vec<Diagnostic>) {
     let mut c = Checker::new(loaded);
     for m in 0..loaded.sources.len() {
@@ -1009,25 +1188,39 @@ pub(super) fn check_package(loaded: &Loaded) -> (Checked, Vec<Diagnostic>) {
         let Some(module) = &source.module else {
             continue;
         };
-        let mut functions: Vec<TirFn> = Vec::new();
-        for decl in &module.decls {
-            if let Decl::Function { .. } = decl
-                && let Some(f) = c.function(m, decl)
-            {
-                functions.push(f);
+        let mut ids = Vec::new();
+        let mut examples = Vec::new();
+        for (i, decl) in module.decls.iter().enumerate() {
+            match decl {
+                Decl::Function { .. } => {
+                    if let Some(&id) = c.decl_ids.get(&(m, i)) {
+                        c.body(id);
+                        ids.push(id);
+                    }
+                }
+                Decl::PackageExample { example, .. } => {
+                    examples.extend(c.package_example(m, example));
+                }
+                _ => {}
             }
         }
+        let functions = ids
+            .iter()
+            .filter_map(|id| c.bodies.remove(id).map(|(_, f)| f))
+            .collect();
         modules.push(TirModule {
             key: source.key.clone(),
             path: source.path.clone(),
             source: source.text.clone(),
             functions,
+            examples,
         });
     }
     let Checker {
         symbols,
         diags,
         resource_calls,
+        tainted,
         ..
     } = c;
     (
@@ -1036,6 +1229,7 @@ pub(super) fn check_package(loaded: &Loaded) -> (Checked, Vec<Diagnostic>) {
             modules,
             requested: loaded.requested.clone(),
             resource_calls,
+            skip: tainted,
         },
         diags,
     )

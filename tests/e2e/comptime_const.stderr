@@ -1,0 +1,12 @@
+page_cap 128
+hello from comptime
+square 0
+square 1
+square 4
+square 9
+square 16
+pair cups 4
+parsed 42
+folded 1024
+marked 9
+batch 128

@@ -25,4 +25,67 @@
             (binding "round" (name "half_up")))
           (body)
           (value (int 2))))
-      primitive)))
+      primitive)
+    (sum "PowStep"
+      (variants (variant "Go" (named "Int")) (variant "Stop" (named "Int"))))
+    (fn "next_pow2"
+      (params (param "n" (at-least (named "Int") (int 1))))
+      (at-least (named "Int") (int 1))
+      pure
+      (examples
+        (example "one stays one"
+          (bindings (binding "n" (int 1)))
+          (body)
+          (value (int 1)))
+        (example "three rounds to four"
+          (bindings (binding "n" (int 3)))
+          (body)
+          (value (int 4)))
+        (example "four stays four"
+          (bindings (binding "n" (int 4)))
+          (body)
+          (value (int 4)))
+        (example "one hundred rounds to one twenty eight"
+          (bindings (binding "n" (int 100)))
+          (body)
+          (value (int 128))))
+      (statements
+        (var "state"
+          (named "PowStep")
+          (call (name "Go") (args (arg nil (int 1))) false))
+        (while-is "state"
+          (variant-pat "Go" (bind "p"))
+          (body
+            (if
+              (binary ge (name "p") (name "n"))
+              (then
+                (set "state" assign
+                  (call (name "Stop") (args (arg nil (name "p"))) false)))
+              (else
+                (set "state" assign
+                  (call
+                    (name "Go")
+                    (args (arg nil (binary add (name "p") (name "p"))))
+                    false))))))
+        (return
+          (match
+            (name "state")
+            (arms
+              (arm
+                (variant-pat "Stop" (bind "p"))
+                (expr-arm
+                  (call
+                    (name "max")
+                    (args (arg "a" (int 1)) (arg "b" (name "p")))
+                    false)))
+              (arm (variant-pat "Go" (wild)) (expr-arm (int 1))))
+            expr-arms))))
+    (const "page_cap"
+      (at-least (named "Int") (int 1))
+      pure
+      (call (name "next_pow2") (args (arg nil (int 100))) false))
+    (alias "Batch"
+      (range
+        (named "Int")
+        (int 1)
+        (comptime (call (name "next_pow2") (args (arg nil (int 100))) false))))))
