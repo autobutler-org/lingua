@@ -716,7 +716,11 @@ impl<'a> Checker<'a> {
                     self.export(m, name, Binding::Poison);
                 }
                 Decl::PackageExample { span, .. } => {
-                    self.not_yet(m, *span, "a package example (examples do not run yet)");
+                    self.not_yet(
+                        m,
+                        *span,
+                        "a package example (package examples do not run yet)",
+                    );
                 }
                 Decl::ComptimeBlock { span, .. } => {
                     self.not_yet(

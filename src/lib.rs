@@ -7,6 +7,7 @@ extern crate self as lingua;
 pub mod ast;
 pub mod build;
 pub mod check;
+pub mod eval;
 pub mod lex;
 pub mod parse;
 pub mod report;

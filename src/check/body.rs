@@ -309,7 +309,7 @@ impl Checker<'_> {
     }
 
     // A function example: each parameter bound once by name, the effect's script, and the
-    // expected value, all checked against the signature. It does not run.
+    // expected value, all checked against the signature. `crate::eval` runs it.
     fn example(&mut self, m: usize, sig: &Sig, ex: &Example) -> Option<TirExample> {
         let mut cx = FnCx {
             m,

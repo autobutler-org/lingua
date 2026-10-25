@@ -1,5 +1,5 @@
 //! Parses every `.lf` under `euler/` and asserts it has no diagnostics.
-//! When the checker lands, the examples in these files will run as well.
+//! `make euler` checks them, which runs their examples.
 
 use std::path::{Path, PathBuf};
 

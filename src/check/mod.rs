@@ -1,10 +1,13 @@
 //! The binder and typechecker (docs/lingua1.md, Module and file model, Name resolution, Types,
 //! Effects): a package of parsed modules in, the typed IR in `crate::tir` out.
 //!
-//! Out of scope until the interpreter exists, and reported as `error: ... not supported yet`
-//! rather than guessed at: comptime evaluation (`const`, `comptime`, a bound that is not
-//! integer literal arithmetic), generative types and providers, `quote` / `unquote`, and
-//! package examples. Function examples are typechecked against the signature; they do not run.
+//! Function examples are typechecked against the signature, then run on `crate::eval` when
+//! their module and its imports checked clean.
+//!
+//! Out of scope until the comptime interpreter exists, and reported as
+//! `error: ... not supported yet` rather than guessed at: comptime evaluation (`const`,
+//! `comptime`, a bound that is not integer literal arithmetic), generative types and
+//! providers, `quote` / `unquote`, and package examples.
 
 mod body;
 mod catalog;
@@ -16,6 +19,7 @@ mod types;
 #[cfg(test)]
 mod tests;
 
+use std::collections::HashSet;
 use std::path::PathBuf;
 
 use crate::ast::Span;
@@ -40,6 +44,8 @@ pub struct Diagnostic {
     /// The source line the span starts on.
     pub line: String,
     pub help: Option<String>,
+    /// A runtime fault (`L040`, `L042`, `L046`, `L076`): rendered as `fault CODE: summary`.
+    pub fault: bool,
 }
 
 impl Diagnostic {
@@ -52,6 +58,16 @@ impl Diagnostic {
             span: None,
             line: String::new(),
             help: None,
+            fault: false,
+        }
+    }
+
+    /// The fault report for `code` at `span`, the block `crate::report::fault` renders.
+    #[must_use]
+    pub fn fault(code: &'static str, path: &str, source: &str, span: Span) -> Self {
+        Diagnostic {
+            fault: true,
+            ..Diagnostic::new(code, report::fault_summary(code), path).at(source, span)
         }
     }
 
@@ -87,6 +103,7 @@ impl Diagnostic {
             span: Some(span),
             line: report::line_of(source, span).to_owned(),
             help: d.help.clone(),
+            fault: false,
         }
     }
 }
@@ -94,8 +111,9 @@ impl Diagnostic {
 impl std::fmt::Display for Diagnostic {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         let at = self.span.map(|span| (span, self.line.as_str()));
+        let fault = if self.fault { "fault " } else { "" };
         f.write_str(&report::block(
-            &format!("{}: {}", self.code, self.summary),
+            &format!("{fault}{}: {}", self.code, self.summary),
             &self.path,
             at,
             self.help.as_deref(),
@@ -133,11 +151,38 @@ pub fn check(paths: &[PathBuf], options: &Options) -> Result<Checked, Error> {
     let mut diagnostics = loaded.diagnostics.clone();
     let (checked, more) = decl::check_package(&loaded);
     diagnostics.extend(more);
+    let runnable = runnable(&loaded, &diagnostics);
+    diagnostics.extend(crate::eval::run_examples(
+        &checked.symbols,
+        &checked.modules,
+        &|module| runnable.contains(&module.key),
+    ));
     if diagnostics.is_empty() {
         Ok(checked)
     } else {
         Err(Error::Diagnostics(finish(diagnostics)))
     }
+}
+
+// The modules whose examples run: those with no diagnostic whose imports all run too, since a
+// function with a diagnostic may be missing from the residue. Sources come imports first, so
+// one pass sees every import before its importer.
+// ponytail: a temporary "not yet" (`const`, a package example) skips the whole module's
+// examples, where lingua1.md's PR 14 asks for per declaration; narrow it once those
+// declarations stop poisoning the bodies that use them.
+fn runnable(loaded: &package::Loaded, diagnostics: &[Diagnostic]) -> HashSet<String> {
+    let mut out = HashSet::new();
+    for source in &loaded.sources {
+        let Some(module) = &source.module else {
+            continue;
+        };
+        if diagnostics.iter().all(|d| d.path != source.path)
+            && module.imports.iter().all(|i| out.contains(&i.path))
+        {
+            out.insert(source.key.clone());
+        }
+    }
+    out
 }
 
 /// `lingua build`: checks `paths`, then applies the link-set rules: exactly one `main`

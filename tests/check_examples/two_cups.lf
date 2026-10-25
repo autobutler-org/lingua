@@ -1,0 +1,15 @@
+type Cents = Int at least 0
+
+fn cups(n: Cents) -> Cents
+  pure
+  example "one cup"
+    n: 1
+    -> 250
+  end
+  example "two cups"
+    n: 2
+    -> 1000
+  end
+
+  return n * 250
+end fn cups
