@@ -1,0 +1,7 @@
+type OrderRow
+  pure
+  comptime
+    const columns = [Column(name: "id", sql_type: "integer"), Column(name: "name", sql_type: "text"), Column(name: "active", sql_type: "boolean")]
+    return record_from_columns(columns)
+  end
+end type OrderRow

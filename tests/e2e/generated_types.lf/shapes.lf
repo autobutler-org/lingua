@@ -1,0 +1,16 @@
+// A generative type and a package `comptime` block; `provided/shapes.lf` is their cache,
+// checked in so a build reuses it and writes nothing here
+
+const order_columns = [Column(name: "id", sql_type: "integer"), Column(name: "name", sql_type: "text"), Column(name: "active", sql_type: "boolean")]
+
+type OrderRow
+  pure
+  comptime
+    return record_from_columns(order_columns)
+  end
+end type OrderRow
+
+comptime
+  pure
+  provide Point = record_from_columns([Column(name: "x", sql_type: "int8"), Column(name: "y", sql_type: "smallint")])
+end

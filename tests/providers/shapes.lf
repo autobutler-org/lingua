@@ -1,0 +1,5 @@
+comptime
+  pure
+  provide Point = record_from_columns([Column(name: "x", sql_type: "integer"), Column(name: "y", sql_type: "int8")])
+  provide Label = record_from_columns([Column(name: "text", sql_type: "varchar")])
+end

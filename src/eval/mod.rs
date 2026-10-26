@@ -47,6 +47,8 @@ pub(crate) enum Value {
     List(Rc<[Value]>),
     Record(SymbolId, Rc<[Value]>),
     Variant(SymbolId, Option<Rc<Value>>),
+    /// A comptime `Type`.
+    Type(Rc<crate::provider::Record>),
 }
 
 /// Where a node is: a module index and a span in its source.
@@ -378,10 +380,33 @@ impl<'a> Machine<'a> {
                 }
                 self.eval(body, env)
             }
+            TirKind::TypeValue(record) => Ok(Value::Type(Rc::new(record.clone()))),
             TirKind::FsRead(_) | TirKind::CatalogColumns(_) => {
                 Err(internal("a comptime-only operation reached an example"))
             }
         }
+    }
+
+    // `record_from_columns(columns)`; a bad list is the prelude's `fail`
+    fn record_from_columns(&self, span: Span, columns: &[Value]) -> Eval<Value> {
+        let pairs = columns
+            .iter()
+            .map(|c| match c {
+                Value::Record(_, f) => match &f[..] {
+                    [Value::Text(name), Value::Text(sql)] => {
+                        Ok((name.to_string(), sql.to_string()))
+                    }
+                    _ => Err(internal("a `Column` without two texts")),
+                },
+                v => Err(internal(&format!("expected a `Column`, found {v:?}"))),
+            })
+            .collect::<Eval<Vec<_>>>()?;
+        crate::provider::record_from_columns(&pairs)
+            .map(|r| Value::Type(Rc::new(r)))
+            .map_err(|message| Stop::Exception {
+                message: message.to_owned(),
+                at: self.at(span),
+            })
     }
 
     // The next script element, or `L041`
@@ -464,6 +489,7 @@ impl<'a> Machine<'a> {
             prelude::LENGTH => Ok(Value::Int(
                 i64::try_from(list(arg(0)?)?.len()).unwrap_or(i64::MAX),
             )),
+            prelude::RECORD_FROM_COLUMNS => self.record_from_columns(span, &list(arg(0)?)?),
             _ => self.call_fn(span, id, args),
         }
     }
@@ -631,6 +657,7 @@ impl<'a> Machine<'a> {
             Value::Record(id, fields) => format!("{}({})", name(*id), all(fields)),
             Value::Variant(id, None) => name(*id).to_owned(),
             Value::Variant(id, Some(p)) => format!("{}({})", name(*id), self.render(p)),
+            Value::Type(record) => format!("type with {} fields", record.fields.len()),
         }
     }
 }
@@ -964,9 +991,17 @@ pub(crate) enum Unfolded {
     Failed(Box<Diagnostic>),
 }
 
+/// A comptime root: an expression, or the statements of a generative body or a package
+/// `comptime` block (its value is what it `return`s, else `nothing`).
+#[derive(Clone, Copy)]
+pub(crate) enum Root<'t> {
+    Expr(&'t TirExpr),
+    Body(&'t [TirStmt], Span),
+}
+
 /// Evaluates the comptime root `root` in module `m` with fuel `100_000`: a `const` initializer,
-/// a bound, or a `comptime` expression, which `what` names for `L058`. Call it from
-/// [`on_big_stack`].
+/// a bound, a `comptime` expression, or a provider body, which `what` names for `L058`.
+/// Call it from [`on_big_stack`].
 ///
 /// # Errors
 /// A missing function, or the root's fault (`L040`, `L042`, `L076`, `L046`), exception
@@ -976,13 +1011,24 @@ pub(crate) fn fold(
     files: Vec<File<'_>>,
     functions: Functions<'_>,
     m: usize,
-    root: &TirExpr,
+    root: Root<'_>,
     what: &str,
 ) -> Result<Value, Unfolded> {
     let mut machine = Machine::with(symbols, files, functions);
     machine.reset(m, FUEL);
-    let at = machine.at(root.span);
-    let failed = match machine.eval(root, &mut Env::new()) {
+    let (ran, span) = match root {
+        Root::Expr(e) => (machine.eval(e, &mut Env::new()), e.span),
+        Root::Body(stmts, span) => (
+            match machine.block(stmts, &mut Env::new()) {
+                Ok(()) => Ok(Value::Nothing),
+                Err(Stop::Return(v)) => Ok(v),
+                Err(stop) => Err(stop),
+            },
+            span,
+        ),
+    };
+    let at = machine.at(span);
+    let failed = match ran {
         Ok(v) => return Ok(v),
         Err(Stop::Missing(id)) => return Err(Unfolded::Missing(id)),
         Err(Stop::Exception {

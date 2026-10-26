@@ -1,0 +1,24 @@
+import OrderRow, Point from "shapes"
+
+fn describe(row: OrderRow) -> Text
+  pure
+  example "active"
+    row: OrderRow(id: 7, name: "ada", active: true)
+    -> "order 7 ada active"
+  end
+
+  if row.active
+    return "order {row.id} {row.name} active"
+  end
+  return "order {row.id} {row.name} closed"
+end fn describe
+
+fn main() -> Nothing
+  pure
+
+  log(describe(OrderRow(id: 7, name: "ada", active: true)))
+  log(describe(OrderRow(name: "bob", active: false, id: 8)))
+  let p = Point(x: 3, y: 4)
+  log("point {p.x},{p.y} sum {p.x + p.y}")
+  return nothing
+end fn main

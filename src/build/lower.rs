@@ -337,7 +337,10 @@ impl<'a> FnLowerer<'a, '_> {
                 self.binds(binds)?;
                 self.expr(body)?
             }
-            TirKind::FsRead(_) | TirKind::CatalogColumns(_) | TirKind::ResourceCall(..) => {
+            TirKind::FsRead(_)
+            | TirKind::CatalogColumns(_)
+            | TirKind::TypeValue(_)
+            | TirKind::ResourceCall(..) => {
                 return Err(internal(
                     "a comptime-only or resource operation reached the runtime residue",
                 ));

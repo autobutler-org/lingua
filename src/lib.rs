@@ -10,5 +10,6 @@ pub mod check;
 pub mod eval;
 pub mod lex;
 pub mod parse;
+pub mod provider;
 pub mod report;
 pub mod tir;

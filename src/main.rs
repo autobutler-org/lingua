@@ -3,7 +3,7 @@ use std::process::ExitCode;
 
 use lingua::ast::dump;
 use lingua::build::{self, arch::amd64, lir};
-use lingua::check::{self, Diagnostic, Options};
+use lingua::check::{self, Cache, Diagnostic, Options};
 use lingua::lex::{TokenKind, lex_source};
 use lingua::parse::parse_source;
 
@@ -15,6 +15,7 @@ commands:
   check [PATH ...]    typecheck modules and their imports; silent when clean
   check --explain L031
                       print the catalog text for a diagnostic code
+  expand [PATH ...]   print the types that generative types and `provide` expand to
   build [PATH ...]    check, then build a static linux/amd64 executable at ./lingua-out
   lir PATH            print the LIR that `build` lowers PATH to
   asm PATH            print the amd64 instructions that `build` selects for PATH
@@ -23,21 +24,24 @@ PATH is a `.lf` file directly in the source root, or the source root itself (eve
 in it); it defaults to `.`. The source root is the nearest directory upward with a
 `lingua.toml`, else the directory of the path.
 
-flags for check and build:
+flags for check, expand, and build:
   --source-root PATH  use PATH as the source root instead of the upward walk
-  --refresh, --offline
-                      provider cache policy (no provider runs until the provider cache lands)
+  --refresh           run every provider effect again and replace the provider cache
+  --offline           run no provider effect; a type missing from the cache is L071
 
 Function examples run on the interpreter during check and build, then package examples; a
 failing one is a diagnostic. `const`, `comptime`, and comptime bounds fold on the same
-interpreter. Generative types, package `comptime` blocks, effectful consts, and macros are
-reported as not supported yet.";
+interpreter. A generative type (`type Name` whose body starts with an effect) and each
+`provide` in a package `comptime` block expand to an ordinary `type` declaration, cached in
+`provided/<module>.lf` under the source root and reused on later runs; `record_from_columns`
+builds a record type from a `List<Column>`. `fs.read`, `http_get`, `catalog.columns`,
+`schema`, `types_from_openapi`, and macros are reported as not supported yet.";
 
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
     let args: Vec<&str> = args.iter().map(String::as_str).collect();
     match args.as_slice() {
-        ["-h" | "--help"] => {
+        ["-h" | "--help"] | [_, "-h" | "--help"] => {
             println!("{USAGE}");
             ExitCode::SUCCESS
         }
@@ -68,6 +72,24 @@ fn main() -> ExitCode {
                     Err(err) => build_error(err.into()),
                 }
             })
+        }
+        ["expand", rest @ ..] => {
+            with_flags(
+                "expand",
+                rest,
+                false,
+                |paths, options| match check::expand(&paths, &options) {
+                    Ok((text, diagnostics)) => {
+                        print!("{text}");
+                        if diagnostics.is_empty() {
+                            ExitCode::SUCCESS
+                        } else {
+                            report(&diagnostics)
+                        }
+                    }
+                    Err(err) => build_error(err.into()),
+                },
+            )
         }
         ["build", rest @ ..] => with_flags("build", rest, true, |paths, options| {
             build_paths(&paths, &options)
@@ -125,9 +147,14 @@ fn with_flags(
             path => paths.push(PathBuf::from(path)),
         }
     }
-    if refresh && offline {
-        return usage_error("--refresh and --offline cannot be used together; pick one");
-    }
+    options.cache = match (refresh, offline) {
+        (true, true) => {
+            return usage_error("--refresh and --offline cannot be used together; pick one");
+        }
+        (true, false) => Cache::Refresh,
+        (false, true) => Cache::Offline,
+        (false, false) => Cache::Default,
+    };
     run(paths, options)
 }
 

@@ -625,8 +625,8 @@ impl Checker<'_> {
                 };
                 (e.map(|e| TirStmt::Set(id, e)), false)
             }
-            Stmt::Return { span, .. } if cx.comptime => {
-                let summary = "`return` in a package example: there is no function to return from";
+            Stmt::Return { span, .. } if cx.comptime && cx.ret != Type::TypeAst => {
+                let summary = "`return` in a package example or a package `comptime` block: there is no function to return from";
                 self.report(m, "L012", word_at(*span, "return".len()), summary.into());
                 (None, true)
             }
@@ -1418,8 +1418,20 @@ impl Checker<'_> {
                 }
                 Some(tx(Type::Int, *span, TirKind::ClockNow))
             }
+            Expr::FsRead(span, _) if cx.comptime && cx.effect == Effect::ReadsFs => {
+                self.not_yet(m, *span, "`fs.read` (it lands with the fs library)");
+                None
+            }
+            Expr::CatalogColumns(span, _) if cx.comptime && cx.effect == Effect::ReadsCatalog => {
+                self.not_yet(
+                    m,
+                    *span,
+                    "`catalog.columns` (lingua has no database client yet)",
+                );
+                None
+            }
             Expr::FsRead(span, _) | Expr::CatalogColumns(span, _) => {
-                self.report(m, "L025", *span, "`fs.read` and `catalog.columns` need `reads fs` or `reads catalog`, which only a const or a generative type can declare".into());
+                self.report(m, "L025", *span, "`fs.read` and `catalog.columns` need `reads fs` or `reads catalog`, which only a const, a generative type, or a package `comptime` block can declare".into());
                 None
             }
         }
@@ -1434,13 +1446,23 @@ impl Checker<'_> {
         }
     }
 
-    // A use of a folded const: its value at `span`, or quietly nothing when it did not fold
-    fn const_use(&self, id: SymbolId, span: Span) -> Option<TirExpr> {
-        let value = self.consts.get(&id);
-        if value.is_none() {
+    // A use of a folded const: its value at `span`, or quietly nothing when it did not fold.
+    // A `Type` is `L063` outside a comptime context.
+    fn const_use(&mut self, cx: &FnCx, id: SymbolId, span: Span) -> Option<TirExpr> {
+        let Some(value) = self.consts.get(&id) else {
             self.hit_poison.set(true);
+            return None;
+        };
+        if value.ty == Type::TypeAst && !cx.comptime {
+            let name = self.symbols[id as usize].name.clone();
+            let summary = format!("`{name}` is a `Type`, which only exists at compile time");
+            self.report(cx.m, "L063", span, summary);
+            return None;
         }
-        value.map(|v| TirExpr { span, ..v.clone() })
+        Some(TirExpr {
+            span,
+            ..value.clone()
+        })
     }
 
     #[allow(clippy::too_many_lines)]
@@ -1452,7 +1474,7 @@ impl Checker<'_> {
                     return None;
                 }
                 if self.consts.contains_key(&id) {
-                    return self.const_use(id, span);
+                    return self.const_use(cx, id, span);
                 }
                 if cx.comptime {
                     self.report_help(
@@ -1473,7 +1495,7 @@ impl Checker<'_> {
                 if !self.ensure(id) {
                     return None;
                 }
-                self.const_use(id, span)
+                self.const_use(cx, id, span)
             }
             Some(Binding::Variant(id)) => {
                 if self.is_poisoned(id) || !self.ensure_parent(id) {
@@ -1891,6 +1913,12 @@ impl Checker<'_> {
                     TirKind::Variant(id, Some(bx(arg))),
                 ))
             }
+            Some(Binding::Comptime)
+                if name == "http_get" && cx.comptime && cx.effect == Effect::ReadsNet =>
+            {
+                self.not_yet(m, *nspan, "`http_get` (lingua has no HTTPS client yet)");
+                None
+            }
             Some(Binding::Comptime) if name == "http_get" => {
                 self.report(m, "L025", *nspan, "`http_get` needs `reads net`, which only a const or a generative type can declare".into());
                 None
@@ -2058,6 +2086,27 @@ impl Checker<'_> {
                 Some(self.in_source_order(cx, &matched.order, args, |args| {
                     tx(ty, span, TirKind::Call(id, args))
                 }))
+            }
+            prelude::RECORD_FROM_COLUMNS => {
+                let params = [(
+                    "columns".to_owned(),
+                    Type::List(Box::new(Type::Nominal(prelude::COLUMN))),
+                )];
+                let matched = self.match_args(cx, span, name, &params, args)?;
+                let args = self.checked_args(cx, &matched, &params)?;
+                if !cx.comptime {
+                    let summary =
+                        "`record_from_columns` returns a `Type`, which only exists at compile time";
+                    self.report_help(
+                        m,
+                        "L063",
+                        span,
+                        summary.into(),
+                        "call it in a generative type's body or a `provide`".into(),
+                    );
+                    return None;
+                }
+                Some(tx(Type::TypeAst, span, TirKind::Call(id, args)))
             }
             _ => None,
         }
