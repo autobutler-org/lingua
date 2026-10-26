@@ -1,0 +1,5 @@
+type OrderRow
+  id: Int
+  name: Text
+  active: Bool
+end type OrderRow

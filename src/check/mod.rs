@@ -5,16 +5,20 @@
 //! them; each use of a folded value is literal TIR. Function examples, then package examples,
 //! run on the same interpreter when their module and its imports checked clean.
 //!
+//! Generative types and package `comptime` blocks expand first in each module
+//! (`generative.rs`), under the `provided/` cache policy, to ordinary product declarations.
+//!
 //! Out of scope until their PRs, and reported per declaration as
-//! `error: ... not supported yet` rather than guessed at: generative types, package
-//! `comptime` blocks, effectful consts and the provider cache, and `quote` / `unquote`. Such a
-//! diagnostic does not stop the module's examples, only those of functions whose check had a
-//! diagnostic or met the unsupported declaration, and of examples that call them.
+//! `error: ... not supported yet` rather than guessed at: `http_get`, `catalog.columns`,
+//! `fs.read`, `schema`, `types_from_openapi`, and `quote` / `unquote`. Such a diagnostic does
+//! not stop the module's examples, only those of functions whose check had a diagnostic or met
+//! the unsupported declaration, and of examples that call them.
 
 mod body;
 mod catalog;
 mod comptime;
 mod decl;
+mod generative;
 mod package;
 mod pattern;
 mod types;
@@ -30,7 +34,7 @@ use crate::report;
 use crate::tir::{SymbolId, SymbolKind, TirModule, TirProgram, Type};
 
 pub use catalog::explain;
-pub use package::Options;
+pub use package::{Cache, Options, is_module_key};
 
 /// The code for a construct that is legal Lingua but that this checker cannot handle yet.
 /// Not an `L` code.
@@ -145,6 +149,8 @@ pub struct Checked {
     resource_calls: Vec<(String, Diagnostic)>,
     /// Functions whose examples do not run (see the module docs).
     skip: HashSet<SymbolId>,
+    /// Each module's generated declarations as source text, imports first.
+    pub expanded: Vec<(String, String)>,
 }
 
 /// `lingua check`: loads `paths` (default `.`) and their import closure and typechecks them.
@@ -172,6 +178,28 @@ pub fn check(paths: &[PathBuf], options: &Options) -> Result<Checked, Error> {
     } else {
         Err(Error::Diagnostics(finish(diagnostics)))
     }
+}
+
+/// `lingua expand`: the same fixed point and cache policy as [`check`], without the examples.
+/// The expanded declarations of the requested modules as source text, a blank line between,
+/// and every diagnostic, sorted. The text holds what expanded even when there are
+/// diagnostics.
+///
+/// # Errors
+/// A usage error.
+pub fn expand(paths: &[PathBuf], options: &Options) -> Result<(String, Vec<Diagnostic>), Error> {
+    let loaded = package::load(paths, options)?;
+    let mut diagnostics = loaded.diagnostics.clone();
+    let (checked, more) = crate::eval::on_big_stack(|| decl::check_package(&loaded));
+    diagnostics.extend(more);
+    let text = checked
+        .expanded
+        .iter()
+        .filter(|(key, _)| checked.requested.contains(key))
+        .map(|(_, text)| text.as_str())
+        .collect::<Vec<_>>()
+        .join("\n");
+    Ok((text, finish(diagnostics)))
 }
 
 // The modules whose examples run: those with no diagnostic but a "not yet" one, whose imports

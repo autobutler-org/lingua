@@ -97,6 +97,14 @@ pub(super) struct Checker<'a> {
     pub consts: HashMap<SymbolId, crate::tir::TirExpr>,
     /// Set when a use meets a poisoned name, which reports nothing more.
     pub hit_poison: Cell<bool>,
+    /// Each module's `provided/` cache, read on first use.
+    pub caches: HashMap<usize, HashMap<String, crate::provider::Record>>,
+    /// Expanded declarations: module, the generated name's span, and the AST.
+    pub generated: Vec<(usize, Span, Decl)>,
+    /// Modules where a provider failed: their cache is left as it was.
+    pub provider_failed: HashSet<usize>,
+    /// Package `comptime` blocks already run: module and the block's start.
+    pub blocks_done: HashSet<(usize, usize, usize)>,
 }
 
 /// A work item on the comptime stack.
@@ -154,7 +162,14 @@ fn prelude_names() -> Vec<(&'static str, Binding)> {
         COMPTIME_PRELUDE
             .iter()
             .filter(|n| !matches!(**n, "quote" | "unquote"))
-            .map(|n| (*n, Binding::Comptime)),
+            .map(|n| {
+                let binding = match *n {
+                    "Column" => Binding::Type(prelude::COLUMN),
+                    "record_from_columns" => Binding::PreludeFn(prelude::RECORD_FROM_COLUMNS),
+                    _ => Binding::Comptime,
+                };
+                (*n, binding)
+            }),
     );
     names
 }
@@ -240,6 +255,7 @@ impl<'a> Checker<'a> {
         };
         fields.insert(prelude::PROCESS, field_list(prelude::PROCESS));
         fields.insert(prelude::THREAD, field_list(prelude::THREAD));
+        fields.insert(prelude::COLUMN, field_list(prelude::COLUMN));
         let mut variants = HashMap::new();
         variants.insert(
             prelude::BOUNDS_ERROR,
@@ -266,6 +282,10 @@ impl<'a> Checker<'a> {
             tainted: HashSet::new(),
             consts: HashMap::new(),
             hit_poison: Cell::new(false),
+            caches: HashMap::new(),
+            generated: Vec::new(),
+            provider_failed: HashSet::new(),
+            blocks_done: HashSet::new(),
         }
     }
 
@@ -375,7 +395,7 @@ impl<'a> Checker<'a> {
     }
 
     // L017 when a file-level name repeats a declaration, an import, or a prelude name
-    fn declare(&mut self, m: usize, name: &str, binding: Binding, span: Span) {
+    pub(super) fn declare(&mut self, m: usize, name: &str, binding: Binding, span: Span) {
         let span = find_word(self.source(m), span, name);
         if self.prelude_binding(name).is_some() {
             self.report(
@@ -397,7 +417,7 @@ impl<'a> Checker<'a> {
         }
     }
 
-    fn export(&mut self, m: usize, name: &str, binding: Binding) {
+    pub(super) fn export(&mut self, m: usize, name: &str, binding: Binding) {
         self.mods[m].exports.push((name.to_owned(), binding));
     }
 
@@ -745,13 +765,7 @@ impl<'a> Checker<'a> {
                     self.declare(m, name, Binding::Resource(id), *span);
                 }
                 Decl::Generative { span, name, .. } => {
-                    self.not_yet(
-                        m,
-                        *span,
-                        "a generative type (it needs the comptime interpreter)",
-                    );
-                    self.declare(m, name, Binding::Poison, *span);
-                    self.export(m, name, Binding::Poison);
+                    self.generated_name(m, name, *span);
                 }
                 Decl::Const { span, name, .. } => {
                     let id = self.push_symbol(name, SymbolKind::Const, Type::Nothing, m, *span);
@@ -760,12 +774,14 @@ impl<'a> Checker<'a> {
                 }
                 // Checked after the bodies, in `check_package`
                 Decl::PackageExample { .. } => {}
-                Decl::ComptimeBlock { span, .. } => {
-                    self.not_yet(
-                        m,
-                        *span,
-                        "a package `comptime` block (it needs the comptime interpreter)",
-                    );
+                Decl::ComptimeBlock { body, .. } => {
+                    for stmt in body {
+                        if let crate::ast::Stmt::Provide { span, name, .. } = stmt {
+                            let id = self.generated_name(m, name, *span);
+                            self.decl_of.insert(id, (m, i));
+                            self.decl_ids.entry((m, i)).or_insert(id);
+                        }
+                    }
                 }
                 Decl::Provide { span, .. } => {
                     self.report(
@@ -785,6 +801,7 @@ impl<'a> Checker<'a> {
                     | Decl::Function { .. }
                     | Decl::Const { .. }
                     | Decl::Resource { .. }
+                    | Decl::Generative { .. }
             ) && let Ok(id) = SymbolId::try_from(first)
             {
                 self.decl_of.insert(id, (m, i));
@@ -859,7 +876,7 @@ impl<'a> Checker<'a> {
     }
 
     #[allow(clippy::too_many_lines)]
-    fn resolve_decl(&mut self, m: usize, decl: &Decl) {
+    pub(super) fn resolve_decl(&mut self, m: usize, decl: &Decl) {
         match decl {
             Decl::Alias { name, ty, .. } => self.alias(m, name, ty),
             Decl::Product { name, fields, .. } => {
@@ -1023,11 +1040,20 @@ impl<'a> Checker<'a> {
                     self.file_const(m, id, *span, ty.as_ref(), effect, init);
                 }
             }
+            Decl::Generative {
+                span,
+                name,
+                effect,
+                body,
+            } => self.generative(m, *span, name, effect, body),
+            Decl::ComptimeBlock { span, effect, body } => {
+                self.comptime_block(m, *span, effect, body);
+            }
             _ => {}
         }
     }
 
-    // A file-level const: pure, or a provider effect that is not supported yet; its value is
+    // A file-level const: pure, or a provider effect (`--offline` runs none); its value is
     // folded now
     fn file_const(
         &mut self,
@@ -1041,10 +1067,19 @@ impl<'a> Checker<'a> {
         match effect {
             Effect::Pure => {}
             Effect::ReadsNet | Effect::ReadsFs | Effect::ReadsCatalog => {
-                self.not_yet(
+                if self.loaded.cache != super::Cache::Offline {
+                    return self.fold_file_const(m, id, ty, effect, init);
+                }
+                // ponytail: lingua1.md caches only generated declarations, so an effectful
+                // const has nothing to reuse offline; it is `L071` rather than a silent read.
+                let name = self.symbols[id as usize].name.clone();
+                let span = find_word(self.source(m), span, &name);
+                self.report_help(
                     m,
+                    "L071",
                     span,
-                    "an effectful `const` (provider effects need the provider cache)",
+                    format!("`--offline` and the const `{name}` needs its provider effect"),
+                    "run without `--offline` to run its effect".into(),
                 );
                 self.poisoned.insert(id);
                 return;
@@ -1060,8 +1095,19 @@ impl<'a> Checker<'a> {
                 return;
             }
         }
+        self.fold_file_const(m, id, ty, effect, init);
+    }
+
+    fn fold_file_const(
+        &mut self,
+        m: usize,
+        id: SymbolId,
+        ty: Option<&TypeExpr>,
+        effect: &Effect,
+        init: &Expr,
+    ) {
         let name = self.symbols[id as usize].name.clone();
-        let mut cx = FnCx::root(m, Effect::Pure);
+        let mut cx = FnCx::root(m, effect.clone());
         let declared = ty.map(|t| self.resolve_type(m, t));
         let tir = match declared {
             Some(None) => None,
@@ -1180,6 +1226,7 @@ pub(super) fn check_package(loaded: &Loaded) -> (Checked, Vec<Diagnostic>) {
     for m in 0..loaded.sources.len() {
         c.imports(m);
         c.collect(m);
+        c.expand(m);
         c.resolve(m);
         c.mods[m].declared = true;
     }
@@ -1216,6 +1263,7 @@ pub(super) fn check_package(loaded: &Loaded) -> (Checked, Vec<Diagnostic>) {
             examples,
         });
     }
+    let expanded = c.write_caches();
     let Checker {
         symbols,
         diags,
@@ -1230,6 +1278,7 @@ pub(super) fn check_package(loaded: &Loaded) -> (Checked, Vec<Diagnostic>) {
             requested: loaded.requested.clone(),
             resource_calls,
             skip: tainted,
+            expanded,
         },
         diags,
     )

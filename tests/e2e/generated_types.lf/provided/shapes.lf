@@ -1,0 +1,10 @@
+type OrderRow
+  id: Int
+  name: Text
+  active: Bool
+end type OrderRow
+
+type Point
+  x: Int
+  y: Int
+end type Point

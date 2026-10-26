@@ -266,6 +266,8 @@ pub enum TirKind {
     FsRead(Box<TirExpr>),
     /// Comptime only; never in the runtime residue.
     CatalogColumns(Box<TirExpr>),
+    /// A folded `Type` (a generated record). Comptime only; never in the runtime residue.
+    TypeValue(crate::provider::Record),
     /// Rejected by `L072` before lowering.
     ResourceCall(SymbolId, Vec<TirExpr>),
     Log(Box<TirExpr>),
@@ -321,8 +323,13 @@ pub mod prelude {
     /// `Process`'s fields follow at `PROCESS_FIELD + i`, then `Thread`'s `id` and `name`.
     pub const PROCESS_FIELD: SymbolId = 14;
     pub const THREAD_FIELD: SymbolId = 21;
+    pub const COLUMN: SymbolId = 23;
+    /// `Column`'s `name` and `sql_type`.
+    pub const COLUMN_FIELD: SymbolId = 24;
+    /// Comptime only: its result is a `Type`.
+    pub const RECORD_FROM_COLUMNS: SymbolId = 26;
     /// The first id after the prelude.
-    pub const END: SymbolId = 23;
+    pub const END: SymbolId = 27;
 
     /// `Process` fields in prelude order.
     pub const PROCESS_FIELDS: [&str; 7] = [
@@ -421,6 +428,19 @@ pub mod prelude {
             },
         ];
         symbols.extend(fields);
+        symbols.extend([
+            symbol(
+                "Column",
+                SymbolKind::Type(TypeKind::Product),
+                Type::Nominal(COLUMN),
+            ),
+            field("name", COLUMN, 0, Type::Text),
+            field("sql_type", COLUMN, 1, Type::Text),
+            Symbol {
+                ty: Type::TypeAst,
+                ..function("record_from_columns")
+            },
+        ]);
         symbols
     }
 
@@ -439,6 +459,10 @@ pub mod prelude {
             );
             assert_eq!(name(PROCESS_FIELD + 6), "parallelism");
             assert_eq!([THREAD_FIELD, THREAD_FIELD + 1].map(name), ["id", "name"]);
+            assert_eq!(
+                [COLUMN, COLUMN_FIELD + 1, RECORD_FROM_COLUMNS].map(name),
+                ["Column", "sql_type", "record_from_columns"]
+            );
         }
     }
 }

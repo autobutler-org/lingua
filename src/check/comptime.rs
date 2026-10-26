@@ -5,7 +5,7 @@
 use super::body::FnCx;
 use super::decl::{Checker, Item, find_word};
 use crate::ast::{Effect, Example, Expect, Expr, Span, TypeExpr};
-use crate::eval::{self, File, Unfolded, Value};
+use crate::eval::{self, File, Root, Unfolded, Value};
 use crate::lex::Location;
 use crate::tir::{
     ExampleKind, SymbolId, SymbolKind, TirExample, TirExpect, TirExpr, TirKind, Type, prelude,
@@ -47,6 +47,12 @@ impl Checker<'_> {
     /// of `root`'s type. `what` names the root for `L058`. `None` after a diagnostic, or
     /// quietly when it calls a function whose check already failed.
     pub(super) fn fold(&mut self, m: usize, root: &TirExpr, what: &str) -> Option<TirExpr> {
+        let v = self.eval_root(m, Root::Expr(root), what)?;
+        Some(self.reify(&v, &root.ty, root.span))
+    }
+
+    /// Evaluates the comptime root `root` in module `m` to a value; see [`Self::fold`].
+    pub(super) fn eval_root(&mut self, m: usize, root: Root<'_>, what: &str) -> Option<Value> {
         // ponytail: a call of an unchecked function stops the run, checks that body, and
         // folds again from the start, so a root re-runs once per function it reaches; walk the
         // root's calls up front if a root that reaches many functions gets slow.
@@ -68,7 +74,6 @@ impl Checker<'_> {
                     .map(|(id, (m, f))| (*id, (*m, f)))
                     .collect();
                 eval::fold(&self.symbols, files, functions, m, root, what)
-                    .map(|v| self.reify(&v, &root.ty, root.span))
             };
             match folded {
                 Ok(e) => return Some(e),
@@ -91,6 +96,7 @@ impl Checker<'_> {
     fn reify(&self, v: &Value, ty: &Type, span: Span) -> TirExpr {
         let kind = match v {
             Value::Int(n) => TirKind::Int(*n),
+            Value::Type(record) => TirKind::TypeValue(record.as_ref().clone()),
             Value::Text(t) => TirKind::Text(t.to_string()),
             Value::Bool(b) => TirKind::Bool(*b),
             Value::Nothing => TirKind::Nothing,

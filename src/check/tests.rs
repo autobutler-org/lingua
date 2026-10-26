@@ -584,8 +584,11 @@ fn l025_const_effects() {
         "fn now() -> Int\n  reads clock\n  example \"e\"\n    clock: [1]\n    -> 1\n  end\n\n  return clock.now()\nend fn now\n\nconst t = now()\n",
         "L025",
     );
-    // A provider effect is a per-declaration \"not yet\" until the provider cache lands
-    rejects("const x\n  reads net\n  = 1\n", super::NOT_YET);
+    // `http_get` is a per-declaration "not yet": lingua has no HTTPS client
+    rejects(
+        "const x: Text\n  reads net\n  = http_get(\"https://example.com\") or fail \"down\"\n",
+        super::NOT_YET,
+    );
 }
 
 #[test]
@@ -649,8 +652,7 @@ fn package_example_rules() {
 
 #[test]
 fn comptime_constructs_still_not_supported_are_per_declaration() {
-    let generative =
-        "type Customers\n  pure\n  comptime\n    return 1\n  end\nend type Customers\n\n";
+    let generative = "type Customers\n  reads net\n  comptime\n    const body = http_get(\"https://x\") or fail \"down\"\n    return record_from_columns([])\n  end\nend type Customers\n\n";
     // The rest of the module still checks and runs its examples
     let wrong =
         "fn one() -> Int\n  pure\n  example \"e\"\n    -> 2\n  end\n\n  return 1\nend fn one\n";
@@ -660,7 +662,7 @@ fn comptime_constructs_still_not_supported_are_per_declaration() {
     );
     // ...but not the examples of a function that leans on an unsupported declaration, or of
     // one that calls such a function
-    let url = "const url: Text\n  reads net\n  = \"x\"\n\n";
+    let url = "const url: Text\n  reads net\n  = http_get(\"https://x\") or fail \"down\"\n\n";
     let leans = "fn two() -> Int\n  pure\n  example \"e\"\n    -> 3\n  end\n\n  log(url)\n  return 2\nend fn two\n\nfn three() -> Int\n  pure\n  example \"e\"\n    -> 0\n  end\n\n  return two() + 1\nend fn three\n\n";
     assert_eq!(
         codes(&format!("{url}{leans}{wrong}")),
@@ -745,4 +747,237 @@ fn out_of_order_arguments_are_bound_in_source_order() {
         args.iter().map(local).collect::<Vec<_>>(),
         [binds[1].0, binds[0].0]
     );
+}
+
+// ---- generative types, package `comptime` blocks, and the provider cache
+
+const COLUMNS: &str = "[Column(name: \"id\", sql_type: \"integer\"), Column(name: \"name\", sql_type: \"text\"), Column(name: \"active\", sql_type: \"boolean\")]";
+
+// A generative `type Row` with effect `effect` and body `body` (indented by the caller)
+fn generative(effect: &str, body: &str) -> String {
+    format!("type Row\n  {effect}\n  comptime\n{body}\n  end\nend type Row\n\n")
+}
+
+fn cache_of(root: &std::path::Path, key: &str) -> Option<String> {
+    std::fs::read_to_string(root.join("provided").join(format!("{key}.lf"))).ok()
+}
+
+fn check_with(root: &std::path::Path, cache: super::Cache) -> Vec<&'static str> {
+    let options = Options {
+        cache,
+        ..Options::default()
+    };
+    diagnostics(check(&[root.to_path_buf()], &options).map(|_| ()))
+        .iter()
+        .map(|d| d.code)
+        .collect()
+}
+
+#[test]
+fn a_generative_type_is_an_ordinary_product_to_the_rest_of_the_module() {
+    let row = generative(
+        "pure",
+        &format!("    return record_from_columns({COLUMNS})"),
+    );
+    let uses = "fn label(r: Row) -> Text\n  pure\n  example \"e\"\n    r: Row(id: 1, name: \"a\", active: true)\n    -> \"a\"\n  end\n\n  return r.name\nend fn label\n";
+    let root = package(&[("m.lf", &format!("{row}{uses}"))]);
+    assert_eq!(check_with(&root, super::Cache::Default), Vec::<&str>::new());
+    assert_eq!(
+        cache_of(&root, "m").as_deref(),
+        Some("type Row\n  id: Int\n  name: Text\n  active: Bool\nend type Row\n")
+    );
+    // The `comptime` line is optional, and the body may call ordinary functions and consts
+    accepts(&format!(
+        "{DOUBLE}const k = double(2)\n\ntype P\n  pure\n  return record_from_columns([Column(name: \"n{{k}}\", sql_type: \"int4\")])\nend\nend type P\n"
+    ));
+    // A field that does not exist is the usual diagnostic at the use
+    rejects(
+        &format!("{row}const r = Row(id: 1, nom: \"a\", active: true)\n"),
+        "L028",
+    );
+}
+
+#[test]
+fn record_from_columns_failures_abort_the_check_with_l058() {
+    for (columns, message) in [
+        ("[]", "no columns"),
+        (
+            "[Column(name: \"x\", sql_type: \"json\")]",
+            "unknown sql type",
+        ),
+        (
+            "[Column(name: \"end\", sql_type: \"text\")]",
+            "bad column name",
+        ),
+        (
+            "[Column(name: \"x\", sql_type: \"text\"), Column(name: \"x\", sql_type: \"text\")]",
+            "duplicate column",
+        ),
+    ] {
+        let source = generative(
+            "pure",
+            &format!("    return record_from_columns({columns})"),
+        );
+        let root = package(&[("m.lf", &source)]);
+        let Err(Error::Diagnostics(d)) = check(std::slice::from_ref(&root), &Options::default())
+        else {
+            panic!("{columns} checked clean")
+        };
+        assert_eq!(
+            d.iter().map(|d| d.code).collect::<Vec<_>>(),
+            ["L058"],
+            "{columns}"
+        );
+        assert!(
+            d[0].summary.contains(&format!("\"{message}\"")),
+            "{}",
+            d[0].summary
+        );
+        assert_eq!(cache_of(&root, "m"), None);
+    }
+    rejects(&generative("pure", "    fail \"no schema\""), "L058");
+}
+
+#[test]
+fn generative_body_rules() {
+    // Falling off the body, or returning something other than a `Type`
+    rejects(&generative("pure", "    const x = 1"), "L012");
+    rejects(&generative("pure", "    return 1"), "L020");
+    // `let` and `var` are `L062`; `provide` is `L067` here
+    rejects(
+        &generative(
+            "pure",
+            &format!("    let c = {COLUMNS}\n    return record_from_columns(c)"),
+        ),
+        "L062",
+    );
+    rejects(
+        &generative(
+            "pure",
+            &format!(
+                "    provide X = record_from_columns({COLUMNS})\n    return record_from_columns({COLUMNS})"
+            ),
+        ),
+        "L067",
+    );
+    // The effect clause: no function effect, no user resource
+    for effect in ["reads clock", "reads db", "writes db"] {
+        rejects(
+            &generative(
+                effect,
+                &format!("    return record_from_columns({COLUMNS})"),
+            ),
+            "L025",
+        );
+    }
+    // `Type` is comptime only: a runtime call is `L063`, and so is a runtime use of a const
+    // holding one, which a comptime context may use
+    rejects(
+        &main(&format!("  let t = record_from_columns({COLUMNS})")),
+        "L063",
+    );
+    let t = format!("const t = record_from_columns({COLUMNS})\n\n");
+    rejects(&with(&t, "  let u = t"), "L063");
+    accepts(&format!(
+        "{t}{}",
+        generative("pure", "    const u = t\n    return u")
+    ));
+}
+
+#[test]
+fn package_comptime_blocks_provide_types() {
+    let block = format!(
+        "comptime\n  pure\n  provide A = record_from_columns({COLUMNS})\n  provide B = record_from_columns([Column(name: \"b\", sql_type: \"bool\")])\nend\n\n"
+    );
+    let uses = "const b = B(b: true)\n";
+    let root = package(&[("m.lf", &format!("{block}{uses}"))]);
+    assert_eq!(check_with(&root, super::Cache::Default), Vec::<&str>::new());
+    assert_eq!(
+        cache_of(&root, "m").as_deref(),
+        Some(
+            "type A\n  id: Int\n  name: Text\n  active: Bool\nend type A\n\ntype B\n  b: Bool\nend type B\n"
+        )
+    );
+    // The effect is optional; `return` is `L012`; a `provide` nested in a statement is `L067`
+    accepts(&format!(
+        "comptime\n  provide A = record_from_columns({COLUMNS})\nend\n"
+    ));
+    rejects(
+        &format!("comptime\n  return record_from_columns({COLUMNS})\nend\n"),
+        "L012",
+    );
+    rejects(
+        &format!(
+            "comptime\n  if true\n    provide A = record_from_columns({COLUMNS})\n  end\nend\n"
+        ),
+        "L067",
+    );
+    rejects("comptime\n  reads clock\n  log(\"x\")\nend\n", "L025");
+    rejects("comptime\n  provide A = 1\nend\n", "L020");
+    rejects("comptime\n  assert 1 == 2, \"broken\"\nend\n", "L058");
+    // `provide` anywhere else is `L067`
+    rejects(
+        &main(&format!("  provide A = record_from_columns({COLUMNS})")),
+        "L067",
+    );
+}
+
+#[test]
+fn reads_fs_is_legal_and_fs_read_is_not_yet() {
+    // `reads fs` passes the effect rules; nothing performs it yet
+    let row = generative(
+        "reads fs",
+        "    const text = fs.read(\"cols.txt\") or fail \"no columns file\"\n    return record_from_columns([Column(name: trim(text), sql_type: \"text\")])",
+    );
+    rejects(&row, super::NOT_YET);
+    rejects(
+        "const t: Text\n  reads fs\n  = fs.read(\"x\") or fail \"missing\"\n",
+        super::NOT_YET,
+    );
+    // `fs.read` needs `reads fs`: not in a pure const, not in a function
+    rejects("const t = fs.read(\"x\")\n", "L025");
+    rejects(
+        "fn f() -> Int\n  reads fs\n  example \"e\"\n    -> 1\n  end\n\n  return 1\nend fn f\n",
+        "L025",
+    );
+}
+
+#[test]
+fn the_cache_policy() {
+    let row = generative(
+        "pure",
+        &format!("    return record_from_columns({COLUMNS})"),
+    );
+    let expanded = "type Row\n  id: Int\n  name: Text\n  active: Bool\nend type Row\n";
+    let edited = "type Row\n  other: Text\nend type Row\n";
+    let root = package(&[("m.lf", &row)]);
+    // Offline with no cache: one `L071` per missing declaration, even a pure one, and
+    // nothing written
+    assert_eq!(check_with(&root, super::Cache::Offline), ["L071"]);
+    assert_eq!(cache_of(&root, "m"), None);
+    // The default writes it; later checks reuse it without running the body
+    assert_eq!(check_with(&root, super::Cache::Default), Vec::<&str>::new());
+    assert_eq!(cache_of(&root, "m").as_deref(), Some(expanded));
+    std::fs::write(root.join("provided/m.lf"), edited).unwrap();
+    for policy in [super::Cache::Default, super::Cache::Offline] {
+        assert_eq!(check_with(&root, policy), Vec::<&str>::new());
+        assert_eq!(cache_of(&root, "m").as_deref(), Some(edited));
+    }
+    // ...and what it reuses is what the module sees
+    let uses = format!("{row}const r = Row(other: \"x\")\n");
+    let reuse = package(&[("m.lf", &uses)]);
+    std::fs::create_dir_all(reuse.join("provided")).unwrap();
+    std::fs::write(reuse.join("provided/m.lf"), edited).unwrap();
+    assert_eq!(
+        check_with(&reuse, super::Cache::Default),
+        Vec::<&str>::new()
+    );
+    // Refresh reruns it and replaces the entry
+    assert_eq!(check_with(&root, super::Cache::Refresh), Vec::<&str>::new());
+    assert_eq!(cache_of(&root, "m").as_deref(), Some(expanded));
+    // A failed provider leaves the cache file alone
+    let failing = generative("pure", "    return record_from_columns([])");
+    std::fs::write(root.join("m.lf"), failing).unwrap();
+    assert_eq!(check_with(&root, super::Cache::Refresh), ["L058"]);
+    assert_eq!(cache_of(&root, "m").as_deref(), Some(expanded));
 }

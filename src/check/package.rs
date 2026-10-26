@@ -9,11 +9,24 @@ use crate::ast::{Module, Span};
 use crate::lex::Location;
 use crate::parse::parse_source;
 
-/// Flags shared by `check` and `build`.
+/// Flags shared by `check`, `expand`, and `build`.
 #[derive(Debug, Default, Clone)]
 pub struct Options {
     /// `--source-root`: overrides the upward `lingua.toml` walk.
     pub source_root: Option<PathBuf>,
+    pub cache: Cache,
+}
+
+/// The provider cache policy (docs/lingua1.md, Compilation pipeline, Provider cache flags).
+#[derive(Debug, Default, Clone, Copy, PartialEq)]
+pub enum Cache {
+    /// Reuse a declaration already in `provided/<module>.lf`; otherwise run the effect.
+    #[default]
+    Default,
+    /// `--refresh`: run every effect again and replace the cache.
+    Refresh,
+    /// `--offline`: run no provider effect; a missing declaration is `L071`.
+    Offline,
 }
 
 /// One module file.
@@ -30,6 +43,9 @@ pub struct Source {
 /// Every module in the request and its import closure, imports before importers.
 #[derive(Debug)]
 pub struct Loaded {
+    /// The source root, canonical.
+    pub root: PathBuf,
+    pub cache: Cache,
     pub sources: Vec<Source>,
     pub requested: Vec<String>,
     pub diagnostics: Vec<Diagnostic>,
@@ -53,6 +69,7 @@ fn whole_line(line: usize, text: &str) -> Span {
 
 /// Whether `key` is one `ident` spelling: a letter, or `_` and at least one more character,
 /// then letters, digits, and `_`.
+#[must_use]
 pub fn is_module_key(key: &str) -> bool {
     let mut chars = key.chars();
     let first_ok = match chars.next() {
@@ -357,6 +374,8 @@ pub fn load(paths: &[PathBuf], options: &Options) -> Result<Loaded, Error> {
     // Imports before importers: the depth-first postorder
     sources.sort_by_key(|s| order.iter().position(|k| *k == s.key));
     Ok(Loaded {
+        root,
+        cache: options.cache,
         sources,
         requested,
         diagnostics,
