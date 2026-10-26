@@ -34,8 +34,9 @@ failing one is a diagnostic. `const`, `comptime`, and comptime bounds fold on th
 interpreter. A generative type (`type Name` whose body starts with an effect) and each
 `provide` in a package `comptime` block expand to an ordinary `type` declaration, cached in
 `provided/<module>.lf` under the source root and reused on later runs; `record_from_columns`
-builds a record type from a `List<Column>`. `fs.read`, `http_get`, `catalog.columns`,
-`schema`, `types_from_openapi`, and macros are reported as not supported yet.";
+builds a record type from a `List<Column>`. `fs.read` reads under the source root in a
+`reads fs` provider or const. `http_get`, `catalog.columns`, `schema`, `types_from_openapi`,
+and macros are reported as not supported yet.";
 
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();

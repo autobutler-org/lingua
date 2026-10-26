@@ -73,7 +73,15 @@ impl Checker<'_> {
                     .filter(|(id, _)| !self.tainted.contains(id))
                     .map(|(id, (m, f))| (*id, (*m, f)))
                     .collect();
-                eval::fold(&self.symbols, files, functions, m, root, what)
+                eval::fold(
+                    &self.symbols,
+                    files,
+                    functions,
+                    &self.loaded.root,
+                    m,
+                    root,
+                    what,
+                )
             };
             match folded {
                 Ok(e) => return Some(e),

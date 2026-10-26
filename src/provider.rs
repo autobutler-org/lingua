@@ -1,12 +1,12 @@
 //! Type providers (docs/lingua1.md, Type providers, Prelude): the `Type` values a generative
 //! body or a `provide` builds, their expansion to real AST, the text of that AST, the
-//! `{source_root}/provided/<module>.lf` cache.
+//! `{source_root}/provided/<module>.lf` cache, and `fs.read`.
 //!
 //! The checker owns the policy (`--offline`, `--refresh`); this module only builds, prints,
 //! reads, and writes.
 
 use std::collections::HashMap;
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 
 use crate::ast::{Decl, Field, Span, TypeExpr};
 
@@ -146,6 +146,52 @@ pub fn write_cache(root: &Path, key: &str, text: &str) -> std::io::Result<()> {
     std::fs::write(path, text)
 }
 
+/// Why `fs.read` has no text.
+#[derive(Debug, PartialEq)]
+pub enum FsFail {
+    NotFound,
+    EscapesRoot,
+    BadEncoding,
+    /// Over 1 MiB: `L047`, not a `Result`.
+    TooBig,
+}
+
+const FS_LIMIT: u64 = 1 << 20;
+
+/// `fs.read(path)`: `path` resolved against `root` must stay under it after `.` and `..`,
+/// and after following symlinks.
+///
+/// # Errors
+/// See [`FsFail`].
+pub fn fs_read(root: &Path, path: &str) -> Result<String, FsFail> {
+    let mut depth = 0usize;
+    for part in Path::new(path).components() {
+        match part {
+            Component::Normal(_) => depth += 1,
+            Component::CurDir => {}
+            Component::ParentDir => depth = depth.checked_sub(1).ok_or(FsFail::EscapesRoot)?,
+            Component::RootDir | Component::Prefix(_) => return Err(FsFail::EscapesRoot),
+        }
+    }
+    let full = root.join(path);
+    let Ok(real) = std::fs::canonicalize(&full) else {
+        return Err(FsFail::NotFound);
+    };
+    let real_root = std::fs::canonicalize(root).map_err(|_| FsFail::NotFound)?;
+    if !real.starts_with(&real_root) {
+        return Err(FsFail::EscapesRoot);
+    }
+    let meta = std::fs::metadata(&real).map_err(|_| FsFail::NotFound)?;
+    if !meta.is_file() {
+        return Err(FsFail::NotFound);
+    }
+    if meta.len() > FS_LIMIT {
+        return Err(FsFail::TooBig);
+    }
+    let bytes = std::fs::read(&real).map_err(|_| FsFail::NotFound)?;
+    String::from_utf8(bytes).map_err(|_| FsFail::BadEncoding)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -202,6 +248,30 @@ mod tests {
             record_from_columns(&cols(&[("a", "text"), ("a", "text")])),
             Err("duplicate column")
         );
+    }
+
+    #[test]
+    fn fs_read_stays_under_the_root() {
+        let root = std::env::temp_dir().join(format!("lingua-fs-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(root.join("sub")).unwrap();
+        std::fs::write(root.join("sub/a.txt"), "hi").unwrap();
+        std::fs::write(root.join("bad.txt"), [0xff, 0xfe]).unwrap();
+        assert_eq!(fs_read(&root, "sub/a.txt").as_deref(), Ok("hi"));
+        assert_eq!(fs_read(&root, "./sub/../sub/a.txt").as_deref(), Ok("hi"));
+        assert_eq!(fs_read(&root, "nope.txt"), Err(FsFail::NotFound));
+        assert_eq!(fs_read(&root, "sub"), Err(FsFail::NotFound));
+        assert_eq!(fs_read(&root, "../x"), Err(FsFail::EscapesRoot));
+        assert_eq!(fs_read(&root, "sub/../../x"), Err(FsFail::EscapesRoot));
+        assert_eq!(fs_read(&root, "/etc/hosts"), Err(FsFail::EscapesRoot));
+        assert_eq!(fs_read(&root, "bad.txt"), Err(FsFail::BadEncoding));
+        #[cfg(unix)]
+        {
+            std::os::unix::fs::symlink("/etc", root.join("out")).unwrap();
+            assert_eq!(fs_read(&root, "out/hosts"), Err(FsFail::EscapesRoot));
+        }
+        std::fs::write(root.join("big.txt"), vec![b'a'; (1 << 20) + 1]).unwrap();
+        assert_eq!(fs_read(&root, "big.txt"), Err(FsFail::TooBig));
     }
 
     #[test]

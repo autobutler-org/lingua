@@ -1418,9 +1418,13 @@ impl Checker<'_> {
                 }
                 Some(tx(Type::Int, *span, TirKind::ClockNow))
             }
-            Expr::FsRead(span, _) if cx.comptime && cx.effect == Effect::ReadsFs => {
-                self.not_yet(m, *span, "`fs.read` (it lands with the fs library)");
-                None
+            Expr::FsRead(span, path) if cx.comptime && cx.effect == Effect::ReadsFs => {
+                let path = self.check(cx, path, &Type::Text)?;
+                let ty = Type::Result(
+                    Box::new(Type::Text),
+                    Box::new(Type::Nominal(prelude::FS_ERROR)),
+                );
+                Some(tx(ty, *span, TirKind::FsRead(bx(path))))
             }
             Expr::CatalogColumns(span, _) if cx.comptime && cx.effect == Effect::ReadsCatalog => {
                 self.not_yet(

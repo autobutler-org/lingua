@@ -76,6 +76,8 @@ enum Stop {
     },
     Heap(At),
     Depth(At),
+    /// `L047` with its summary.
+    Limit(At, String),
     /// A call of a function this run was not given: unchecked, or skipped because its check
     /// had a diagnostic.
     Missing(SymbolId),
@@ -102,6 +104,8 @@ pub(crate) type Functions<'a> = HashMap<SymbolId, (usize, &'a TirFn)>;
 
 struct Machine<'a> {
     symbols: &'a [Symbol],
+    /// The source root `fs.read` resolves against; `None` outside a comptime root.
+    root: Option<&'a std::path::Path>,
     files: Vec<File<'a>>,
     functions: Functions<'a>,
     fuel: u64,
@@ -141,6 +145,7 @@ impl<'a> Machine<'a> {
     fn with(symbols: &'a [Symbol], files: Vec<File<'a>>, functions: Functions<'a>) -> Self {
         Machine {
             symbols,
+            root: None,
             files,
             functions,
             fuel: FUEL,
@@ -380,11 +385,40 @@ impl<'a> Machine<'a> {
                 }
                 self.eval(body, env)
             }
+            TirKind::FsRead(path) => {
+                let path = self.texts(path, env)?;
+                self.fs_read(e.span, &path)
+            }
             TirKind::TypeValue(record) => Ok(Value::Type(Rc::new(record.clone()))),
-            TirKind::FsRead(_) | TirKind::CatalogColumns(_) => {
+            TirKind::CatalogColumns(_) => {
                 Err(internal("a comptime-only operation reached an example"))
             }
         }
+    }
+
+    // `fs.read(path)` as the prelude's `Result<Text, FsError>`
+    fn fs_read(&mut self, span: Span, path: &str) -> Eval<Value> {
+        let root = self
+            .root
+            .ok_or_else(|| internal("`fs.read` outside a comptime root"))?;
+        let error = match crate::provider::fs_read(root, path) {
+            Ok(text) => {
+                let text = self.text(span, text)?;
+                return self.variant(span, prelude::OK, Some(text));
+            }
+            Err(crate::provider::FsFail::TooBig) => {
+                return Err(Stop::Limit(
+                    self.at(span),
+                    format!("`fs.read(\"{path}\")`: the file is over the 1 MiB limit"),
+                ));
+            }
+            Err(crate::provider::FsFail::NotFound) => prelude::NOT_FOUND,
+            Err(crate::provider::FsFail::EscapesRoot) => prelude::ESCAPES_ROOT,
+            Err(crate::provider::FsFail::BadEncoding) => prelude::BAD_ENCODING,
+        };
+        let path = self.text(span, path.to_owned())?;
+        let error = self.variant(span, error, Some(path))?;
+        self.variant(span, prelude::ERR, Some(error))
     }
 
     // `record_from_columns(columns)`; a bad list is the prelude's `fail`
@@ -936,6 +970,7 @@ impl Machine<'_> {
                 at,
                 format!("example \"{label}\" exceeded the call depth limit of {DEPTH}"),
             ),
+            Stop::Limit(at, summary) => self.diagnostic("L047", at, summary),
             Stop::Exception { .. } | Stop::Return(_) | Stop::Missing(_) => self.diagnostic(
                 crate::check::NOT_YET,
                 arrow,
@@ -1001,7 +1036,7 @@ pub(crate) enum Root<'t> {
 
 /// Evaluates the comptime root `root` in module `m` with fuel `100_000`: a `const` initializer,
 /// a bound, a `comptime` expression, or a provider body, which `what` names for `L058`.
-/// Call it from [`on_big_stack`].
+/// `fs.read` resolves against `source_root`. Call it from [`on_big_stack`].
 ///
 /// # Errors
 /// A missing function, or the root's fault (`L040`, `L042`, `L076`, `L046`), exception
@@ -1010,11 +1045,13 @@ pub(crate) fn fold(
     symbols: &[Symbol],
     files: Vec<File<'_>>,
     functions: Functions<'_>,
+    source_root: &std::path::Path,
     m: usize,
     root: Root<'_>,
     what: &str,
 ) -> Result<Value, Unfolded> {
     let mut machine = Machine::with(symbols, files, functions);
+    machine.root = Some(source_root);
     machine.reset(m, FUEL);
     let (ran, span) = match root {
         Root::Expr(e) => (machine.eval(e, &mut Env::new()), e.span),
