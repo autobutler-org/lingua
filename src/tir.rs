@@ -328,8 +328,12 @@ pub mod prelude {
     pub const COLUMN_FIELD: SymbolId = 24;
     /// Comptime only: its result is a `Type`.
     pub const RECORD_FROM_COLUMNS: SymbolId = 26;
+    pub const FS_ERROR: SymbolId = 27;
+    pub const NOT_FOUND: SymbolId = 28;
+    pub const ESCAPES_ROOT: SymbolId = 29;
+    pub const BAD_ENCODING: SymbolId = 30;
     /// The first id after the prelude.
-    pub const END: SymbolId = 27;
+    pub const END: SymbolId = 31;
 
     /// `Process` fields in prelude order.
     pub const PROCESS_FIELDS: [&str; 7] = [
@@ -441,6 +445,16 @@ pub mod prelude {
                 ..function("record_from_columns")
             },
         ]);
+        symbols.extend([
+            symbol(
+                "FsError",
+                SymbolKind::Type(TypeKind::Sum),
+                Type::Nominal(FS_ERROR),
+            ),
+            variant("NotFound", FS_ERROR, 0, Some(Type::Text)),
+            variant("EscapesRoot", FS_ERROR, 1, Some(Type::Text)),
+            variant("BadEncoding", FS_ERROR, 2, Some(Type::Text)),
+        ]);
         symbols
     }
 
@@ -462,6 +476,10 @@ pub mod prelude {
             assert_eq!(
                 [COLUMN, COLUMN_FIELD + 1, RECORD_FROM_COLUMNS].map(name),
                 ["Column", "sql_type", "record_from_columns"]
+            );
+            assert_eq!(
+                [FS_ERROR, BAD_ENCODING].map(name),
+                ["FsError", "BadEncoding"]
             );
         }
     }

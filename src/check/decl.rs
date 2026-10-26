@@ -164,6 +164,10 @@ fn prelude_names() -> Vec<(&'static str, Binding)> {
             .filter(|n| !matches!(**n, "quote" | "unquote"))
             .map(|n| {
                 let binding = match *n {
+                    "FsError" => Binding::Type(prelude::FS_ERROR),
+                    "NotFound" => Binding::Variant(prelude::NOT_FOUND),
+                    "EscapesRoot" => Binding::Variant(prelude::ESCAPES_ROOT),
+                    "BadEncoding" => Binding::Variant(prelude::BAD_ENCODING),
                     "Column" => Binding::Type(prelude::COLUMN),
                     "record_from_columns" => Binding::PreludeFn(prelude::RECORD_FROM_COLUMNS),
                     _ => Binding::Comptime,
@@ -260,6 +264,14 @@ impl<'a> Checker<'a> {
         variants.insert(
             prelude::BOUNDS_ERROR,
             vec![prelude::OUT_OF_RANGE, prelude::NOT_AN_INTEGER],
+        );
+        variants.insert(
+            prelude::FS_ERROR,
+            vec![
+                prelude::NOT_FOUND,
+                prelude::ESCAPES_ROOT,
+                prelude::BAD_ENCODING,
+            ],
         );
         Checker {
             loaded,

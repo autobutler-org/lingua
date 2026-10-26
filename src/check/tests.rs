@@ -923,17 +923,21 @@ fn package_comptime_blocks_provide_types() {
 }
 
 #[test]
-fn reads_fs_is_legal_and_fs_read_is_not_yet() {
-    // `reads fs` passes the effect rules; nothing performs it yet
+fn reads_fs_reads_under_the_source_root() {
     let row = generative(
         "reads fs",
         "    const text = fs.read(\"cols.txt\") or fail \"no columns file\"\n    return record_from_columns([Column(name: trim(text), sql_type: \"text\")])",
     );
-    rejects(&row, super::NOT_YET);
-    rejects(
-        "const t: Text\n  reads fs\n  = fs.read(\"x\") or fail \"missing\"\n",
-        super::NOT_YET,
+    let root = package(&[("m.lf", &row), ("cols.txt", "label\n")]);
+    assert_eq!(check_with(&root, super::Cache::Default), Vec::<&str>::new());
+    assert_eq!(
+        cache_of(&root, "m").as_deref(),
+        Some("type Row\n  label: Text\nend type Row\n")
     );
+    // A file-level const may read too; its errors are the prelude's `FsError`
+    let consts = "const text: Text\n  reads fs\n  = fs.read(\"cols.txt\") or fail \"missing\"\n\nconst missing: Bool\n  reads fs\n  = match fs.read(\"nope.txt\")\n    Err(NotFound(\"nope.txt\")) -> true\n    Ok(_) -> false\n    Err(_) -> false\n  end\n\nconst escapes: Bool\n  reads fs\n  = match fs.read(\"../cols.txt\")\n    Err(EscapesRoot(_)) -> true\n    Ok(_) -> false\n    Err(_) -> false\n  end\n\nexample \"text\"\n  -> text == \"label\\n\"\nend\n\nexample \"missing\"\n  -> missing\nend\n\nexample \"escapes\"\n  -> escapes\nend\n";
+    let root = package(&[("c.lf", consts), ("cols.txt", "label\n")]);
+    assert_eq!(check_with(&root, super::Cache::Default), Vec::<&str>::new());
     // `fs.read` needs `reads fs`: not in a pure const, not in a function
     rejects("const t = fs.read(\"x\")\n", "L025");
     rejects(

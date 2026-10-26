@@ -10,9 +10,9 @@
 //!
 //! Out of scope until their PRs, and reported per declaration as
 //! `error: ... not supported yet` rather than guessed at: `http_get`, `catalog.columns`,
-//! `fs.read`, `schema`, `types_from_openapi`, and `quote` / `unquote`. Such a diagnostic does
-//! not stop the module's examples, only those of functions whose check had a diagnostic or met
-//! the unsupported declaration, and of examples that call them.
+//! `schema`, `types_from_openapi`, and `quote` / `unquote`. Such a diagnostic does not stop the
+//! module's examples, only those of functions whose check had a diagnostic or met the
+//! unsupported declaration, and of examples that call them.
 
 mod body;
 mod catalog;
