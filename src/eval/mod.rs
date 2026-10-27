@@ -49,6 +49,19 @@ pub(crate) enum Value {
     Variant(SymbolId, Option<Rc<Value>>),
     /// A comptime `Type`.
     Type(Rc<crate::provider::Generated>),
+    /// A comptime `Expr`: a quoted tree, `unquote` already applied.
+    Expr(Ast),
+}
+
+/// A quoted tree. Equality is structural over the tree as source, so spans and layout do
+/// not count (lingua1.md, Typed IR: `Expr` equality is not the user `==`).
+#[derive(Debug, Clone)]
+pub(crate) struct Ast(pub Rc<crate::ast::QuoteBody>);
+
+impl PartialEq for Ast {
+    fn eq(&self, other: &Self) -> bool {
+        crate::ast::print::quote_body(&self.0) == crate::ast::print::quote_body(&other.0)
+    }
 }
 
 /// Where a node is: a module index and a span in its source.
@@ -76,6 +89,8 @@ enum Stop {
     },
     Heap(At),
     Depth(At),
+    /// `L064`: a statement filled an `unquote` hole in expression position.
+    Splice(At),
     /// A call of a function this run was not given: unchecked, or skipped because its check
     /// had a diagnostic.
     Missing(SymbolId),
@@ -381,6 +396,23 @@ impl<'a> Machine<'a> {
                 self.eval(body, env)
             }
             TirKind::TypeValue(record) => Ok(Value::Type(Rc::new(record.clone()))),
+            TirKind::Quote(template, holes) => {
+                let values = holes
+                    .iter()
+                    .map(|h| match self.eval(h, env)? {
+                        Value::Expr(ast) => Ok(ast.0),
+                        v => Err(internal(&format!("`unquote` of {v:?}"))),
+                    })
+                    .collect::<Eval<Vec<_>>>()?;
+                let mut body = template.as_ref().clone();
+                if !values.is_empty() {
+                    let values: Vec<&crate::ast::QuoteBody> =
+                        values.iter().map(Rc::as_ref).collect();
+                    crate::ast::quote::fill(&mut body, &values)
+                        .map_err(|_| Stop::Splice(self.at(e.span)))?;
+                }
+                Ok(Value::Expr(Ast(Rc::new(body))))
+            }
             TirKind::FsRead(_) | TirKind::CatalogColumns(_) => {
                 Err(internal("a comptime-only operation reached an example"))
             }
@@ -677,6 +709,10 @@ impl<'a> Machine<'a> {
                     format!("type with {} variants", variants.len())
                 }
             },
+            Value::Expr(ast) => crate::ast::quote::clean(&format!(
+                "quote({})",
+                crate::ast::print::quote_body(&ast.0)
+            )),
         }
     }
 }
@@ -954,6 +990,11 @@ impl Machine<'_> {
                 "L047",
                 at,
                 format!("example \"{label}\" exceeded the call depth limit of {DEPTH}"),
+            ),
+            Stop::Splice(at) => self.diagnostic(
+                "L064",
+                at,
+                "the splice is not a node the grammar can parse: an `unquote` in expression position holds a statement".into(),
             ),
             Stop::Exception { .. } | Stop::Return(_) | Stop::Missing(_) => self.diagnostic(
                 crate::check::NOT_YET,

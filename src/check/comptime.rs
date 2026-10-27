@@ -1,6 +1,6 @@
 //! Comptime roots (docs/lingua1.md, Compile-time execution, Examples): folding a `const`
 //! initializer, a bound, or a `comptime` expression on `crate::eval`, the bodies those roots
-//! call, and package examples. The splice step is empty until macros land.
+//! call, and package examples. Splicing a macro call is `splice.rs`.
 
 use super::body::FnCx;
 use super::decl::{Checker, Item, find_word};
@@ -97,6 +97,7 @@ impl Checker<'_> {
         let kind = match v {
             Value::Int(n) => TirKind::Int(*n),
             Value::Type(generated) => TirKind::TypeValue(generated.as_ref().clone()),
+            Value::Expr(ast) => TirKind::Quote(Box::new(ast.0.as_ref().clone()), Vec::new()),
             Value::Text(t) => TirKind::Text(t.to_string()),
             Value::Bool(b) => TirKind::Bool(*b),
             Value::Nothing => TirKind::Nothing,

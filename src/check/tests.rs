@@ -1211,3 +1211,160 @@ fn the_builders_are_comptime_only() {
         "L021",
     );
 }
+
+// ---- macros: `quote`, `unquote`, and the splice
+
+fn corpus(name: &str) -> String {
+    std::fs::read_to_string(
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("tests/corpus")
+            .join(name),
+    )
+    .unwrap()
+}
+
+// `assert_nonzero` from the normative `assert.lf`: a statement macro
+fn nonzero() -> String {
+    let assert = corpus("assert.lf");
+    let end = assert.find("end fn assert_nonzero\n").unwrap();
+    format!("{}end fn assert_nonzero\n\n", &assert[..end])
+}
+
+// An expression macro
+const TWICE: &str = "fn twice(value: Expr) -> Expr\n  pure\n  example \"doubles\"\n    value: quote(2)\n    -> quote(2 + 2)\n  end\n\n  return quote(unquote(value) + unquote(value))\nend fn twice\n\n";
+
+#[test]
+fn assert_lf_checks_clean() {
+    assert_eq!(
+        codes_of(&[("assert.lf", &corpus("assert.lf"))]),
+        Vec::<&str>::new()
+    );
+}
+
+#[test]
+fn the_function_example_compares_trees() {
+    // A wrong expected tree fails the example
+    let wrong = corpus("assert.lf").replacen("assert 1 != 0", "assert 2 != 0", 1);
+    assert_eq!(codes_of(&[("assert.lf", &wrong)]), ["L043"]);
+    accepts(TWICE);
+    rejects(&TWICE.replace("-> quote(2 + 2)", "-> quote(2 + 3)"), "L043");
+}
+
+#[test]
+fn a_package_example_splices_its_comptime_call() {
+    let nonzero = nonzero();
+    accepts(&format!(
+        "{nonzero}example \"one\"\n  comptime assert_nonzero(1)\n  -> true\nend\n"
+    ));
+    // The marker is redundant in a comptime context
+    accepts(&format!(
+        "{nonzero}example \"one\"\n  assert_nonzero(1)\n  -> true\nend\n"
+    ));
+    rejects(
+        &format!(
+            "{nonzero}example \"one\"\n  comptime assert_nonzero(1)\n  -> exception \"nonzero\"\nend\n"
+        ),
+        "L059",
+    );
+}
+
+#[test]
+fn a_splice_runs_in_a_runtime_body() {
+    let nonzero = nonzero();
+    // The argument is the caller's AST: `n`, not its value
+    accepts(&format!(
+        "{nonzero}{TWICE}fn f(n: Int) -> Int\n  pure\n  example \"three\"\n    n: 3\n    -> 6\n  end\n  example \"zero\"\n    n: 0\n    -> exception \"nonzero\"\n  end\n\n  comptime assert_nonzero(n)\n  let d = comptime twice(n)\n  return d\nend fn f\n"
+    ));
+}
+
+#[test]
+fn l063_expr_and_type_are_comptime_only() {
+    let nonzero = nonzero();
+    // A runtime call without `comptime`
+    rejects(&with(&nonzero, "  assert_nonzero(1)"), "L063");
+    // `Expr` as a runtime type, and `quote` in a runtime body
+    rejects(
+        "fn f(e: Expr) -> Int\n  pure\n  example \"e\"\n    e: quote(1)\n    -> 1\n  end\n\n  return 1\nend fn f\n",
+        "L063",
+    );
+    rejects(&main("  let e = quote(1)"), "L063");
+    // A function that returns `Type` is a comptime context too
+    let mk = format!(
+        "fn mk() -> Type\n  pure\n  example \"e\"\n    -> record_from_columns({COLUMNS})\n  end\n\n  return record_from_columns({COLUMNS})\nend fn mk\n\n"
+    );
+    accepts(&format!("{mk}{}", generative("pure", "    return mk()")));
+    rejects(&with(&mk, "  let t = mk()"), "L063");
+}
+
+#[test]
+fn l062_let_in_a_macro_body() {
+    rejects(
+        "fn m() -> Expr\n  pure\n  example \"e\"\n    -> quote(1)\n  end\n\n  let x = quote(1)\n  return x\nend fn m\n",
+        "L062",
+    );
+}
+
+#[test]
+fn l064_a_statement_in_an_expression_slot() {
+    rejects(
+        "fn bad() -> Expr\n  pure\n  example \"e\"\n    -> quote(1)\n  end\n\n  const s = quote(\n    fail \"x\"\n  )\n  return quote(1 + unquote(s))\nend fn bad\n",
+        "L064",
+    );
+}
+
+#[test]
+fn l065_splice_kind_mismatch() {
+    let nonzero = nonzero();
+    rejects(
+        &with(&nonzero, "  let x = comptime assert_nonzero(1)"),
+        "L065",
+    );
+    rejects(&with(TWICE, "  comptime twice(1)"), "L065");
+}
+
+#[test]
+fn l066_unquote_outside_quote() {
+    rejects(
+        "fn m(value: Expr) -> Expr\n  pure\n  example \"e\"\n    value: quote(1)\n    -> quote(1)\n  end\n\n  return unquote(value)\nend fn m\n",
+        "L066",
+    );
+}
+
+#[test]
+fn splices_are_hygienic() {
+    // The quote's `t` is a fresh binder: it does not clash with, or capture, the caller's
+    // `t`, and two splices get two binders
+    let positive = "fn positive(value: Expr) -> Expr\n  pure\n  example \"loops\"\n    value: quote(1)\n    -> quote(\n      for t in 0 until 1\n        assert 1 > t, \"positive\"\n      end\n    )\n  end\n\n  return quote(\n    for t in 0 until 1\n      assert unquote(value) > t, \"positive\"\n    end\n  )\nend fn positive\n\n";
+    accepts(&format!(
+        "{positive}fn f(t: Int) -> Int\n  pure\n  example \"five\"\n    t: 5\n    -> 5\n  end\n  example \"zero\"\n    t: 0\n    -> exception \"positive\"\n  end\n\n  comptime positive(t)\n  comptime positive(t)\n  return t\nend fn f\n"
+    ));
+}
+
+#[test]
+fn a_quoted_free_name_resolves_on_the_macros_scope() {
+    let lib = "fn helper() -> Int\n  pure\n  example \"one\"\n    -> 1\n  end\n\n  return 1\nend fn helper\n\nfn call_helper() -> Expr\n  pure\n  example \"quotes\"\n    -> quote(helper())\n  end\n\n  return quote(helper())\nend fn call_helper\n";
+    // `helper` is not imported here, and the caller's `helper` is a local
+    let user = "import call_helper from \"lib\"\n\nfn g(helper: Int) -> Int\n  pure\n  example \"e\"\n    helper: 5\n    -> 1\n  end\n\n  return comptime call_helper()\nend fn g\n";
+    assert_eq!(
+        codes_of(&[("lib.lf", lib), ("user.lf", user)]),
+        Vec::<&str>::new()
+    );
+    // An unresolved name is `L011` on the macro
+    rejects(
+        "fn m() -> Expr\n  pure\n  example \"e\"\n    -> quote(1)\n  end\n\n  return quote(nope())\nend fn m\n",
+        "L011",
+    );
+}
+
+#[test]
+fn a_macro_is_not_emitted() {
+    let source = format!("{}{}", nonzero(), main("  comptime assert_nonzero(1)"));
+    let program = link(&[package(&[("m.lf", &source)])], &Options::default()).unwrap();
+    let names: Vec<&str> = program
+        .modules
+        .iter()
+        .flat_map(|m| &m.functions)
+        .map(|f| program.symbols[f.id as usize].name.as_str())
+        .collect();
+    assert_eq!(names, ["main"]);
+}

@@ -114,6 +114,7 @@ The exception and fault blocks follow `lingua1.md` § Value errors and exception
 | `process_fields` | `main(process: Process)`: `os`, `arch`, no `args`, `program` base name, `thread.name`, `pid`, `thread.id`, `parallelism` |
 | `main_param_name` | the `Process` parameter can have any name |
 | `comptime_const` | file-level consts folded at check time and emitted as literals (`Int`, `Text`, `List<Int>`, a record, a `Result`), an inner `const`, a `comptime` call, a `comptime` bound |
+| `splice` | macros (functions that return `Expr`) spliced into `main` with `comptime`: a statement splice (`assert`), an expression splice (`twice`), and a quoted `for` spliced twice, whose binder is fresh beside the caller's `i`. An argument is the caller's AST (`d - i`), not its value. The failing spliced `assert` reports at the `comptime` call site. `splice.expanded` is the `lingua expand` golden, checked by `tests/providers_cli.rs` |
 | `layout` | comments, blank lines, multi-line calls with trailing commas, an example on `main`, `//` inside a string |
 | `order_total` | **package**: end-state corpus `money.lf` (the `percent` primitive, `next_pow2`, `page_cap`, `Batch`) and `order.lf` (with its package example), imported by `main.lf`; order totals, `percent` rounding, `parse_discount` |
 | `geometry` | **package**: three modules, transitive imports, importing a sum also binds its constructors |
