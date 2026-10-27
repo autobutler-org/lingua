@@ -1,0 +1,18 @@
+fn assert_nonzero(value: Expr) -> Expr
+  pure
+  example "wraps a check"
+    value: quote(1)
+    -> quote(
+      assert 1 != 0, "nonzero"
+    )
+  end
+
+  return quote(
+    assert unquote(value) != 0, "nonzero"
+  )
+end fn assert_nonzero
+
+example "zero is fatal"
+  comptime assert_nonzero(0)
+  -> exception "nonzero"
+end

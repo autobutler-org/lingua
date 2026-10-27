@@ -8,9 +8,12 @@
 //! Generative types and package `comptime` blocks expand first in each module
 //! (`generative.rs`), under the `provided/` cache policy, to ordinary product declarations.
 //!
+//! A macro call (a function that returns `Expr`) splices into the caller's body before the
+//! caller's check goes on (`splice.rs`); the macro itself is comptime only and is not linked.
+//!
 //! Out of scope until their PRs, and reported per declaration as
 //! `error: ... not supported yet` rather than guessed at: `http_get`, `catalog.columns`,
-//! `fs.read`, `schema`, `types_from_openapi`, and `quote` / `unquote`. Such a diagnostic does
+//! `fs.read`, `schema`, and `types_from_openapi`. Such a diagnostic does
 //! not stop the module's examples, only those of functions whose check had a diagnostic or met
 //! the unsupported declaration, and of examples that call them.
 
@@ -22,6 +25,7 @@ mod generative;
 mod pack;
 mod package;
 mod pattern;
+mod splice;
 mod types;
 
 #[cfg(test)]
@@ -157,6 +161,8 @@ pub struct Checked {
     consts: std::collections::HashMap<SymbolId, crate::tir::TirExpr>,
     /// Expansions: module index, the generated name's span, the name, and what it expanded to.
     generated: Vec<(usize, Span, String, crate::provider::Generated)>,
+    /// Each module's declarations that hold a splice, printed with the splices in place.
+    pub spliced: Vec<(String, String)>,
 }
 
 /// `lingua check`: loads `paths` (default `.`) and their import closure and typechecks them.
@@ -187,9 +193,9 @@ pub fn check(paths: &[PathBuf], options: &Options) -> Result<Checked, Error> {
 }
 
 /// `lingua expand`: the same fixed point and cache policy as [`check`], without the examples.
-/// The expanded declarations of the requested modules as source text, a blank line between,
-/// and every diagnostic, sorted. The text holds what expanded even when there are
-/// diagnostics.
+/// The expanded declarations of the requested modules as source text, then each declaration
+/// that holds a macro splice, printed with the splice in place, a blank line between; and
+/// every diagnostic, sorted. The text holds what expanded even when there are diagnostics.
 ///
 /// # Errors
 /// A usage error.
@@ -201,6 +207,7 @@ pub fn expand(paths: &[PathBuf], options: &Options) -> Result<(String, Vec<Diagn
     let text = checked
         .expanded
         .iter()
+        .chain(&checked.spliced)
         .filter(|(key, _)| checked.requested.contains(key))
         .map(|(_, text)| text.as_str())
         .collect::<Vec<_>>()
@@ -286,9 +293,16 @@ pub fn link(paths: &[PathBuf], options: &Options) -> Result<TirProgram, Error> {
     }
     let (m, i) = mains[0];
     let main = checked.modules[m].functions[i].id;
+    // A function that returns `Expr` or `Type` lives on only as its splices
+    let mut modules = checked.modules;
+    for module in &mut modules {
+        module
+            .functions
+            .retain(|f| !matches!(f.ret, Type::ExprAst | Type::TypeAst));
+    }
     Ok(TirProgram {
         symbols: checked.symbols,
-        modules: checked.modules,
+        modules,
         main,
     })
 }

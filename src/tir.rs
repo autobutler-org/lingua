@@ -16,9 +16,12 @@
 //! the value as literal TIR (`Int`, `Text`, `List`, `Record`, `Variant`), so the interpreter and
 //! lowering see an ordinary literal.
 //!
-//! Omitted: `Quote` and `Unquote` (comptime IR only; they never reach the runtime residue,
-//! and the comptime interpreter will add them with its `QuoteBody`), and the `Expr`/`Type`
-//! comptime values (`Type::ExprAst` and `Type::TypeAst` stand for their types).
+//! `Quote` and `Unquote` are one node, `TirKind::Quote(template, holes)`: the template is the
+//! quoted AST with each `unquote` replaced by a numbered hole, and `holes` is the TIR of each
+//! `unquote` operand in hole order (lingua1.md's `Unquote(TirExpr)`). A comptime `Expr`
+//! value as literal TIR is a `Quote` with no holes. Both are comptime IR only and never reach
+//! the runtime residue. `Type::ExprAst` and `Type::TypeAst` are the types of the comptime
+//! values.
 //!
 //! Conventions the backend relies on:
 //! - Call arguments, record fields, and prelude arguments are in declaration order; names are
@@ -269,6 +272,9 @@ pub enum TirKind {
     /// A folded `Type` (a generated record or sum). Comptime only; never in the runtime
     /// residue.
     TypeValue(crate::provider::Generated),
+    /// `quote` with its `unquote` operands, in hole order (see the module docs). Comptime
+    /// only; never in the runtime residue.
+    Quote(Box<crate::ast::QuoteBody>, Vec<TirExpr>),
     /// Rejected by `L072` before lowering.
     ResourceCall(SymbolId, Vec<TirExpr>),
     Log(Box<TirExpr>),
