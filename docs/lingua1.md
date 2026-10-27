@@ -979,6 +979,62 @@ type OrderRow
 end type OrderRow
 ```
 
+Sum fixture. A sum mixes zero-payload, bounded, and nominal payloads. The payload `Cents` resolves through the module's own import:
+
+```lingua
+import Cents from "money"
+
+type Promo
+  pure
+  comptime
+    return sum_from_variants([
+      SumVariant(name: "NoPromo", payload: ""),
+      SumVariant(name: "PercentOff", payload: "Int in 1 through 100"),
+      SumVariant(name: "AmountOff", payload: "Cents"),
+    ])
+  end
+end type Promo
+```
+
+`type Promo` expands to exactly:
+
+```lingua
+type Promo
+  NoPromo
+  PercentOff(Int in 1 through 100)
+  AmountOff(Cents)
+end type Promo
+```
+
+Record fixture. In the same module, after `Promo`, a record mixes `Int`, a nominal type, a bound, and the generated sum:
+
+```lingua
+type Offer
+  pure
+  comptime
+    return record_from_fields([
+      RecordField(name: "id", type_text: "Int"),
+      RecordField(name: "price", type_text: "Cents"),
+      RecordField(name: "quantity", type_text: "Int in 1 through 100"),
+      RecordField(name: "promo", type_text: "Promo"),
+    ])
+  end
+end type Offer
+```
+
+`type Offer` expands to exactly:
+
+```lingua
+type Offer
+  id: Int
+  price: Cents
+  quantity: Int in 1 through 100
+  promo: Promo
+end type Offer
+```
+
+The module's cache file is `Promo`, a blank line, then `Offer`.
+
 ### Macros
 
 A macro is an ordinary function whose result type is `Expr`. There are no reader macros and no `macro_rules!`. The call site is marked `comptime`. Because the result is `Expr` and the call is in statement or expression position, the interpreter's result is spliced before typechecking the surrounding body. A splice that is not a node the grammar already has is `L064`. A statement splice in expression position, or the reverse, is `L065`. Macros do not add syntax.
@@ -1178,9 +1234,13 @@ Ambient in every module. Not imported. Not exported by user modules.
 | `types_from_openapi` | `(body: Text) -> Type` | `pure` | see OpenAPI subset below. One schema: that product or sum. Several: a module `Type` |
 | `schema` | `(body: Text, name: Text) -> Type` | `pure` | one named schema as a product or sum. Unknown name: `fail "unknown schema"` |
 | `Column` | `name: Text`, `sql_type: Text` | | prelude product |
+| `SumVariant` | `name: Text`, `payload: Text` | | prelude product. `payload` is type text, or `""` for no payload |
+| `RecordField` | `name: Text`, `type_text: Text` | | prelude product. `type_text` is type text |
 | `Process` | `program: Text`, `args: List<Text>`, `os: Text`, `arch: Text`, `pid: Int at least 1`, `thread: Thread`, `parallelism: Int at least 1` | | prelude product. The optional parameter of `main`. See Entry |
 | `Thread` | `id: Int`, `name: Text` | | prelude product. The main thread |
 | `record_from_columns` | `(columns: List<Column>) -> Type` | `pure` | product `Type`. See column mapping below |
+| `record_from_fields` | `(fields: List<RecordField>) -> Type` | `pure` | product `Type`. See field mapping below |
+| `sum_from_variants` | `(variants: List<SumVariant>) -> Type` | `pure` | sum `Type`. See `SumVariant` mapping below |
 | `catalog.columns` | `(table: Text) -> Result<List<Column>, DbMetaError>` | `reads catalog` | keyword call `catalog.columns(table)`. One parameter, so positional is legal. Not a method of `resource db`. In scope only under `reads catalog` |
 | `DbMetaError` | `NotConfigured`, `DbUnavailable(Text)` | | closed sum. `DbUnavailable` is not `NetUnavailable` and not `DbError.Unavailable` |
 
@@ -1201,6 +1261,12 @@ Ambient in every module. Not imported. Not exported by user modules.
 No `allOf`, `oneOf`, arrays, or numeric formats. Those are `fail "unsupported schema"`. `schema(body: body, name: name)` returns that one product or sum. Both parameters are `Text`, so a positional call is `L021`. Unknown `name` is `fail "unknown schema"`. `types_from_openapi` returns that product or sum when `components.schemas` has one entry, and a module `Type` (the named products and sums in key order) when it has several. A generative `type` body that returns the module is `L073`.
 
 **Column mapping.** `record_from_columns` builds one product. PostgreSQL `typname` values normalize before the product is built: `smallint`, `integer`, `bigint`, `int2`, `int4`, and `int8` become `Int`; `boolean` and `bool` become `Bool`; `text`, `varchar`, `character varying`, and `bpchar` become `Text`. Anything else is `fail "unknown sql type"`. An empty list is `fail "no columns"`. A `name` that is not an identifier is `fail "bad column name"`. A repeated name is `fail "duplicate column"`. Field order is list order. The orders fixture above is the normative input and output.
+
+**Type text.** `sum_from_variants` and `record_from_fields` spell a type as `Text` that must lex and parse, as source does, to exactly one `type-expr`: `"Int"`, `"Cents"`, `"Int in 1 through 100"`, `"List<Line>"`, `"Result<Cents, ParseError>"`. Each product has two `Text` fields, so its construction is named. The builder checks only its argument, and each of its `fail`s is `L058`. It does not resolve names; the expansion does. The generated declaration is checked as if it were written in the module that declares the generative type or holds the `comptime` block, so type text resolves in that module's declarations, its imports, and the prelude, and the codes of a written declaration apply at the generated name: an unknown type is `L011`, a name that is not a type is `L020`, a bound that does not fold is `L060`. Type text may name another generated type, and a reference back to the declaration being generated is a recursive type, as in a written one, not `L061`. `lingua expand` prints type text in the formatter's layout, so the cache file re-parses to the same declaration and resolves in the same module.
+
+**SumVariant mapping.** `sum_from_variants` builds one sum. Each `SumVariant` is one variant, in list order. `name` is the constructor. `payload: ""` is a zero-payload variant; any other `payload` is type text. An empty list is `fail "no variants"`. A `name` that is not an `ident`, including a keyword such as `Ok`, is `fail "bad variant name"`. A repeated name is `fail "duplicate variant"`. A payload that is not type text is `fail "bad payload type"`. A variant spelled like a prelude name (`OutOfRange`, `Column`) or like another file-level name of that module is `L017`. The constructors are exported, imported, and packed like a written sum's. The `Promo` fixture above is the normative input and output.
+
+**Field mapping.** `record_from_fields` builds one product from source type spellings. `record_from_columns` stays the builder for database catalogs. Each `RecordField` is one field, in list order. An empty list is `fail "no fields"`. A `name` that is not an `ident` is `fail "bad field name"`. A repeated name is `fail "duplicate field"`. A `type_text` that is not type text, `""` included, is `fail "bad field type"`: a written field always has a `type-expr`. The `Offer` fixture above is the normative input and output.
 
 `split`'s separator and text share a type on purpose: a swapped positional call would still be `Text`. The name `separator:` is the rail.
 
@@ -2443,6 +2509,8 @@ Rollback of a bad checker build is reverting the toolchain binary. `provided/*.l
 
 **A separate `comptime fn`, or folding every runtime `let`.** A restricted function subset would split the language the model has to learn, and folding a `let` because the compiler can see a literal would make runtime and compile time depend on inference. The marker stays on the use site. Type bounds, const initializers, examples, and generative bodies are comptime contexts and never demote. The cost is that `const n = next_pow2(input)` is `L060` instead of a quiet runtime binding, which is the point of the rule.
 
+**Builders that name types some other way.** `sum_from_variants` and `record_from_fields` spell a type as `type-expr` text. Three other spellings were rejected. PostgreSQL names, as `record_from_columns` uses, cannot say `Cents`, `Int in 1 through 100`, or another sum, which is what a payload or a domain field usually is. A type name used as a `Type` value (`payload: Cents`) would be a new construct: no expression position names a type today, and `Type` is a whole record or sum, not a payload or a field type. `quote` of a type is also new: `quote` takes a statement or an expression, and a quoted type would still need its own resolution rule. Text costs nothing new, is deterministic, and is exactly what `lingua expand` prints, so the cache re-parses. Cost: a misspelled type is found at expansion (`L011`), not when the `SumVariant` or `RecordField` is built. Widening `record_from_columns` to accept the same text was also rejected: it would mix two vocabularies in one field, and `"text"` and `"Text"` would both mean `Text`.
+
 **Dynamic linking as a language mode.** A `dynamic` keyword or a second output type would bake the link mode into source. It is a flag. Static is the default where the OS allows it, and `--dynamic` links the system C library. Foreign shared libraries stay out of scope. The executable is produced by the hand-written assembler, not by a codegen library.
 
 ---
@@ -2562,9 +2630,9 @@ Each PR compiles, is reviewable on its own, and leaves `lingua check` (or the su
 
 ### PR 16 — Generative types and the provider cache
 
-- **Files/components:** `src/provider`, `provided/` writer, prelude `http_get`, `fs.read`, `catalog.columns`, `types_from_openapi`, `schema`, `record_from_columns`.
+- **Files/components:** `src/provider`, `provided/` writer, prelude `http_get`, `fs.read`, `catalog.columns`, `types_from_openapi`, `schema`, `record_from_columns`, `RecordField`, `record_from_fields`, `SumVariant`, `sum_from_variants`.
 - **Depends on:** PR 14 and PR 15 (`or fail` in the provider samples).
-- **Changes:** Generative type bodies and package `comptime` blocks. `provide` is a statement and is `L067` outside a package comptime block. Effects `reads net`, `reads catalog`, and `reads fs` only on those forms and on file-level consts (`L025` on a function, and `L025` for `reads clock` or a user-resource effect on those forms). An inner `const` inherits the block's effect. Expansion is real AST. `lingua expand` prints it. `check`, `expand`, `pack`, and the check inside `build` share `--refresh` and `--offline` and write `{source_root}/provided/<module>.lf` as ordinary `type` declarations in source order. `L071` is one diagnostic per missing declaration. `L073` when a module `Type` is returned from `type Name`. `catalog.columns(table)` is prelude, not a second operation of `resource db`. Missing `[db] url` is `Err(NotConfigured)`. Timeouts and the non-public address ban are the `Result`s in the prelude section, not `L072`. Tests use the OpenAPI `Customer` fixture and the `orders` column fixture in this document, not the public network, and compare the exact expanded text. `lingua pack` gains the `# expanded` header lines for those types. The acceptance corpus still performs no provider effect.
+- **Changes:** Generative type bodies and package `comptime` blocks. `provide` is a statement and is `L067` outside a package comptime block. Effects `reads net`, `reads catalog`, and `reads fs` only on those forms and on file-level consts (`L025` on a function, and `L025` for `reads clock` or a user-resource effect on those forms). An inner `const` inherits the block's effect. Expansion is real AST. `lingua expand` prints it. `check`, `expand`, `pack`, and the check inside `build` share `--refresh` and `--offline` and write `{source_root}/provided/<module>.lf` as ordinary `type` declarations in source order. `L071` is one diagnostic per missing declaration. `L073` when a module `Type` is returned from `type Name`. `catalog.columns(table)` is prelude, not a second operation of `resource db`. Missing `[db] url` is `Err(NotConfigured)`. Timeouts and the non-public address ban are the `Result`s in the prelude section, not `L072`. `record_from_fields` and `sum_from_variants`, their `fail` messages, type text resolved at expansion, and expanded sums in the cache and in `pack`. Tests use the OpenAPI `Customer` fixture, the `orders` column fixture, and the `Promo` and `Offer` fixtures in this document, not the public network, and compare the exact expanded text. `lingua pack` gains the `# expanded` header lines for those types. The acceptance corpus still performs no provider effect.
 
 ### PR 17 — `quote` / `unquote` splice
 
