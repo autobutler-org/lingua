@@ -97,6 +97,8 @@ Today there is no Lingua grammar, checker, or toolchain. The pain this design re
 
 **One grammar.** File-level declarations, expressions, types, examples, and patterns are the EBNF in this document. The formatter and the packer are not second grammars. The packer does not parse a different import syntax.
 
+**Every pass is visible.** Each stage that transforms a program has a text view a developer, or an LLM, can read to debug it: `lingua lex`, `lingua parse`, `lingua expand`, `lingua lir`, and `lingua asm`. A view prefers Lingua source that re-parses, as `expand` prints generated types, over an internal tree. A view of a stage that has no source form, such as LIR, is a text dump. Each view is golden-tested. A new stage, or a stage that changes what reaches the next one, ships with its view in the same change. Comptime folding and the typed IR do not have a view yet.
+
 **`Cents` lives in `money.lf`.** `percent` returns `Cents`, and `order.lf` imports `money`. Defining `Cents` in both files would create two nominal types or an import cycle. One definition, in the module that implements `percent`.
 
 **`money.percent` is a primitive.** `part * of / 100` is not enough: `part * of` does not fit in `Int` when `of` is near `INT_MAX`, so the 64-bit `*` faults with `L040` before `/` runs. A loop that added `of`, `part` times, would also blow the example fuel limit on large `Cents`. The body is the keyword `primitive`, allowlisted to that one signature. The runner evaluates the math in this document with a wide intermediate. Untrusted `primitive` on any other function is `L049`. It cannot inject I/O.
