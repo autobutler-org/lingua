@@ -9,7 +9,7 @@ use crate::ast::{Module, Span};
 use crate::lex::Location;
 use crate::parse::parse_source;
 
-/// Flags shared by `check`, `expand`, and `build`.
+/// Flags shared by `check`, `expand`, `pack`, and `build`.
 #[derive(Debug, Default, Clone)]
 pub struct Options {
     /// `--source-root`: overrides the upward `lingua.toml` walk.

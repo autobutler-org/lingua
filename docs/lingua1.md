@@ -1178,7 +1178,6 @@ Not included: bodies of imported functions, comments from the imported file, tra
 ```text
 # lingua pack order.lf
 # module order
-# source root: /src
 # language: lingua1
 
 # import Cents from "money"

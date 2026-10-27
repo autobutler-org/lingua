@@ -301,7 +301,7 @@ impl Checker<'_> {
     /// Each module's expanded declarations as source text, in source order; and the cache
     /// file of each, written unless `--offline` or one of its providers failed.
     pub(super) fn write_caches(&mut self) -> Vec<(String, String)> {
-        let mut generated = std::mem::take(&mut self.generated);
+        let mut generated = self.generated.clone();
         generated.sort_by_key(|(m, span, ..)| (*m, span.start.line, span.start.column));
         let mut out = Vec::new();
         for m in 0..self.loaded.sources.len() {
