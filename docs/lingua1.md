@@ -199,7 +199,7 @@ The `.ast` form:
 - Every AST `String`, names included, is a double-quoted string escaped with `\"`, `\\`, `\n`, and `\t`. A bare atom is therefore always a head, a tag, `true` / `false`, an integer, or `nil` for an absent option. Names are quoted because `nil` is a legal `ident`.
 - A list field is `(label item ...)`: `(params ...)`, `(args ...)`, `(then ...)`, `(else ...)`. When a list is a node's only payload, its items follow the head directly: `(text ...)`, `(statements ...)`, `(stmt-arm ...)`, `(list-pat ...)`.
 - Tags are bare atoms. Effects are `pure`, `reads-clock`, `reads-net`, `reads-fs`, `reads-catalog`, `(reads "db")`, and `(writes "x")`. Operators are `add sub mul div rem eq ne lt gt le ge`. `Set` ops are `assign` and `add-assign`. Arm kinds are `expr-arms` and `stmt-arms`. Resource ops are `read` and `write`. A function body is `primitive` or `(statements ...)`. An expectation is `(value e)` or `(exception "m")`. Text parts are `(literal "...")` and `(hole e)`.
-- The `broken` flag is a trailing `true` or `false` on `list` and `call`. An argument is `(arg "name" e)`, or `(arg nil e)` when it is positional.
+- The `broken` flag is a trailing `true` or `false` on `list` and `call`. `fs-read` and `catalog-columns` carry trailing `named` and `broken` bools. An argument is `(arg "name" e)`, or `(arg nil e)` when it is positional.
 - A node prints on one line when it fits in 80 columns. Otherwise the head and its leading atoms stay on the first line, and each remaining child goes on its own line, indented two spaces.
 
 ```lisp
@@ -221,7 +221,7 @@ inverse:  untyped AST --unparse--> tokens --unlex--> source
 
 | Inverse | Input | Output | Round trip |
 |---|---|---|---|
-| unparse | untyped AST | A token list in the [Formatter](#formatter) layout. unparse picks the line breaks and indent and gives each token its `line:col`. `broken` lists and calls get one element per line. Closers are generated: `end fn <name>`, `end type <name>`, or `end resource <name>` from the declaration, and bare `end` for every inner block. | `parse(unparse(a)) == a`, ignoring spans |
+| unparse | untyped AST | A token list in the [Formatter](#formatter) layout. unparse picks the line breaks and indent and gives each token its `line:col`. `broken` lists and calls get one element per line, except a broken list of literals, which packs several per line to 80 columns. Closers are generated: `end fn <name>`, `end type <name>`, or `end resource <name>` from the declaration, and bare `end` for every inner block. | `parse(unparse(a)) == a`, ignoring spans |
 | unlex | token list | Source with each token's lexeme placed at its `line:col`, and line breaks from `Newline` tokens. Strings are re-escaped. | `lex(unlex(t)) == t` |
 
 Layout belongs to unparse, and unlex makes no layout choices. That keeps unlex the exact inverse of lex for any token list, whether it came from lex, from unparse, or from an edit. The AST stores no closer. A tree that parsed already passed `L002` and `L003`, so the opener alone fixes the closer.
@@ -1150,7 +1150,7 @@ Canonical layout:
 
 - Indent is two spaces per open construct (`fn`, `type`, `resource`, `example`, `comptime`, generative body, `if`, `else`, `match`, match-arm block, `for`, `while`).
 - Indent is computed from `end` and from match-arm extent, never from the input indent.
-- One statement per line. The formatter does not wrap expressions and does not move a break into or out of a list or a call. If the parser saw a newline inside `[]` or `()`, the reprint is broken: one element or argument per line, trailing comma, closing delimiter on its own line at the opening indent. Otherwise the list or call is one line. Example bindings may keep `[` on the line after `:`.
+- One statement per line. The formatter does not wrap expressions and does not move a break into or out of a list or a call. If the parser saw a newline inside `[]` or `()`, the reprint is broken: one element or argument per line, a trailing comma when the grammar allows one, and the closing delimiter on its own line at the opening indent. A broken list of literals is the exception. A literal is an integer with an optional leading `-`, `true`, `false`, `nothing`, or a string with no holes. A list of lists is not a list of literals. Those literals pack several per line, as many as fit in 80 columns, with a trailing comma after every element and a space after a comma only when another element follows on that line. The first literal on a line is printed even when it alone is wider than 80. A list or call the parser did not break stays one line, however long. Example bindings may keep `[` on the line after `:`.
 - One blank line between top-level declarations. One blank line between the last `example` and the body or `primitive`. No other blank lines inside a declaration.
 - No blank line between the header, the effect, and the first example.
 - One space after `,` and `:`. No space before `,` or `:`. One space around `=`, `+=`, `->`, and binary operators. No space before `(`. No space immediately inside `()` or `[]`.
@@ -2224,8 +2224,8 @@ Expr =
   | Quote(Span, QuoteBody)
   | Unquote(Span, Expr)
   | ClockNow(Span)
-  | FsRead(Span, Expr)
-  | CatalogColumns(Span, Expr)
+  | FsRead(Span, Expr, named: bool, broken: bool)
+  | CatalogColumns(Span, Expr, named: bool, broken: bool)
 
 QuoteBody = QuotedStmt(Stmt) | QuotedExpr(Expr)
 
