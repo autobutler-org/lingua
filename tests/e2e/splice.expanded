@@ -1,0 +1,17 @@
+fn main() -> Nothing
+  pure
+
+  let i = 3
+  assert i > 0, "not positive"
+  let d = i - 1 + (i - 1)
+  log("{d}")
+  for i_2 in 0 until i
+    log("{i - i_2}")
+  end
+  for i_3 in 0 until d - i
+    log("{d - i - i_3}")
+  end
+  assert d - 7 > 0, "not positive"
+  log("unreachable")
+  return nothing
+end fn main

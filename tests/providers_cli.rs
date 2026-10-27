@@ -204,3 +204,24 @@ fn expand_usage_is_self_guiding() {
     assert_eq!(output.status.code(), Some(0), "{}", stderr(&output));
     assert_eq!(stdout(&output), "");
 }
+
+// `lingua expand` also prints each declaration that holds a macro splice, with the splice in
+// place, as source that parses again; a splice writes no cache
+#[test]
+fn expand_prints_spliced_declarations_as_source() {
+    for (from, name) in [("tests/corpus", "assert"), ("tests/e2e", "splice")] {
+        let from = Path::new(env!("CARGO_MANIFEST_DIR")).join(from);
+        let dir = workdir(name, &[]);
+        let source = format!("{name}.lf");
+        std::fs::copy(from.join(&source), dir.join(&source)).unwrap();
+        let output = lingua(&dir, &["expand", &source]);
+        assert_eq!(output.status.code(), Some(0), "{}", stderr(&output));
+        let golden = std::fs::read_to_string(from.join(format!("{name}.expanded"))).unwrap();
+        assert_eq!(stdout(&output), golden);
+        assert!(
+            lingua::parse::parse_source(golden.as_bytes(), name).is_ok(),
+            "{golden}"
+        );
+        assert!(cache(&dir, name).is_none());
+    }
+}

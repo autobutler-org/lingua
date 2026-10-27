@@ -1,0 +1,55 @@
+fn assert_positive(value: Expr) -> Expr
+  pure
+  example "wraps a check"
+    value: quote(1)
+    -> quote(
+      assert 1 > 0, "not positive"
+    )
+  end
+
+  return quote(
+    assert unquote(value) > 0, "not positive"
+  )
+end fn assert_positive
+
+fn twice(value: Expr) -> Expr
+  pure
+  example "adds a tree to itself"
+    value: quote(2)
+    -> quote(2 + 2)
+  end
+
+  return quote(unquote(value) + unquote(value))
+end fn twice
+
+fn count_down(n: Expr) -> Expr
+  pure
+  example "loops"
+    n: quote(2)
+    -> quote(
+      for i in 0 until 2
+        log("{2 - i}")
+      end
+    )
+  end
+
+  return quote(
+    for i in 0 until unquote(n)
+      log("{unquote(n) - i}")
+    end
+  )
+end fn count_down
+
+fn main() -> Nothing
+  pure
+
+  let i = 3
+  comptime assert_positive(i)
+  let d = comptime twice(i - 1)
+  log("{d}")
+  comptime count_down(i)
+  comptime count_down(d - i)
+  comptime assert_positive(d - 7)
+  log("unreachable")
+  return nothing
+end fn main

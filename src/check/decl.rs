@@ -105,6 +105,8 @@ pub(super) struct Checker<'a> {
     pub provider_failed: HashSet<usize>,
     /// Package `comptime` blocks already run: module and the block's start.
     pub blocks_done: HashSet<(usize, usize, usize)>,
+    /// Splices: module, the call site, and the tree that replaced it, for `lingua expand`.
+    pub spliced: Vec<(usize, Span, crate::ast::QuoteBody)>,
 }
 
 /// A work item on the comptime stack.
@@ -112,6 +114,8 @@ pub(super) struct Checker<'a> {
 pub(super) enum Item {
     Decl(SymbolId),
     Body(SymbolId),
+    /// A macro call being spliced and its result checked.
+    Splice(SymbolId),
 }
 
 const COMPTIME_PRELUDE: [&str; 23] = [
@@ -287,6 +291,7 @@ impl<'a> Checker<'a> {
             generated: Vec::new(),
             provider_failed: HashSet::new(),
             blocks_done: HashSet::new(),
+            spliced: Vec::new(),
         }
     }
 
@@ -303,6 +308,13 @@ impl<'a> Checker<'a> {
     }
 
     pub fn diag(&self, m: usize, code: &'static str, span: Span, summary: String) -> Diagnostic {
+        // A name from a splice prints as its source spelling
+        let summary = if summary.contains([crate::ast::quote::QUALIFIED, crate::ast::quote::BINDER])
+        {
+            crate::ast::quote::clean(&summary)
+        } else {
+            summary
+        };
         Diagnostic::new(code, summary, self.path(m)).at(self.source(m), span)
     }
 
@@ -330,6 +342,27 @@ impl<'a> Checker<'a> {
             None => format!("{what} is not supported yet"),
         };
         self.report(m, NOT_YET, span, summary);
+    }
+
+    /// `L063` unless `ty` can exist at runtime: `Expr` and `Type`, alone or inside a list or
+    /// a result, cannot.
+    pub fn runtime_type(&mut self, m: usize, ty: &Type, span: Span) -> bool {
+        fn comptime(ty: &Type) -> bool {
+            match ty {
+                Type::ExprAst | Type::TypeAst => true,
+                Type::List(t) => comptime(t),
+                Type::Result(a, b) => comptime(a) || comptime(b),
+                _ => false,
+            }
+        }
+        if !comptime(ty) {
+            return true;
+        }
+        let shown = self.show(ty);
+        let summary = format!("`{shown}` only exists at compile time; it is not a runtime type");
+        let help = "only a function that returns `Expr` or `Type` takes one";
+        self.report_help(m, "L063", span, summary, help.into());
+        false
     }
 
     pub fn show(&self, ty: &Type) -> String {
@@ -365,6 +398,13 @@ impl<'a> Checker<'a> {
 
     /// A file-level name: the module's own declarations and imports, then the prelude.
     pub fn lookup(&self, m: usize, name: &str) -> Option<Binding> {
+        // A spliced free name means what it meant in the macro's module
+        if let Some((name, module)) = name.split_once(crate::ast::quote::QUALIFIED)
+            && let Ok(module) = module.parse::<usize>()
+            && module < self.mods.len()
+        {
+            return self.lookup(module, name);
+        }
         let found = self.mods[m]
             .names
             .get(name)
@@ -604,6 +644,8 @@ impl<'a> Checker<'a> {
                     }
                 },
                 Some(Binding::Type(id)) => self.ensure(id).then_some(Type::Nominal(id)),
+                Some(Binding::Comptime) if name == "Expr" => Some(Type::ExprAst),
+                Some(Binding::Comptime) if name == "Type" => Some(Type::TypeAst),
                 Some(Binding::Comptime) => {
                     self.not_yet(m, *span, &format!("the comptime type `{name}`"));
                     None
@@ -844,7 +886,7 @@ impl<'a> Checker<'a> {
     /// `again`, at the declaration that repeats.
     pub fn cycle(&mut self, again: Item) {
         let id = |item: &Item| match *item {
-            Item::Decl(id) | Item::Body(id) => id,
+            Item::Decl(id) | Item::Body(id) | Item::Splice(id) => id,
         };
         let from = self.stack.iter().position(|i| *i == again).unwrap_or(0);
         let names: Vec<String> = self.stack[from..]
@@ -897,6 +939,9 @@ impl<'a> Checker<'a> {
                         );
                         continue;
                     }
+                    if let Some(t) = &ty {
+                        self.runtime_type(m, t, f.ty.span());
+                    }
                     match ty {
                         Some(ty) => list.push((f.name.clone(), ty)),
                         None => {
@@ -916,6 +961,9 @@ impl<'a> Checker<'a> {
                         continue;
                     };
                     let payload = self.resolve_type(m, payload_expr);
+                    if let Some(t) = &payload {
+                        self.runtime_type(m, t, payload_expr.span());
+                    }
                     if payload.is_none() {
                         self.poisoned.insert(vid);
                     }
@@ -947,8 +995,17 @@ impl<'a> Checker<'a> {
                     module: m,
                 };
                 let mut ok = true;
+                // A function that returns `Expr` or `Type` is comptime only; any other takes
+                // runtime parameters
+                let comptime_only =
+                    matches!(&ret, TypeExpr::Named(_, n) if n == "Expr" || n == "Type");
                 for p in params {
                     let ty = self.resolve_type(m, &p.ty);
+                    if let Some(t) = &ty
+                        && !comptime_only
+                    {
+                        self.runtime_type(m, t, p.ty.span());
+                    }
                     let pspan = find_word(self.source(m), p.span, &p.name);
                     if sig.params.iter().any(|(n, _)| *n == p.name) {
                         self.report(
@@ -1265,6 +1322,7 @@ pub(super) fn check_package(loaded: &Loaded) -> (Checked, Vec<Diagnostic>) {
         });
     }
     let expanded = c.write_caches();
+    let spliced = c.spliced_text();
     let Checker {
         symbols,
         diags,
@@ -1280,6 +1338,7 @@ pub(super) fn check_package(loaded: &Loaded) -> (Checked, Vec<Diagnostic>) {
             resource_calls,
             skip: tainted,
             expanded,
+            spliced,
         },
         diags,
     )

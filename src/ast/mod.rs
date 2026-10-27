@@ -1,6 +1,8 @@
 //! Untyped AST from the parser. Names are strings; sugar (`or return`, `+=`, examples) is kept.
 
 mod dump;
+pub mod print;
+pub mod quote;
 
 pub use dump::dump;
 
@@ -165,7 +167,7 @@ pub struct Bind {
     pub value: Expr,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum TypeExpr {
     Named(Span, String),
     Apply(Span, String, Vec<TypeExpr>),
@@ -185,13 +187,13 @@ impl TypeExpr {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum AssignOp {
     Assign,
     AddAssign,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Stmt {
     Let {
         span: Span,
@@ -268,7 +270,7 @@ pub enum Stmt {
 }
 
 // `broken` records a newline inside the delimiters, for the formatter
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Expr {
     IntLit(Span, i64),
     Text(Span, Vec<TextPart>),
@@ -324,39 +326,39 @@ impl Expr {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum QuoteBody {
     QuotedStmt(Box<Stmt>),
     QuotedExpr(Box<Expr>),
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum TextPart {
     Literal(String),
     Hole(Expr),
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct Arg {
     pub span: Span,
     pub name: Option<String>,
     pub value: Expr,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct Arm {
     pub span: Span,
     pub pattern: Pattern,
     pub body: ArmBody,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum ArmKind {
     ExprArms,
     StmtArms,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum ArmBody {
     ExprArm(Expr),
     StmtArm(Vec<Stmt>),
@@ -377,7 +379,7 @@ pub enum BinOp {
     Ge,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Pattern {
     Wild(Span),
     LitInt(Span, i64),

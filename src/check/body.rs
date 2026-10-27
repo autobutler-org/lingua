@@ -25,6 +25,9 @@ pub(super) struct FnCx {
     /// A comptime context: a `const` initializer, a bound, a `comptime` operand, or a package
     /// example. A runtime local here is `L060`, and `let` or `var` is `L062`.
     pub comptime: bool,
+    /// The body of a function that returns `Expr` or `Type`, whose parameters are the
+    /// call's comptime values. Not an inner `const` there, which folds at check time.
+    pub macro_body: bool,
 }
 
 impl FnCx {
@@ -37,6 +40,7 @@ impl FnCx {
             scopes: vec![Vec::new()],
             example: false,
             comptime: true,
+            macro_body: false,
         }
     }
 
@@ -49,6 +53,7 @@ impl FnCx {
             scopes: self.scopes.clone(),
             example: self.example,
             comptime: true,
+            macro_body: false,
         }
     }
 }
@@ -175,8 +180,8 @@ fn reaches_end(stmts: &[Stmt], var: &str, assigned: bool) -> Option<bool> {
 }
 
 /// Arguments in parameter order, by the positional-call rule.
-struct Matched<'e> {
-    args: Vec<Option<&'e Expr>>,
+pub(super) struct Matched<'e> {
+    pub args: Vec<Option<&'e Expr>>,
     /// The parameter index of each argument, in source order.
     order: Vec<usize>,
 }
@@ -207,7 +212,7 @@ impl Checker<'_> {
             .map(|(_, id)| *id)
     }
 
-    fn resolve_name(&self, cx: &FnCx, name: &str) -> Option<Binding> {
+    pub(super) fn resolve_name(&self, cx: &FnCx, name: &str) -> Option<Binding> {
         Self::local(cx, name)
             .map(Binding::Local)
             .or_else(|| self.lookup(cx.m, name))
@@ -224,7 +229,7 @@ impl Checker<'_> {
         names
     }
 
-    fn unknown(&mut self, cx: &FnCx, span: Span, name: &str) {
+    pub(super) fn unknown(&mut self, cx: &FnCx, span: Span, name: &str) {
         let help = alternatives(&self.visible_in(cx));
         self.report_help(cx.m, "L011", span, format!("unknown name `{name}`"), help);
     }
@@ -295,6 +300,8 @@ impl Checker<'_> {
             .iter()
             .filter_map(|ex| self.example(m, &sig, ex))
             .collect();
+        // A function that returns `Expr` or `Type` has a comptime body
+        let comptime_only = matches!(sig.ret, Type::ExprAst | Type::TypeAst);
         let mut cx = FnCx {
             m,
             effect: effect.clone(),
@@ -307,7 +314,8 @@ impl Checker<'_> {
                     .collect(),
             ],
             example: false,
-            comptime: false,
+            comptime: comptime_only,
+            macro_body: comptime_only,
         };
         let body = match body {
             FnBody::Primitive => TirBody::Primitive,
@@ -348,6 +356,7 @@ impl Checker<'_> {
             scopes: vec![Vec::new()],
             example: true,
             comptime: false,
+            macro_body: false,
         };
         let resource = match &sig.effect {
             Effect::Reads(r) | Effect::Writes(r) => Some(r.clone()),
@@ -552,6 +561,7 @@ impl Checker<'_> {
                 let value = match ty {
                     Some(ty) => self
                         .resolve_type(m, ty)
+                        .filter(|t| cx.comptime || self.runtime_type(m, t, ty.span()))
                         .and_then(|t| self.check(cx, init, &t).map(|e| (e, t))),
                     None => self.synth(cx, init).map(|e| {
                         let t = e.ty.clone();
@@ -625,7 +635,9 @@ impl Checker<'_> {
                 };
                 (e.map(|e| TirStmt::Set(id, e)), false)
             }
-            Stmt::Return { span, .. } if cx.comptime && cx.ret != Type::TypeAst => {
+            Stmt::Return { span, .. }
+                if cx.comptime && !matches!(cx.ret, Type::TypeAst | Type::ExprAst) =>
+            {
                 let summary = "`return` in a package example or a package `comptime` block: there is no function to return from";
                 self.report(m, "L012", word_at(*span, "return".len()), summary.into());
                 (None, true)
@@ -768,6 +780,11 @@ impl Checker<'_> {
                 (None, false)
             }
             Stmt::ExprStmt { span, expr } => {
+                if let Some((id, call)) = self.macro_call(cx, expr) {
+                    return self
+                        .splice_stmt(cx, expr, id, call)
+                        .unwrap_or((None, false));
+                }
                 if let Expr::Match(mspan, scrutinee, arms, ArmKind::StmtArms) = expr {
                     return self.stmt_match(cx, *mspan, scrutinee, arms);
                 }
@@ -1131,7 +1148,11 @@ impl Checker<'_> {
     // ---- expressions
 
     /// `check(e, T)`.
+    #[allow(clippy::too_many_lines)]
     pub(super) fn check(&mut self, cx: &mut FnCx, e: &Expr, t: &Type) -> Option<TirExpr> {
+        if let Some((id, call)) = self.macro_call(cx, e) {
+            return self.splice_expr(cx, e, id, call, Some(t));
+        }
         if let Some(v) = literal_int(e) {
             return self.literal(cx, e.span(), v, t);
         }
@@ -1339,6 +1360,9 @@ impl Checker<'_> {
     #[allow(clippy::too_many_lines)]
     pub(super) fn synth(&mut self, cx: &mut FnCx, e: &Expr) -> Option<TirExpr> {
         let m = cx.m;
+        if let Some((id, call)) = self.macro_call(cx, e) {
+            return self.splice_expr(cx, e, id, call, None);
+        }
         if let Some(v) = literal_int(e) {
             return Some(tx(Type::Int, e.span(), TirKind::Int(v)));
         }
@@ -1380,12 +1404,11 @@ impl Checker<'_> {
                 let root = self.synth(&mut cx.comptime(), inner)?;
                 self.fold(m, &root, "a `comptime` expression")
             }
-            Expr::Quote(span, _) | Expr::Unquote(span, _) => {
-                self.not_yet(
-                    m,
-                    *span,
-                    "`quote` / `unquote` (macros need the comptime interpreter)",
-                );
+            Expr::Quote(span, body) => self.quote(cx, *span, body),
+            Expr::Unquote(span, _) => {
+                let summary = "`unquote` outside `quote`".to_owned();
+                let help = "use the `Expr` directly, or write `quote(... unquote(e) ...)`";
+                self.report_help(m, "L066", *span, summary, help.into());
                 None
             }
             Expr::OrReturn(span, inner, mapping) => {
@@ -1453,9 +1476,10 @@ impl Checker<'_> {
             self.hit_poison.set(true);
             return None;
         };
-        if value.ty == Type::TypeAst && !cx.comptime {
+        if matches!(value.ty, Type::TypeAst | Type::ExprAst) && !cx.comptime {
             let name = self.symbols[id as usize].name.clone();
-            let summary = format!("`{name}` is a `Type`, which only exists at compile time");
+            let shown = self.show(&value.ty);
+            let summary = format!("`{name}` is a `{shown}`, which only exists at compile time");
             self.report(cx.m, "L063", span, summary);
             return None;
         }
@@ -1476,7 +1500,8 @@ impl Checker<'_> {
                 if self.consts.contains_key(&id) {
                     return self.const_use(cx, id, span);
                 }
-                if cx.comptime {
+                let param = self.symbols[id as usize].kind == SymbolKind::Param;
+                if cx.comptime && !(param && cx.macro_body) {
                     self.report_help(
                         m,
                         "L060",
@@ -1607,7 +1632,7 @@ impl Checker<'_> {
 
     // Arguments to parameters: names by name, positionals in order, positionals only for a
     // parameter whose type is unique (L021), every parameter once (L028)
-    fn match_args<'e>(
+    pub(super) fn match_args<'e>(
         &mut self,
         cx: &FnCx,
         span: Span,
@@ -1750,7 +1775,7 @@ impl Checker<'_> {
         tx(call.ty.clone(), call.span, TirKind::Let(binds, bx(call)))
     }
 
-    fn effect_check(
+    pub(super) fn effect_check(
         &mut self,
         cx: &FnCx,
         span: Span,
@@ -1834,6 +1859,14 @@ impl Checker<'_> {
                     return None;
                 }
                 let sig = self.sigs.get(&id)?.clone();
+                if matches!(sig.ret, Type::ExprAst | Type::TypeAst) && !cx.comptime && !cx.example {
+                    let shown = self.show(&sig.ret);
+                    let summary =
+                        format!("`{name}` returns `{shown}`, which only exists at compile time");
+                    let help = "call it in a comptime context: a `const`, a generative type, or a package example";
+                    self.report_help(m, "L063", span, summary, help.into());
+                    return None;
+                }
                 let matched = self.match_args(cx, span, name, &sig.params, args);
                 let effect_ok = self.effect_check(cx, *nspan, name, &sig.effect, sig.module);
                 let matched = matched?;
@@ -2098,7 +2131,7 @@ impl Checker<'_> {
                 let params = [(param.to_owned(), Type::List(Box::new(Type::Nominal(item))))];
                 let matched = self.match_args(cx, span, name, &params, args)?;
                 let args = self.checked_args(cx, &matched, &params)?;
-                if !cx.comptime {
+                if !cx.comptime && !cx.example {
                     let summary =
                         format!("`{name}` returns a `Type`, which only exists at compile time");
                     self.report_help(

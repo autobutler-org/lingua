@@ -15,7 +15,8 @@ commands:
   check [PATH ...]    typecheck modules and their imports; silent when clean
   check --explain L031
                       print the catalog text for a diagnostic code
-  expand [PATH ...]   print the types that generative types and `provide` expand to
+  expand [PATH ...]   print the types that generative types and `provide` expand to, and
+                      each declaration that holds a macro splice, spliced
   build [PATH ...]    check, then build a static linux/amd64 executable at ./lingua-out
   lir PATH            print the LIR that `build` lowers PATH to
   asm PATH            print the amd64 instructions that `build` selects for PATH
@@ -36,8 +37,9 @@ interpreter. A generative type (`type Name` whose body starts with an effect) an
 `provided/<module>.lf` under the source root and reused on later runs. `record_from_columns`
 builds a record type from a `List<Column>`; `record_from_fields` and `sum_from_variants` build
 a record or a sum whose field and payload types are type text, such as \"Int in 1 through 100\".
-`fs.read`, `http_get`, `catalog.columns`,
-`schema`, `types_from_openapi`, and macros are reported as not supported yet.";
+A macro is a function that returns `Expr`, built with `quote` and `unquote`; `comptime f(...)`
+splices its tree into the caller before the caller is checked. `fs.read`, `http_get`,
+`catalog.columns`, `schema`, and `types_from_openapi` are reported as not supported yet.";
 
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
