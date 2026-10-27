@@ -41,10 +41,92 @@ b3:
   v21 = call rt.text_concat(v19)
   ret v21
 
-fn main.main params=0 vregs=36 stack=site.1
+fn main.promo_text params=1 vregs=28 stack=site.1
+b0:
+  v2 = load v0, 0
+  v3 = const 0
+  v4 = eq v2, v3
+  branch v4, b3, b2
+b1:
+  ret v1
+b2:
+  v6 = load v0, 0
+  v7 = const 1
+  v8 = eq v6, v7
+  branch v8, b5, b4
+b3:
+  v5 = addr str.4
+  v1 = move v5
+  jump b1
+b4:
+  v17 = load v0, 0
+  v18 = const 2
+  v19 = eq v17, v18
+  branch v19, b7, b6
+b5:
+  v9 = load v0, 8
+  v10 = move v9
+  v11 = call rt.int_to_text(v10)
+  v12 = addr str.5
+  v13 = const 24
+  v14 = call rt.alloc(v13)
+  v15 = const 2
+  store v14, 0, v15
+  store v14, 8, v11
+  store v14, 16, v12
+  v16 = call rt.text_concat(v14)
+  v1 = move v16
+  jump b1
+b6:
+  raise site.2
+b7:
+  v20 = load v0, 8
+  v21 = move v20
+  v22 = call rt.int_to_text(v21)
+  v23 = addr str.6
+  v24 = const 24
+  v25 = call rt.alloc(v24)
+  v26 = const 2
+  store v25, 0, v26
+  store v25, 8, v22
+  store v25, 16, v23
+  v27 = call rt.text_concat(v25)
+  v1 = move v27
+  jump b1
+
+fn main.offer_text params=1 vregs=17 stack=site.3
+b0:
+  v1 = addr str.7
+  v2 = load v0, 0
+  v3 = call rt.int_to_text(v2)
+  v4 = addr str.8
+  v5 = load v0, 16
+  v6 = call rt.int_to_text(v5)
+  v7 = addr str.9
+  v8 = load v0, 8
+  v9 = call rt.int_to_text(v8)
+  v10 = addr str.10
+  v11 = load v0, 24
+  v12 = call main.promo_text(v11)
+  v13 = const 72
+  v14 = call rt.alloc(v13)
+  v15 = const 8
+  store v14, 0, v15
+  store v14, 8, v1
+  store v14, 16, v3
+  store v14, 24, v4
+  store v14, 32, v6
+  store v14, 40, v7
+  store v14, 48, v9
+  store v14, 56, v10
+  store v14, 64, v12
+  v16 = call rt.text_concat(v14)
+  ret v16
+
+fn main.main params=0 vregs=66 stack=site.4
 b0:
   v0 = const 7
-  v1 = addr str.4
+  v1 = addr str.11
   v2 = const 1
   v3 = const 24
   v4 = call rt.alloc(v3)
@@ -54,7 +136,7 @@ b0:
   v5 = call main.describe(v4)
   v6 = call rt.log(v5)
   v7 = const 8
-  v8 = addr str.5
+  v8 = addr str.12
   v9 = const 0
   v10 = const 24
   v11 = call rt.alloc(v10)
@@ -70,16 +152,16 @@ b0:
   store v17, 0, v14
   store v17, 8, v15
   v18 = move v17
-  v19 = addr str.6
+  v19 = addr str.13
   v20 = load v18, 0
   v21 = call rt.int_to_text(v20)
-  v22 = addr str.7
+  v22 = addr str.14
   v23 = load v18, 8
   v24 = call rt.int_to_text(v23)
-  v25 = addr str.8
+  v25 = addr str.15
   v26 = load v18, 0
   v27 = load v18, 8
-  v28 = add.chk v26, v27 @site.2
+  v28 = add.chk v26, v27 @site.5
   v29 = call rt.int_to_text(v28)
   v30 = const 56
   v31 = call rt.alloc(v30)
@@ -93,9 +175,58 @@ b0:
   store v31, 48, v29
   v33 = call rt.text_concat(v31)
   v34 = call rt.log(v33)
-  v35 = const 0
-  ret v35
+  v35 = const 1
+  v36 = const 250
+  v37 = const 2
+  v38 = addr var.shapes.Promo.NoPromo
+  v39 = const 32
+  v40 = call rt.alloc(v39)
+  store v40, 0, v35
+  store v40, 8, v36
+  store v40, 16, v37
+  store v40, 24, v38
+  v41 = call main.offer_text(v40)
+  v42 = call rt.log(v41)
+  v43 = const 2
+  v44 = const 999
+  v45 = const 100
+  v46 = const 10
+  v47 = const 1
+  v48 = const 16
+  v49 = call rt.alloc(v48)
+  store v49, 0, v47
+  store v49, 8, v46
+  v50 = const 32
+  v51 = call rt.alloc(v50)
+  store v51, 0, v43
+  store v51, 8, v44
+  store v51, 16, v45
+  store v51, 24, v49
+  v52 = call main.offer_text(v51)
+  v53 = call rt.log(v52)
+  v54 = const 3
+  v55 = const 0
+  v56 = const 1
+  v57 = const 75
+  v58 = const 2
+  v59 = const 16
+  v60 = call rt.alloc(v59)
+  store v60, 0, v58
+  store v60, 8, v57
+  v61 = const 32
+  v62 = call rt.alloc(v61)
+  store v62, 0, v54
+  store v62, 8, v55
+  store v62, 16, v56
+  store v62, 24, v60
+  v63 = call main.offer_text(v62)
+  v64 = call rt.log(v63)
+  v65 = const 0
+  ret v65
 
 site.0 fault L077 main.lf:3:1
 site.1 fault L077 main.lf:16:1
-site.2 fault L040 main.lf:22:31
+site.2 internal main.lf:27:10
+site.3 fault L077 main.lf:34:1
+site.4 fault L077 main.lf:44:1
+site.5 fault L040 main.lf:50:31

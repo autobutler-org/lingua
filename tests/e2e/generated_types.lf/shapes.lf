@@ -1,6 +1,8 @@
 // A generative type and a package `comptime` block; `provided/shapes.lf` is their cache,
 // checked in so a build reuses it and writes nothing here
 
+import Cents from "money"
+
 const order_columns = [Column(name: "id", sql_type: "integer"), Column(name: "name", sql_type: "text"), Column(name: "active", sql_type: "boolean")]
 
 type OrderRow
@@ -14,3 +16,26 @@ comptime
   pure
   provide Point = record_from_columns([Column(name: "x", sql_type: "int8"), Column(name: "y", sql_type: "smallint")])
 end
+
+type Promo
+  pure
+  comptime
+    return sum_from_variants([
+      SumVariant(name: "NoPromo", payload: ""),
+      SumVariant(name: "PercentOff", payload: "Int in 1 through 100"),
+      SumVariant(name: "AmountOff", payload: "Cents"),
+    ])
+  end
+end type Promo
+
+type Offer
+  pure
+  comptime
+    return record_from_fields([
+      RecordField(name: "id", type_text: "Int"),
+      RecordField(name: "price", type_text: "Cents"),
+      RecordField(name: "quantity", type_text: "Int in 1 through 100"),
+      RecordField(name: "promo", type_text: "Promo"),
+    ])
+  end
+end type Offer

@@ -1,4 +1,4 @@
-import OrderRow, Point from "shapes"
+import OrderRow, Point, Offer, Promo from "shapes"
 
 fn describe(row: OrderRow) -> Text
   pure
@@ -13,6 +13,34 @@ fn describe(row: OrderRow) -> Text
   return "order {row.id} {row.name} closed"
 end fn describe
 
+fn promo_text(promo: Promo) -> Text
+  pure
+  example "none"
+    promo: NoPromo
+    -> "no promo"
+  end
+  example "percent"
+    promo: PercentOff(15)
+    -> "15% off"
+  end
+
+  return match promo
+    NoPromo -> "no promo"
+    PercentOff(percent) -> "{percent}% off"
+    AmountOff(amount) -> "{amount} off"
+  end
+end fn promo_text
+
+fn offer_text(offer: Offer) -> Text
+  pure
+  example "amount"
+    offer: Offer(id: 1, price: 250, quantity: 2, promo: AmountOff(50))
+    -> "offer 1: 2 x 250, 50 off"
+  end
+
+  return "offer {offer.id}: {offer.quantity} x {offer.price}, {promo_text(offer.promo)}"
+end fn offer_text
+
 fn main() -> Nothing
   pure
 
@@ -20,5 +48,8 @@ fn main() -> Nothing
   log(describe(OrderRow(name: "bob", active: false, id: 8)))
   let p = Point(x: 3, y: 4)
   log("point {p.x},{p.y} sum {p.x + p.y}")
+  log(offer_text(Offer(id: 1, price: 250, quantity: 2, promo: NoPromo)))
+  log(offer_text(Offer(promo: PercentOff(10), quantity: 100, price: 999, id: 2)))
+  log(offer_text(Offer(id: 3, price: 0, quantity: 1, promo: AmountOff(75))))
   return nothing
 end fn main

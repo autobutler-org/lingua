@@ -1,0 +1,3 @@
+// `Cents`, imported by the generated `Promo` and `Offer` through their type text
+
+type Cents = Int at least 0

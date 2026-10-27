@@ -59,6 +59,24 @@ pub fn parse_source(bytes: &[u8], key: &str) -> Result<Module, Vec<Diagnostic>> 
     }
 }
 
+/// Lexes and parses `text` as exactly one `type-expr` (docs/lingua1.md, Type text), with
+/// every node at `span`; `None` when it is anything else.
+#[must_use]
+pub fn parse_type_text(text: &str, span: Span) -> Option<TypeExpr> {
+    let tokens: Vec<Token> = lex_source(text.as_bytes())
+        .ok()?
+        .into_iter()
+        .map(|t| Token {
+            location: span.start,
+            end: span.end,
+            ..t
+        })
+        .collect();
+    let mut parser = Parser::new(tokens, false);
+    let ty = parser.parse_type_expr().ok()?;
+    (parser.at(&TokenKind::Eof) && parser.diagnostics.is_empty()).then_some(ty)
+}
+
 type Parsed<T> = Result<T, Diagnostic>;
 
 const MAX_NESTING: usize = 64;

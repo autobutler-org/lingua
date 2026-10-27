@@ -2,7 +2,7 @@
 //! Types, Effects, Value errors and exceptions). Patterns and exhaustiveness are
 //! `pattern.rs`.
 
-use super::decl::{Binding, Checker, Sig, alternatives, find_word, type_span, word_at};
+use super::decl::{Binding, Checker, Sig, alternatives, find_word, word_at};
 use super::types::{self, contains};
 use crate::ast::{
     Arg, Arm, ArmBody, ArmKind, AssignOp, BinOp, Decl, Effect, Example, Expect, Expr, FnBody,
@@ -289,7 +289,7 @@ impl Checker<'_> {
         let sig = self.sigs.get(&id)?.clone();
         let header = Span {
             start: span.start,
-            end: type_span(ret).end,
+            end: ret.span().end,
         };
         let tir_examples: Vec<TirExample> = examples
             .iter()
@@ -2087,21 +2087,25 @@ impl Checker<'_> {
                     tx(ty, span, TirKind::Call(id, args))
                 }))
             }
-            prelude::RECORD_FROM_COLUMNS => {
-                let params = [(
-                    "columns".to_owned(),
-                    Type::List(Box::new(Type::Nominal(prelude::COLUMN))),
-                )];
+            prelude::RECORD_FROM_COLUMNS
+            | prelude::RECORD_FROM_FIELDS
+            | prelude::SUM_FROM_VARIANTS => {
+                let (param, item) = match id {
+                    prelude::RECORD_FROM_COLUMNS => ("columns", prelude::COLUMN),
+                    prelude::RECORD_FROM_FIELDS => ("fields", prelude::RECORD_FIELD),
+                    _ => ("variants", prelude::SUM_VARIANT),
+                };
+                let params = [(param.to_owned(), Type::List(Box::new(Type::Nominal(item))))];
                 let matched = self.match_args(cx, span, name, &params, args)?;
                 let args = self.checked_args(cx, &matched, &params)?;
                 if !cx.comptime {
                     let summary =
-                        "`record_from_columns` returns a `Type`, which only exists at compile time";
+                        format!("`{name}` returns a `Type`, which only exists at compile time");
                     self.report_help(
                         m,
                         "L063",
                         span,
-                        summary.into(),
+                        summary,
                         "call it in a generative type's body or a `provide`".into(),
                     );
                     return None;

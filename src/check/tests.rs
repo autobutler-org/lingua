@@ -981,3 +981,233 @@ fn the_cache_policy() {
     assert_eq!(check_with(&root, super::Cache::Refresh), ["L058"]);
     assert_eq!(cache_of(&root, "m").as_deref(), Some(expanded));
 }
+
+// ---- `sum_from_variants` and `record_from_fields`
+
+// `type Name` built by `builder` over `items` (the list's elements, comma-separated)
+fn built(name: &str, builder: &str, items: &str) -> String {
+    format!(
+        "type {name}\n  pure\n  comptime\n    return {builder}([{items}])\n  end\nend type {name}\n\n"
+    )
+}
+
+fn variant(name: &str, payload: &str) -> String {
+    format!("SumVariant(name: \"{name}\", payload: \"{payload}\")")
+}
+
+fn field(name: &str, type_text: &str) -> String {
+    format!("RecordField(name: \"{name}\", type_text: \"{type_text}\")")
+}
+
+fn promo() -> String {
+    let variants = [
+        variant("NoPromo", ""),
+        variant("PercentOff", "Int in 1 through 100"),
+        variant("AmountOff", "Cents"),
+    ];
+    built("Promo", "sum_from_variants", &variants.join(", "))
+}
+
+fn offer() -> String {
+    let fields = [
+        field("id", "Int"),
+        field("price", "Cents"),
+        field("quantity", "Int in 1 through 100"),
+        field("promo", "Promo"),
+    ];
+    built("Offer", "record_from_fields", &fields.join(", "))
+}
+
+const OFF: &str = "fn off(p: Promo) -> Text\n  pure\n  example \"none\"\n    p: NoPromo\n    -> \"none\"\n  end\n  example \"percent\"\n    p: PercentOff(5)\n    -> \"5%\"\n  end\n\n  return match p\n    NoPromo -> \"none\"\n    PercentOff(n) -> \"{n}%\"\n    AmountOff(c) -> \"{c}\"\n  end\nend fn off\n";
+
+#[test]
+fn the_promo_and_offer_fixtures_are_an_ordinary_sum_and_product() {
+    let promo_lf = format!("import Cents from \"money\"\n\n{}{}{OFF}", promo(), offer());
+    let importer = "import Offer, Promo from \"promo\"\n\nfn label(o: Offer) -> Text\n  pure\n  example \"amount\"\n    o: Offer(id: 1, price: 50, quantity: 2, promo: AmountOff(7))\n    -> \"2 x 50 less 7\"\n  end\n\n  let off = match o.promo\n    NoPromo -> \"0\"\n    PercentOff(n) -> \"{n}%\"\n    AmountOff(c) -> \"{c}\"\n  end\n  return \"{o.quantity} x {o.price} less {off}\"\nend fn label\n";
+    let root = package(&[
+        ("money.lf", CENTS),
+        ("promo.lf", &promo_lf),
+        ("use.lf", importer),
+    ]);
+    assert_eq!(check_with(&root, super::Cache::Default), Vec::<&str>::new());
+    assert_eq!(
+        cache_of(&root, "promo").as_deref(),
+        Some(
+            "type Promo\n  NoPromo\n  PercentOff(Int in 1 through 100)\n  AmountOff(Cents)\nend type Promo\n\ntype Offer\n  id: Int\n  price: Cents\n  quantity: Int in 1 through 100\n  promo: Promo\nend type Offer\n"
+        )
+    );
+    // The same from the cache, without running a body
+    assert_eq!(check_with(&root, super::Cache::Offline), Vec::<&str>::new());
+    // A match missing a generated variant is the usual `L030`
+    let partial = "import Promo from \"promo\"\n\nfn f(p: Promo) -> Int\n  pure\n  example \"e\"\n    p: NoPromo\n    -> 0\n  end\n\n  return match p\n    NoPromo -> 0\n    PercentOff(_) -> 1\n  end\nend fn f\n";
+    std::fs::write(root.join("use.lf"), partial).unwrap();
+    let missing = check_with(&root, super::Cache::Default);
+    assert_eq!(missing.len(), 1, "{missing:?}");
+    assert_ne!(missing[0], "L011");
+}
+
+#[test]
+fn the_builders_fail_with_l058_and_the_spec_messages() {
+    let cases = [
+        ("sum_from_variants", String::new(), "no variants"),
+        ("sum_from_variants", variant("Ok", ""), "bad variant name"),
+        (
+            "sum_from_variants",
+            format!("{}, {}", variant("A", ""), variant("A", "Int")),
+            "duplicate variant",
+        ),
+        (
+            "sum_from_variants",
+            variant("A", "Int Int"),
+            "bad payload type",
+        ),
+        ("record_from_fields", String::new(), "no fields"),
+        ("record_from_fields", field("end", "Int"), "bad field name"),
+        (
+            "record_from_fields",
+            format!("{}, {}", field("a", "Int"), field("a", "Text")),
+            "duplicate field",
+        ),
+        ("record_from_fields", field("a", ""), "bad field type"),
+        ("record_from_fields", field("a", "List<"), "bad field type"),
+    ];
+    for (builder, items, message) in cases {
+        let root = package(&[("m.lf", &built("T", builder, &items))]);
+        let Err(Error::Diagnostics(d)) = check(std::slice::from_ref(&root), &Options::default())
+        else {
+            panic!("{items} checked clean")
+        };
+        assert_eq!(
+            d.iter().map(|d| d.code).collect::<Vec<_>>(),
+            ["L058"],
+            "{items}"
+        );
+        assert!(
+            d[0].summary.contains(&format!("\"{message}\"")),
+            "{}",
+            d[0].summary
+        );
+        assert_eq!(cache_of(&root, "m"), None);
+    }
+}
+
+// The one diagnostic of `source`, which must point at `type T`'s name on line 1
+#[track_caller]
+fn at_the_generated_name(source: &str, code: &str) {
+    let root = package(&[("m.lf", source)]);
+    let d = diagnostics(check(&[root], &Options::default()).map(|_| ()));
+    assert_eq!(
+        d.iter().map(|d| d.code).collect::<Vec<_>>(),
+        [code],
+        "{source}"
+    );
+    let text = d[0].to_string();
+    assert!(text.contains("m.lf:1:6\n"), "{text}");
+}
+
+#[test]
+fn type_text_resolves_in_the_module_at_the_generated_name() {
+    // The code of the same text in a written field. A file-level bound has no runtime
+    // local, so a bound that does not fold is `L025` or `L076` here, not `L060`
+    let rest = "fn f() -> Int\n  pure\n  example \"e\"\n    -> 1\n  end\n\n  return 1\nend fn f\n\nfn now() -> Int\n  reads clock\n  example \"e\"\n    clock: [1]\n    -> 1\n  end\n\n  let t = clock.now()\n  return t\nend fn now\n";
+    for (text, code) in [
+        ("Centz", "L011"),
+        ("List<Centz>", "L011"),
+        ("f", "L020"),
+        ("Int at least now()", "L025"),
+        ("Int in 1 through 1 / 0", "L076"),
+    ] {
+        rejects(&format!("type T\n  x: {text}\nend type T\n\n{rest}"), code);
+        at_the_generated_name(
+            &format!(
+                "{}{rest}",
+                built("T", "record_from_fields", &field("x", text))
+            ),
+            code,
+        );
+        at_the_generated_name(
+            &format!(
+                "{}{rest}",
+                built("T", "sum_from_variants", &variant("X", text))
+            ),
+            code,
+        );
+    }
+    // A bound folds in the module: consts, functions
+    accepts(&format!(
+        "const top = 9\n\n{}",
+        built(
+            "T",
+            "record_from_fields",
+            &field("x", "Int in 1 through top + 1")
+        )
+    ));
+}
+
+#[test]
+fn a_generated_variant_that_clashes_is_l017() {
+    for name in ["OutOfRange", "Column", "f", "T"] {
+        at_the_generated_name(
+            &format!(
+                "{}fn f() -> Int\n  pure\n  example \"e\"\n    -> 1\n  end\n\n  return 1\nend fn f\n",
+                built("T", "sum_from_variants", &variant(name, ""))
+            ),
+            "L017",
+        );
+    }
+    // ...and so does one of another generated sum
+    let a = built("A", "sum_from_variants", &variant("X", ""));
+    let b = built("B", "sum_from_variants", &variant("X", ""));
+    rejects(&format!("{a}{b}"), "L017");
+}
+
+#[test]
+fn generated_types_may_be_recursive_and_name_each_other() {
+    let tree = built(
+        "Tree",
+        "sum_from_variants",
+        &[variant("Leaf", "Int"), variant("Node", "List<Tree>")].join(", "),
+    );
+    let forest = built(
+        "Forest",
+        "record_from_fields",
+        &field("trees", "List<Tree>"),
+    );
+    let sum = "fn total(t: Tree) -> Int\n  pure\n  example \"leaf\"\n    t: Leaf(3)\n    -> 3\n  end\n\n  return match t\n    Leaf(n) -> n\n    Node(_) -> 0\n  end\nend fn total\n";
+    accepts(&format!("{tree}{forest}{sum}"));
+    // A record that refers to itself through a list, and a block that provides two types,
+    // one naming the other
+    accepts(&built(
+        "Node",
+        "record_from_fields",
+        &[field("v", "Int"), field("kids", "List<Node>")].join(", "),
+    ));
+    accepts(&format!(
+        "comptime\n  pure\n  provide A = sum_from_variants([{}])\n  provide B = record_from_fields([{}])\nend\n\nconst b = B(a: Hit(1))\n",
+        variant("Hit", "Int"),
+        field("a", "A")
+    ));
+}
+
+#[test]
+fn the_builders_are_comptime_only() {
+    rejects(
+        &main(&format!(
+            "  let t = sum_from_variants([{}])",
+            variant("A", "")
+        )),
+        "L063",
+    );
+    rejects(
+        &main(&format!(
+            "  let t = record_from_fields([{}])",
+            field("a", "Int")
+        )),
+        "L063",
+    );
+    // `SumVariant` and `RecordField` have two `Text` fields, so construction is named
+    rejects(
+        &built("T", "sum_from_variants", "SumVariant(\"A\", \"\")"),
+        "L021",
+    );
+}

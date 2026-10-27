@@ -173,6 +173,18 @@ pub enum TypeExpr {
     Range(Span, Box<TypeExpr>, Expr, Expr),
 }
 
+impl TypeExpr {
+    #[must_use]
+    pub fn span(&self) -> Span {
+        match self {
+            TypeExpr::Named(span, _)
+            | TypeExpr::Apply(span, ..)
+            | TypeExpr::AtLeast(span, ..)
+            | TypeExpr::Range(span, ..) => *span,
+        }
+    }
+}
+
 #[derive(Debug, PartialEq)]
 pub enum AssignOp {
     Assign,

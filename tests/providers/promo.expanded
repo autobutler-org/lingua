@@ -1,0 +1,12 @@
+type Promo
+  NoPromo
+  PercentOff(Int in 1 through 100)
+  AmountOff(Cents)
+end type Promo
+
+type Offer
+  id: Int
+  price: Cents
+  quantity: Int in 1 through 100
+  promo: Promo
+end type Offer

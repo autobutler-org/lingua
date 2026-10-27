@@ -96,7 +96,7 @@ impl Checker<'_> {
     fn reify(&self, v: &Value, ty: &Type, span: Span) -> TirExpr {
         let kind = match v {
             Value::Int(n) => TirKind::Int(*n),
-            Value::Type(record) => TirKind::TypeValue(record.as_ref().clone()),
+            Value::Type(generated) => TirKind::TypeValue(generated.as_ref().clone()),
             Value::Text(t) => TirKind::Text(t.to_string()),
             Value::Bool(b) => TirKind::Bool(*b),
             Value::Nothing => TirKind::Nothing,

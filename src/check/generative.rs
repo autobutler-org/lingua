@@ -1,14 +1,14 @@
 //! Generative types and package `comptime` blocks (docs/lingua1.md, Type providers): each
 //! generated name is a type symbol from the first pass; expanding it runs its body on the
 //! interpreter, or reuses `provided/<module>.lf` under the cache policy, and the result is an
-//! ordinary product declaration the rest of the checker resolves like a written one.
+//! ordinary product or sum declaration the rest of the checker resolves like a written one.
 
 use super::Cache;
 use super::body::FnCx;
 use super::decl::{Binding, Checker, find_word, word_at};
 use crate::ast::{Decl, Effect, Span, Stmt};
 use crate::eval::{Root, Value};
-use crate::provider::{self, Record};
+use crate::provider::{self, Generated};
 use crate::tir::{SymbolKind, TirStmt, Type, TypeKind};
 
 // One step of a package `comptime` block
@@ -32,8 +32,9 @@ impl Checker<'_> {
     }
 
     /// Expands module `m`'s generative types and package `comptime` blocks, in source
-    /// order, before anything else in it resolves, so every generated name is a product by
-    /// the time a body or another declaration uses it.
+    /// order, before anything else in it resolves, so every generated name is a product or a
+    /// sum, with its constructors declared and exported, by the time a body, another
+    /// declaration, or an importing module uses it.
     pub(super) fn expand(&mut self, m: usize) {
         let Some(module) = &self.loaded.sources[m].module else {
             return;
@@ -71,8 +72,8 @@ impl Checker<'_> {
         false
     }
 
-    // The cached record `name` of module `m`, unless the policy is `--refresh`
-    fn cached(&mut self, m: usize, name: &str) -> Option<Record> {
+    // The cached expansion of `name` in module `m`, unless the policy is `--refresh`
+    fn cached(&mut self, m: usize, name: &str) -> Option<Generated> {
         if self.loaded.cache == Cache::Refresh {
             return None;
         }
@@ -111,7 +112,7 @@ impl Checker<'_> {
             return;
         };
         let name_span = find_word(self.source(m), span, name);
-        let record = if let Some(r) = self.cached(m, name) {
+        let generated = if let Some(r) = self.cached(m, name) {
             Some(r)
         } else if !self.provider_effect(m, span, effect) {
             None
@@ -121,7 +122,7 @@ impl Checker<'_> {
         } else {
             self.generative_body(m, name, name_span, effect, body)
         };
-        self.adopt(m, id, name, name_span, record);
+        self.adopt(m, id, name, name_span, generated);
     }
 
     fn generative_body(
@@ -131,7 +132,7 @@ impl Checker<'_> {
         name_span: Span,
         effect: &Effect,
         body: &[Stmt],
-    ) -> Option<Record> {
+    ) -> Option<Generated> {
         let mut cx = FnCx {
             ret: Type::TypeAst,
             ..FnCx::root(m, effect.clone())
@@ -148,15 +149,16 @@ impl Checker<'_> {
             return None;
         }
         match self.eval_root(m, Root::Body(&stmts, name_span), &format!("`type {name}`"))? {
-            Value::Type(record) => Some(record.as_ref().clone()),
+            Value::Type(generated) => Some(generated.as_ref().clone()),
             _ => None,
         }
     }
 
-    // The expansion of `name` becomes a product declaration that resolves like a written
-    // one; without one, the name is poisoned and its uses report nothing more.
-    fn adopt(&mut self, m: usize, id: u32, name: &str, span: Span, record: Option<Record>) {
-        let Some(record) = record else {
+    // The expansion of `name` becomes a product or sum declaration that resolves like a
+    // written one, in module `m`, with every diagnostic at the generated name; without one,
+    // the name is poisoned and its uses report nothing more.
+    fn adopt(&mut self, m: usize, id: u32, name: &str, span: Span, generated: Option<Generated>) {
+        let Some(generated) = generated else {
             self.provider_failed.insert(m);
             self.poisoned.insert(id);
             self.mods[m].names.insert(name.to_owned(), Binding::Poison);
@@ -167,10 +169,33 @@ impl Checker<'_> {
             }
             return;
         };
-        let decl = provider::decl(name, &record, span);
-        self.symbols[id as usize].kind = SymbolKind::Type(TypeKind::Product);
+        let decl = provider::decl(name, &generated, span);
+        let kind = match &generated {
+            Generated::Record(_) => TypeKind::Product,
+            Generated::Sum(variants) => {
+                // A written sum's constructors, as `collect` declares them
+                let ids = (0..)
+                    .zip(variants)
+                    .map(|(tag, (vname, _))| {
+                        let kind = SymbolKind::Variant {
+                            parent: id,
+                            tag,
+                            payload: None,
+                        };
+                        let vid =
+                            self.push_symbol(vname.as_str(), kind, Type::Nominal(id), m, span);
+                        self.declare(m, vname.as_str(), Binding::Variant(vid), span);
+                        self.export(m, vname.as_str(), Binding::Variant(vid));
+                        vid
+                    })
+                    .collect();
+                self.variants.insert(id, ids);
+                TypeKind::Sum
+            }
+        };
+        self.symbols[id as usize].kind = SymbolKind::Type(kind);
         self.resolve_decl(m, &decl);
-        self.generated.push((m, span, decl));
+        self.generated.push((m, span, name.to_owned(), generated));
     }
 
     /// A package `comptime` block: its statements run in order under its effect, and each
@@ -198,12 +223,12 @@ impl Checker<'_> {
                 _ => None,
             })
             .collect();
-        let cached: Vec<Option<Record>> = provides
+        let cached: Vec<Option<Generated>> = provides
             .iter()
             .map(|(name, ..)| self.cached(m, name))
             .collect();
         let all_cached = !provides.is_empty() && cached.iter().all(Option::is_some);
-        let records: Vec<Option<Record>> = if all_cached {
+        let expansions: Vec<Option<Generated>> = if all_cached {
             cached
         } else if !self.provider_effect(m, span, effect) {
             vec![None; provides.len()]
@@ -217,12 +242,12 @@ impl Checker<'_> {
         } else {
             self.run_block(m, span, effect, body, provides.len())
         };
-        for ((name, name_span, id), record) in provides.into_iter().zip(records) {
-            self.adopt(m, id, &name, name_span, record);
+        for ((name, name_span, id), generated) in provides.into_iter().zip(expansions) {
+            self.adopt(m, id, &name, name_span, generated);
         }
     }
 
-    // Checks the block's statements, then runs them in order; the record of each `provide`
+    // Checks the block's statements, then runs them in order; the expansion of each `provide`
     // in source order, `None` for all of them after a diagnostic
     fn run_block(
         &mut self,
@@ -231,7 +256,7 @@ impl Checker<'_> {
         effect: &Effect,
         body: &[Stmt],
         n: usize,
-    ) -> Vec<Option<Record>> {
+    ) -> Vec<Option<Generated>> {
         let mut cx = FnCx::root(m, effect.clone());
         let (mark, poison) = (self.diags.len(), self.hit_poison.replace(false));
         // Statements between `provide`s run as one body; nothing flows between steps but
@@ -265,7 +290,7 @@ impl Checker<'_> {
                     }
                 }
                 Step::Provide(e) => match self.eval_root(m, Root::Expr(e), what) {
-                    Some(Value::Type(record)) => out.push(Some(record.as_ref().clone())),
+                    Some(Value::Type(generated)) => out.push(Some(generated.as_ref().clone())),
                     _ => return vec![None; n],
                 },
             }
@@ -277,13 +302,13 @@ impl Checker<'_> {
     /// file of each, written unless `--offline` or one of its providers failed.
     pub(super) fn write_caches(&mut self) -> Vec<(String, String)> {
         let mut generated = std::mem::take(&mut self.generated);
-        generated.sort_by_key(|(m, span, _)| (*m, span.start.line, span.start.column));
+        generated.sort_by_key(|(m, span, ..)| (*m, span.start.line, span.start.column));
         let mut out = Vec::new();
         for m in 0..self.loaded.sources.len() {
-            let decls: Vec<&Decl> = generated
+            let decls: Vec<(&str, &Generated)> = generated
                 .iter()
                 .filter(|(gm, ..)| *gm == m)
-                .map(|(.., d)| d)
+                .map(|(.., name, g)| (name.as_str(), g))
                 .collect();
             if decls.is_empty() {
                 continue;
