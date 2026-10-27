@@ -55,15 +55,8 @@ fn main() -> Nothing
   pure
 
   let inputs: List<Text> = [
-    "localhost:8080",
-    " example.org :443",
-    "db:65535",
-    "db:0",
-    "db:70000",
-    "web: 80",
-    ":80",
-    "nohost",
-    "a:b:c",
+    "localhost:8080", " example.org :443", "db:65535", "db:0", "db:70000",
+    "web: 80", ":80", "nohost", "a:b:c",
   ]
   for raw in inputs
     log(render(raw))

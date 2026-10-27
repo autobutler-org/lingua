@@ -5,11 +5,11 @@
       (named "Text")
       reads-fs
       (or-fail
-        (fs-read (text (literal "openapi.json")))
+        (fs-read (text (literal "openapi.json")) false false)
         (text (literal "schema unavailable"))))
     (const "named_text"
       (named "Text")
       reads-fs
       (or-fail
-        (fs-read (text (literal "openapi.json")))
+        (fs-read (text (literal "openapi.json")) true false)
         (text (literal "schema unavailable"))))))

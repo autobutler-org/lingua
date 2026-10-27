@@ -1418,11 +1418,11 @@ impl Checker<'_> {
                 }
                 Some(tx(Type::Int, *span, TirKind::ClockNow))
             }
-            Expr::FsRead(span, _) if cx.comptime && cx.effect == Effect::ReadsFs => {
+            Expr::FsRead(span, ..) if cx.comptime && cx.effect == Effect::ReadsFs => {
                 self.not_yet(m, *span, "`fs.read` (it lands with the fs library)");
                 None
             }
-            Expr::CatalogColumns(span, _) if cx.comptime && cx.effect == Effect::ReadsCatalog => {
+            Expr::CatalogColumns(span, ..) if cx.comptime && cx.effect == Effect::ReadsCatalog => {
                 self.not_yet(
                     m,
                     *span,
@@ -1430,7 +1430,7 @@ impl Checker<'_> {
                 );
                 None
             }
-            Expr::FsRead(span, _) | Expr::CatalogColumns(span, _) => {
+            Expr::FsRead(span, ..) | Expr::CatalogColumns(span, ..) => {
                 self.report(m, "L025", *span, "`fs.read` and `catalog.columns` need `reads fs` or `reads catalog`, which only a const, a generative type, or a package `comptime` block can declare".into());
                 None
             }
