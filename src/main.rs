@@ -16,6 +16,7 @@ commands:
   check --explain L031
                       print the catalog text for a diagnostic code
   expand [PATH ...]   print the types that generative types and `provide` expand to
+  pack FILE           print FILE for a prompt, its imports' declarations and signatures first
   build [PATH ...]    check, then build a static linux/amd64 executable at ./lingua-out
   lir PATH            print the LIR that `build` lowers PATH to
   asm PATH            print the amd64 instructions that `build` selects for PATH
@@ -24,7 +25,7 @@ PATH is a `.lf` file directly in the source root, or the source root itself (eve
 in it); it defaults to `.`. The source root is the nearest directory upward with a
 `lingua.toml`, else the directory of the path.
 
-flags for check, expand, and build:
+flags for check, expand, pack, and build:
   --source-root PATH  use PATH as the source root instead of the upward walk
   --refresh           run every provider effect again and replace the provider cache
   --offline           run no provider effect; a type missing from the cache is L071
@@ -92,6 +93,19 @@ fn main() -> ExitCode {
                     Err(err) => build_error(err.into()),
                 },
             )
+        }
+        ["pack", rest @ ..] => {
+            with_flags("pack", rest, false, |paths, options| {
+                match check::pack(&paths, &options) {
+                    Ok((out, clean)) => {
+                        match std::io::Write::write_all(&mut std::io::stdout(), &out) {
+                            Ok(()) if clean => ExitCode::SUCCESS,
+                            _ => ExitCode::FAILURE,
+                        }
+                    }
+                    Err(err) => build_error(err.into()),
+                }
+            })
         }
         ["build", rest @ ..] => with_flags("build", rest, true, |paths, options| {
             build_paths(&paths, &options)

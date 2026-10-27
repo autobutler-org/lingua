@@ -1270,6 +1270,8 @@ pub(super) fn check_package(loaded: &Loaded) -> (Checked, Vec<Diagnostic>) {
         diags,
         resource_calls,
         tainted,
+        consts,
+        generated,
         ..
     } = c;
     (
@@ -1280,6 +1282,8 @@ pub(super) fn check_package(loaded: &Loaded) -> (Checked, Vec<Diagnostic>) {
             resource_calls,
             skip: tainted,
             expanded,
+            consts,
+            generated,
         },
         diags,
     )

@@ -740,7 +740,7 @@ fn snippet(source: &str, span: Span) -> String {
 }
 
 // A text value as a Lingua literal
-fn quote(text: &str) -> String {
+pub(crate) fn quote(text: &str) -> String {
     let mut out = String::from('"');
     for c in text.chars() {
         match c {

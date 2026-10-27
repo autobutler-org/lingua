@@ -110,7 +110,7 @@ fn hole_free(e: &Expr) -> Option<String> {
     }
 }
 
-fn effect_text(effect: &Effect) -> String {
+pub(super) fn effect_text(effect: &Effect) -> String {
     match effect {
         Effect::Pure => "pure".into(),
         Effect::ReadsClock => "reads clock".into(),

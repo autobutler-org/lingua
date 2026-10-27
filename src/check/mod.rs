@@ -19,6 +19,7 @@ mod catalog;
 mod comptime;
 mod decl;
 mod generative;
+mod pack;
 mod package;
 mod pattern;
 mod types;
@@ -34,6 +35,7 @@ use crate::report;
 use crate::tir::{SymbolId, SymbolKind, TirModule, TirProgram, Type};
 
 pub use catalog::explain;
+pub use pack::pack;
 pub use package::{Cache, Options, is_module_key};
 
 /// The code for a construct that is legal Lingua but that this checker cannot handle yet.
@@ -151,6 +153,10 @@ pub struct Checked {
     skip: HashSet<SymbolId>,
     /// Each module's generated declarations as source text, imports first.
     pub expanded: Vec<(String, String)>,
+    /// Folded consts as literal TIR.
+    consts: std::collections::HashMap<SymbolId, crate::tir::TirExpr>,
+    /// Expansions: module index, the generated name's span, the name, and what it expanded to.
+    generated: Vec<(usize, Span, String, crate::provider::Generated)>,
 }
 
 /// `lingua check`: loads `paths` (default `.`) and their import closure and typechecks them.
