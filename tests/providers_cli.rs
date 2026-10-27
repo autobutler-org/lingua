@@ -74,6 +74,29 @@ fn provide_writes_each_name_in_source_order() {
     );
 }
 
+#[test]
+fn expand_prints_the_promo_and_offer_fixtures_and_their_cache() {
+    let dir = workdir("promo", &["money.lf", "promo.lf"]);
+    let output = lingua(&dir, &["expand", "promo.lf"]);
+    assert_eq!(output.status.code(), Some(0), "{}", stderr(&output));
+    assert_eq!(stdout(&output), fixture("promo.expanded"));
+    assert_eq!(
+        cache(&dir, "promo").as_deref(),
+        Some(&*fixture("promo.expanded"))
+    );
+    // The cache re-parses to the same declarations: offline, an importer sees the sum's
+    // constructors and the record's fields
+    std::fs::write(
+        dir.join("use.lf"),
+        "import Offer, Promo from \"promo\"\n\nconst o = Offer(id: 1, price: 250, quantity: 3, promo: PercentOff(10))\n",
+    )
+    .unwrap();
+    let output = lingua(&dir, &["check", "--offline"]);
+    assert_eq!(output.status.code(), Some(0), "{}", stderr(&output));
+    let output = lingua(&dir, &["expand", "--offline", "promo.lf"]);
+    assert_eq!(stdout(&output), fixture("promo.expanded"));
+}
+
 // What a cache hit stands for: the body's result, here a different record than the body
 // builds, so a hit is visible
 const EDITED: &str = "type OrderRow\n  id: Int\n  note: Text\nend type OrderRow\n";

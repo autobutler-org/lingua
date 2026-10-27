@@ -98,9 +98,9 @@ pub(super) struct Checker<'a> {
     /// Set when a use meets a poisoned name, which reports nothing more.
     pub hit_poison: Cell<bool>,
     /// Each module's `provided/` cache, read on first use.
-    pub caches: HashMap<usize, HashMap<String, crate::provider::Record>>,
-    /// Expanded declarations: module, the generated name's span, and the AST.
-    pub generated: Vec<(usize, Span, Decl)>,
+    pub caches: HashMap<usize, HashMap<String, crate::provider::Generated>>,
+    /// Expansions: module, the generated name's span, the name, and what it expanded to.
+    pub generated: Vec<(usize, Span, String, crate::provider::Generated)>,
     /// Modules where a provider failed: their cache is left as it was.
     pub provider_failed: HashSet<usize>,
     /// Package `comptime` blocks already run: module and the block's start.
@@ -114,7 +114,7 @@ pub(super) enum Item {
     Body(SymbolId),
 }
 
-const COMPTIME_PRELUDE: [&str; 19] = [
+const COMPTIME_PRELUDE: [&str; 23] = [
     "Expr",
     "Type",
     "http_get",
@@ -128,7 +128,11 @@ const COMPTIME_PRELUDE: [&str; 19] = [
     "types_from_openapi",
     "schema",
     "Column",
+    "SumVariant",
+    "RecordField",
     "record_from_columns",
+    "record_from_fields",
+    "sum_from_variants",
     "DbMetaError",
     "NotConfigured",
     "DbUnavailable",
@@ -165,7 +169,11 @@ fn prelude_names() -> Vec<(&'static str, Binding)> {
             .map(|n| {
                 let binding = match *n {
                     "Column" => Binding::Type(prelude::COLUMN),
+                    "SumVariant" => Binding::Type(prelude::SUM_VARIANT),
+                    "RecordField" => Binding::Type(prelude::RECORD_FIELD),
                     "record_from_columns" => Binding::PreludeFn(prelude::RECORD_FROM_COLUMNS),
+                    "record_from_fields" => Binding::PreludeFn(prelude::RECORD_FROM_FIELDS),
+                    "sum_from_variants" => Binding::PreludeFn(prelude::SUM_FROM_VARIANTS),
                     _ => Binding::Comptime,
                 };
                 (*n, binding)
@@ -223,15 +231,6 @@ pub(super) fn word_at(span: Span, len: usize) -> Span {
     }
 }
 
-pub(super) fn type_span(ty: &TypeExpr) -> Span {
-    match ty {
-        TypeExpr::Named(span, _)
-        | TypeExpr::Apply(span, ..)
-        | TypeExpr::AtLeast(span, ..)
-        | TypeExpr::Range(span, ..) => *span,
-    }
-}
-
 /// A list of names for a `help:` line, capped at 64.
 pub(super) fn alternatives<S: AsRef<str>>(names: &[S]) -> String {
     let shown: Vec<&str> = names.iter().take(64).map(AsRef::as_ref).collect();
@@ -255,7 +254,9 @@ impl<'a> Checker<'a> {
         };
         fields.insert(prelude::PROCESS, field_list(prelude::PROCESS));
         fields.insert(prelude::THREAD, field_list(prelude::THREAD));
-        fields.insert(prelude::COLUMN, field_list(prelude::COLUMN));
+        for product in [prelude::COLUMN, prelude::SUM_VARIANT, prelude::RECORD_FIELD] {
+            fields.insert(product, field_list(product));
+        }
         let mut variants = HashMap::new();
         variants.insert(
             prelude::BOUNDS_ERROR,
@@ -575,7 +576,7 @@ impl<'a> Checker<'a> {
                 self.report(
                     m,
                     "L020",
-                    type_span(base),
+                    base.span(),
                     format!("a bound's base must be `Int`, not `{shown}`"),
                 );
                 None
@@ -1148,7 +1149,7 @@ impl<'a> Checker<'a> {
                 self.report(
                     m,
                     "L020",
-                    type_span(ty),
+                    ty.span(),
                     format!(
                         "a newtype's base must be `Int`, an integer bound, or `Text`, not `{shown}`"
                     ),

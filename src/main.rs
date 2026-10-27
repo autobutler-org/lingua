@@ -33,8 +33,10 @@ Function examples run on the interpreter during check and build, then package ex
 failing one is a diagnostic. `const`, `comptime`, and comptime bounds fold on the same
 interpreter. A generative type (`type Name` whose body starts with an effect) and each
 `provide` in a package `comptime` block expand to an ordinary `type` declaration, cached in
-`provided/<module>.lf` under the source root and reused on later runs; `record_from_columns`
-builds a record type from a `List<Column>`. `fs.read`, `http_get`, `catalog.columns`,
+`provided/<module>.lf` under the source root and reused on later runs. `record_from_columns`
+builds a record type from a `List<Column>`; `record_from_fields` and `sum_from_variants` build
+a record or a sum whose field and payload types are type text, such as \"Int in 1 through 100\".
+`fs.read`, `http_get`, `catalog.columns`,
 `schema`, `types_from_openapi`, and macros are reported as not supported yet.";
 
 fn main() -> ExitCode {

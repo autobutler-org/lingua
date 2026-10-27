@@ -1,0 +1,24 @@
+import Cents from "money"
+
+type Promo
+  pure
+  comptime
+    return sum_from_variants([
+      SumVariant(name: "NoPromo", payload: ""),
+      SumVariant(name: "PercentOff", payload: "Int in 1 through 100"),
+      SumVariant(name: "AmountOff", payload: "Cents"),
+    ])
+  end
+end type Promo
+
+type Offer
+  pure
+  comptime
+    return record_from_fields([
+      RecordField(name: "id", type_text: "Int"),
+      RecordField(name: "price", type_text: "Cents"),
+      RecordField(name: "quantity", type_text: "Int in 1 through 100"),
+      RecordField(name: "promo", type_text: "Promo"),
+    ])
+  end
+end type Offer

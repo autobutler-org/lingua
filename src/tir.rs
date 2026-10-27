@@ -266,8 +266,9 @@ pub enum TirKind {
     FsRead(Box<TirExpr>),
     /// Comptime only; never in the runtime residue.
     CatalogColumns(Box<TirExpr>),
-    /// A folded `Type` (a generated record). Comptime only; never in the runtime residue.
-    TypeValue(crate::provider::Record),
+    /// A folded `Type` (a generated record or sum). Comptime only; never in the runtime
+    /// residue.
+    TypeValue(crate::provider::Generated),
     /// Rejected by `L072` before lowering.
     ResourceCall(SymbolId, Vec<TirExpr>),
     Log(Box<TirExpr>),
@@ -328,8 +329,18 @@ pub mod prelude {
     pub const COLUMN_FIELD: SymbolId = 24;
     /// Comptime only: its result is a `Type`.
     pub const RECORD_FROM_COLUMNS: SymbolId = 26;
+    pub const SUM_VARIANT: SymbolId = 27;
+    /// `SumVariant`'s `name` and `payload`.
+    pub const SUM_VARIANT_FIELD: SymbolId = 28;
+    pub const RECORD_FIELD: SymbolId = 30;
+    /// `RecordField`'s `name` and `type_text`.
+    pub const RECORD_FIELD_FIELD: SymbolId = 31;
+    /// Comptime only: its result is a `Type`.
+    pub const RECORD_FROM_FIELDS: SymbolId = 33;
+    /// Comptime only: its result is a `Type`.
+    pub const SUM_FROM_VARIANTS: SymbolId = 34;
     /// The first id after the prelude.
-    pub const END: SymbolId = 27;
+    pub const END: SymbolId = 35;
 
     /// `Process` fields in prelude order.
     pub const PROCESS_FIELDS: [&str; 7] = [
@@ -440,6 +451,28 @@ pub mod prelude {
                 ty: Type::TypeAst,
                 ..function("record_from_columns")
             },
+            symbol(
+                "SumVariant",
+                SymbolKind::Type(TypeKind::Product),
+                Type::Nominal(SUM_VARIANT),
+            ),
+            field("name", SUM_VARIANT, 0, Type::Text),
+            field("payload", SUM_VARIANT, 1, Type::Text),
+            symbol(
+                "RecordField",
+                SymbolKind::Type(TypeKind::Product),
+                Type::Nominal(RECORD_FIELD),
+            ),
+            field("name", RECORD_FIELD, 0, Type::Text),
+            field("type_text", RECORD_FIELD, 1, Type::Text),
+            Symbol {
+                ty: Type::TypeAst,
+                ..function("record_from_fields")
+            },
+            Symbol {
+                ty: Type::TypeAst,
+                ..function("sum_from_variants")
+            },
         ]);
         symbols
     }
@@ -462,6 +495,25 @@ pub mod prelude {
             assert_eq!(
                 [COLUMN, COLUMN_FIELD + 1, RECORD_FROM_COLUMNS].map(name),
                 ["Column", "sql_type", "record_from_columns"]
+            );
+            assert_eq!(
+                [
+                    SUM_VARIANT,
+                    SUM_VARIANT_FIELD + 1,
+                    RECORD_FIELD,
+                    RECORD_FIELD_FIELD + 1,
+                    RECORD_FROM_FIELDS,
+                    SUM_FROM_VARIANTS
+                ]
+                .map(name),
+                [
+                    "SumVariant",
+                    "payload",
+                    "RecordField",
+                    "type_text",
+                    "record_from_fields",
+                    "sum_from_variants"
+                ]
             );
         }
     }

@@ -48,7 +48,7 @@ pub(crate) enum Value {
     Record(SymbolId, Rc<[Value]>),
     Variant(SymbolId, Option<Rc<Value>>),
     /// A comptime `Type`.
-    Type(Rc<crate::provider::Record>),
+    Type(Rc<crate::provider::Generated>),
 }
 
 /// Where a node is: a module index and a span in its source.
@@ -387,21 +387,25 @@ impl<'a> Machine<'a> {
         }
     }
 
-    // `record_from_columns(columns)`; a bad list is the prelude's `fail`
-    fn record_from_columns(&self, span: Span, columns: &[Value]) -> Eval<Value> {
-        let pairs = columns
+    // `record_from_columns`, `record_from_fields`, or `sum_from_variants` of `items`, a list
+    // of a two-text prelude product; a bad list is the prelude's `fail`
+    fn build_type(
+        &self,
+        span: Span,
+        items: &[Value],
+        build: fn(&[(String, String)]) -> crate::provider::Built,
+    ) -> Eval<Value> {
+        let pairs = items
             .iter()
             .map(|c| match c {
                 Value::Record(_, f) => match &f[..] {
-                    [Value::Text(name), Value::Text(sql)] => {
-                        Ok((name.to_string(), sql.to_string()))
-                    }
-                    _ => Err(internal("a `Column` without two texts")),
+                    [Value::Text(a), Value::Text(b)] => Ok((a.to_string(), b.to_string())),
+                    _ => Err(internal("a builder item without two texts")),
                 },
-                v => Err(internal(&format!("expected a `Column`, found {v:?}"))),
+                v => Err(internal(&format!("expected a builder item, found {v:?}"))),
             })
             .collect::<Eval<Vec<_>>>()?;
-        crate::provider::record_from_columns(&pairs)
+        build(&pairs)
             .map(|r| Value::Type(Rc::new(r)))
             .map_err(|message| Stop::Exception {
                 message: message.to_owned(),
@@ -489,7 +493,15 @@ impl<'a> Machine<'a> {
             prelude::LENGTH => Ok(Value::Int(
                 i64::try_from(list(arg(0)?)?.len()).unwrap_or(i64::MAX),
             )),
-            prelude::RECORD_FROM_COLUMNS => self.record_from_columns(span, &list(arg(0)?)?),
+            prelude::RECORD_FROM_COLUMNS => {
+                self.build_type(span, &list(arg(0)?)?, crate::provider::record_from_columns)
+            }
+            prelude::RECORD_FROM_FIELDS => {
+                self.build_type(span, &list(arg(0)?)?, crate::provider::record_from_fields)
+            }
+            prelude::SUM_FROM_VARIANTS => {
+                self.build_type(span, &list(arg(0)?)?, crate::provider::sum_from_variants)
+            }
             _ => self.call_fn(span, id, args),
         }
     }
@@ -657,7 +669,14 @@ impl<'a> Machine<'a> {
             Value::Record(id, fields) => format!("{}({})", name(*id), all(fields)),
             Value::Variant(id, None) => name(*id).to_owned(),
             Value::Variant(id, Some(p)) => format!("{}({})", name(*id), self.render(p)),
-            Value::Type(record) => format!("type with {} fields", record.fields.len()),
+            Value::Type(generated) => match generated.as_ref() {
+                crate::provider::Generated::Record(fields) => {
+                    format!("type with {} fields", fields.len())
+                }
+                crate::provider::Generated::Sum(variants) => {
+                    format!("type with {} variants", variants.len())
+                }
+            },
         }
     }
 }
