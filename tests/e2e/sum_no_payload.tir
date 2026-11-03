@@ -1,0 +1,76 @@
+(program
+  (main "main")
+  (module "sum_no_payload" "sum_no_payload.lf"
+    (types
+      (type "Light" sum)
+      (variant "Red" "Light" 0 nil)
+      (variant "Yellow" "Light" 1 nil)
+      (variant "Green" "Light" 2 nil))
+    (functions
+      (fn "next_light"
+        (params (param "light#42" (nominal "Light")))
+        (nominal "Light")
+        pure
+        (examples
+          (example "red to green" function
+            (inputs (input "light#42" (variant "Red" : (nominal "Light"))))
+            (value (variant "Green" : (nominal "Light")))))
+        (statements
+          (return
+            (match
+              (local "light#42" : (nominal "Light"))
+              (arms
+                (arm
+                  (variant "Red")
+                  (expr (variant "Green" : (nominal "Light"))))
+                (arm
+                  (variant "Green")
+                  (expr (variant "Yellow" : (nominal "Light"))))
+                (arm
+                  (variant "Yellow")
+                  (expr (variant "Red" : (nominal "Light")))))
+              :
+              (nominal "Light")))))
+      (fn "light_name"
+        (params (param "light#43" (nominal "Light")))
+        text
+        pure
+        (examples
+          (example "red" function
+            (inputs (input "light#43" (variant "Red" : (nominal "Light"))))
+            (value (text "red" : text))))
+        (statements
+          (return
+            (match
+              (local "light#43" : (nominal "Light"))
+              (arms
+                (arm (variant "Red") (expr (text "red" : text)))
+                (arm (variant "Yellow") (expr (text "yellow" : text)))
+                (arm (variant "Green") (expr (text "green" : text))))
+              :
+              text))))
+      (fn "main"
+        (params)
+        nothing
+        pure
+        (examples)
+        (statements
+          (let "current" (variant "Red" : (nominal "Light")))
+          (for-range "step"
+            (int 0 : int)
+            (int 4 : int)
+            (statements
+              (expr
+                (log
+                  (call "light_name"
+                    (local "current" : (nominal "Light"))
+                    :
+                    text)
+                  :
+                  nothing))
+              (set "current"
+                (call "next_light"
+                  (local "current" : (nominal "Light"))
+                  :
+                  (nominal "Light")))))
+          (return (nothing : nothing)))))))

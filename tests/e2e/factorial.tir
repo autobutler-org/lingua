@@ -1,0 +1,59 @@
+(program
+  (main "main")
+  (module "factorial" "factorial.lf"
+    (functions
+      (fn "factorial"
+        (params (param "n" int))
+        int
+        pure
+        (examples
+          (example "zero" function
+            (inputs (input "n" (int 0 : int)))
+            (value (int 1 : int)))
+          (example "five" function
+            (inputs (input "n" (int 5 : int)))
+            (value (int 120 : int))))
+        (statements
+          (if
+            (cmp le (local "n" : int) (int 1 : int) : bool)
+            (then (return (int 1 : int)))
+            (else))
+          (return
+            (mul
+              (local "n" : int)
+              (call "factorial"
+                (sub (local "n" : int) (int 1 : int) : int)
+                :
+                int)
+              :
+              int))))
+      (fn "main"
+        (params)
+        nothing
+        pure
+        (examples)
+        (statements
+          (for-range "i"
+            (int 0 : int)
+            (int 6 : int)
+            (statements
+              (expr
+                (log
+                  (concat
+                    (local "i" : (bound 0 5))
+                    (text "! = " : text)
+                    (call "factorial" (local "i" : (bound 0 5)) : int)
+                    :
+                    text)
+                  :
+                  nothing))))
+          (expr
+            (log
+              (concat
+                (text "20! = " : text)
+                (call "factorial" (int 20 : int) : int)
+                :
+                text)
+              :
+              nothing))
+          (return (nothing : nothing)))))))

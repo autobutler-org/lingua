@@ -1,0 +1,156 @@
+(program
+  (main "main")
+  (module "list_index" "list_index.lf"
+    (functions
+      (fn "pick"
+        (params (param "items" (list int)) (param "position" int))
+        text
+        pure
+        (examples
+          (example "hit" function
+            (inputs
+              (input "items" (list (int 2 : int) (int 3 : int) : (list int)))
+              (input "position" (int 1 : int)))
+            (value (text "[1] = 3" : text)))
+          (example "miss" function
+            (inputs
+              (input "items" (list (int 2 : int) (int 3 : int) : (list int)))
+              (input "position" (int 2 : int)))
+            (value (text "[2] out of range" : text))))
+        (statements
+          (return
+            (match
+              (index
+                (local "items" : (list int))
+                (local "position" : int)
+                true
+                :
+                (result int (nominal "BoundsError")))
+              (arms
+                (arm
+                  (variant "Ok" (bind "value"))
+                  (expr
+                    (concat
+                      (text "[" : text)
+                      (local "position" : int)
+                      (text "] = " : text)
+                      (local "value" : int)
+                      :
+                      text)))
+                (arm
+                  (variant "Err" wild)
+                  (expr
+                    (concat
+                      (text "[" : text)
+                      (local "position" : int)
+                      (text "] out of range" : text)
+                      :
+                      text))))
+              :
+              text))))
+      (fn "main"
+        (params)
+        nothing
+        pure
+        (examples)
+        (statements
+          (let "primes"
+            (list
+              (int 2 : int)
+              (int 3 : int)
+              (int 5 : int)
+              (int 7 : int)
+              :
+              (list int)))
+          (expr
+            (log
+              (call "pick" (local "primes" : (list int)) (int 0 : int) : text)
+              :
+              nothing))
+          (expr
+            (log
+              (call "pick" (local "primes" : (list int)) (int 3 : int) : text)
+              :
+              nothing))
+          (expr
+            (log
+              (call "pick" (local "primes" : (list int)) (int 4 : int) : text)
+              :
+              nothing))
+          (expr
+            (log
+              (call "pick" (local "primes" : (list int)) (int -1 : int) : text)
+              :
+              nothing))
+          (expr
+            (log
+              (call "pick" (list : (list int)) (int 0 : int) : text)
+              :
+              nothing))
+          (let "top" (int int-max : int))
+          (expr
+            (log
+              (call "pick"
+                (local "primes" : (list int))
+                (local "top" : int)
+                :
+                text)
+              :
+              nothing))
+          (let "static_pick"
+            (index
+              (list (int 10 : int) (int 20 : int) (int 30 : int) : (list int))
+              (int 2 : int)
+              false
+              :
+              int))
+          (expr
+            (log
+              (concat
+                (text "static " : text)
+                (local "static_pick" : int)
+                :
+                text)
+              :
+              nothing))
+          (let "checked"
+            (match
+              (index
+                (local "primes" : (list int))
+                (int 1 : int)
+                true
+                :
+                (result int (nominal "BoundsError")))
+              (arms
+                (arm (variant "Ok" (bind "ok")) (expr (local "ok" : int)))
+                (arm (variant "Err" wild) (statements (fail "index 1 missing"))))
+              :
+              int))
+          (expr
+            (log
+              (concat (text "checked " : text) (local "checked" : int) : text)
+              :
+              nothing))
+          (let "names"
+            (list (text "ada" : text) (text "grace" : text) : (list text)))
+          (let "missing"
+            (match
+              (index
+                (local "names" : (list text))
+                (int 5 : int)
+                true
+                :
+                (result text (nominal "BoundsError")))
+              (arms
+                (arm
+                  (variant "Ok" (bind "found"))
+                  (expr (local "found" : text)))
+                (arm (variant "Err" wild) (expr (text "out of range" : text))))
+              :
+              text))
+          (expr
+            (log
+              (concat (text "names[5] " : text) (local "missing" : text) : text)
+              :
+              nothing))
+          (return (nothing : nothing)))))))

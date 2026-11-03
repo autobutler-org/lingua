@@ -1,0 +1,29 @@
+(program
+  (main "main")
+  (module "overflow_mul" "overflow_mul.lf"
+    (functions
+      (fn "main"
+        (params)
+        nothing
+        pure
+        (examples)
+        (statements
+          (let "half" (int 4611686018427387904 : int))
+          (let "two" (int 2 : int))
+          (let "neg_two" (int -2 : int))
+          (expr
+            (log
+              (concat
+                (text "before " : text)
+                (mul (local "half" : int) (local "neg_two" : int) : int)
+                :
+                text)
+              :
+              nothing))
+          (let "doubled" (mul (local "half" : int) (local "two" : int) : int))
+          (expr
+            (log
+              (concat (text "after " : text) (local "doubled" : int) : text)
+              :
+              nothing))
+          (return (nothing : nothing)))))))

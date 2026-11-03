@@ -1,0 +1,62 @@
+(program
+  (main "main")
+  (module "splice" "splice.lf"
+    (functions
+      (fn "main"
+        (params)
+        nothing
+        pure
+        (examples)
+        (statements
+          (let "i" (int 3 : int))
+          (assert
+            (cmp gt (local "i" : int) (int 0 : int) : bool)
+            "not positive")
+          (let "d"
+            (add
+              (sub (local "i" : int) (int 1 : int) : int)
+              (sub (local "i" : int) (int 1 : int) : int)
+              :
+              int))
+          (expr (log (concat (local "d" : int) : text) : nothing))
+          (for-range "i2"
+            (int 0 : int)
+            (local "i" : int)
+            (statements
+              (expr
+                (log
+                  (concat
+                    (sub
+                      (local "i" : int)
+                      (local "i2" : (bound 0 int-max))
+                      :
+                      int)
+                    :
+                    text)
+                  :
+                  nothing))))
+          (for-range "i3"
+            (int 0 : int)
+            (sub (local "d" : int) (local "i" : int) : int)
+            (statements
+              (expr
+                (log
+                  (concat
+                    (sub
+                      (sub (local "d" : int) (local "i" : int) : int)
+                      (local "i3" : (bound 0 int-max))
+                      :
+                      int)
+                    :
+                    text)
+                  :
+                  nothing))))
+          (assert
+            (cmp gt
+              (sub (local "d" : int) (int 7 : int) : int)
+              (int 0 : int)
+              :
+              bool)
+            "not positive")
+          (expr (log (text "unreachable" : text) : nothing))
+          (return (nothing : nothing)))))))

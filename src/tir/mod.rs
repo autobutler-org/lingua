@@ -36,6 +36,10 @@
 
 use crate::ast::{Effect, Span};
 
+mod dump;
+
+pub use dump::dump;
+
 /// A dense index into `TirProgram.symbols`.
 pub type SymbolId = u32;
 

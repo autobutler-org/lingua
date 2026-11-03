@@ -1,0 +1,145 @@
+(program
+  (main "main")
+  (module "max_bound" "max_bound.lf"
+    (types (type "Cents" (newtype int (range 0 int-max))))
+    (functions
+      (fn "floor_zero"
+        (params (param "amount" int))
+        (nominal "Cents")
+        pure
+        (examples
+          (example "negative" function
+            (inputs (input "amount" (int -5 : int)))
+            (value (int 0 : (nominal "Cents"))))
+          (example "positive" function
+            (inputs (input "amount" (int 12 : int)))
+            (value (int 12 : (nominal "Cents")))))
+        (statements
+          (return
+            (call "max"
+              (int 0 : int)
+              (local "amount" : int)
+              :
+              (nominal "Cents")))))
+      (fn "discounted"
+        (params
+          (param "price" (nominal "Cents"))
+          (param "off" (nominal "Cents")))
+        (nominal "Cents")
+        pure
+        (examples
+          (example "cannot go negative" function
+            (inputs
+              (input "price" (int 200 : (nominal "Cents")))
+              (input "off" (int 500 : (nominal "Cents"))))
+            (value (int 0 : (nominal "Cents"))))
+          (example "ten percent" function
+            (inputs
+              (input "price" (int 1200 : (nominal "Cents")))
+              (input "off" (int 120 : (nominal "Cents"))))
+            (value (int 1080 : (nominal "Cents")))))
+        (statements
+          (return
+            (call "max"
+              (sub
+                (local "price" : (nominal "Cents"))
+                (local "off" : (nominal "Cents"))
+                :
+                int)
+              (int 0 : int)
+              :
+              (nominal "Cents")))))
+      (fn "main"
+        (params)
+        nothing
+        pure
+        (examples)
+        (statements
+          (expr
+            (log
+              (concat
+                (text "floor -5 " : text)
+                (call "floor_zero" (int -5 : int) : (nominal "Cents"))
+                :
+                text)
+              :
+              nothing))
+          (expr
+            (log
+              (concat
+                (text "floor 42 " : text)
+                (call "floor_zero" (int 42 : int) : (nominal "Cents"))
+                :
+                text)
+              :
+              nothing))
+          (expr
+            (log
+              (concat
+                (text "discounted 200 by 500 " : text)
+                (call "discounted"
+                  (int 200 : (nominal "Cents"))
+                  (int 500 : (nominal "Cents"))
+                  :
+                  (nominal "Cents"))
+                :
+                text)
+              :
+              nothing))
+          (expr
+            (log
+              (concat
+                (text "discounted 1200 by 120 " : text)
+                (call "discounted"
+                  (int 1200 : (nominal "Cents"))
+                  (int 120 : (nominal "Cents"))
+                  :
+                  (nominal "Cents"))
+                :
+                text)
+              :
+              nothing))
+          (expr
+            (log
+              (concat
+                (text "max 3 9 " : text)
+                (call "max" (int 3 : int) (int 9 : int) : (bound 9 9))
+                :
+                text)
+              :
+              nothing))
+          (expr
+            (log
+              (concat
+                (text "max -3 -9 " : text)
+                (call "max" (int -3 : int) (int -9 : int) : (bound -3 -3))
+                :
+                text)
+              :
+              nothing))
+          (let "top" (int int-max : int))
+          (let "bottom"
+            (sub (int -9223372036854775807 : int) (int 1 : int) : int))
+          (expr
+            (log
+              (concat
+                (text "max top " : text)
+                (call "max"
+                  (local "top" : int)
+                  (int 0 : int)
+                  :
+                  (bound 0 int-max))
+                :
+                text)
+              :
+              nothing))
+          (expr
+            (log
+              (concat
+                (text "max bottom " : text)
+                (call "max" (local "bottom" : int) (local "bottom" : int) : int)
+                :
+                text)
+              :
+              nothing))
+          (return (nothing : nothing)))))))

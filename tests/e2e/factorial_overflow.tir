@@ -1,0 +1,54 @@
+(program
+  (main "main")
+  (module "factorial_overflow" "factorial_overflow.lf"
+    (functions
+      (fn "factorial"
+        (params (param "n" int))
+        int
+        pure
+        (examples
+          (example "zero" function
+            (inputs (input "n" (int 0 : int)))
+            (value (int 1 : int)))
+          (example "five" function
+            (inputs (input "n" (int 5 : int)))
+            (value (int 120 : int))))
+        (statements
+          (if
+            (cmp le (local "n" : int) (int 1 : int) : bool)
+            (then (return (int 1 : int)))
+            (else))
+          (return
+            (mul
+              (local "n" : int)
+              (call "factorial"
+                (sub (local "n" : int) (int 1 : int) : int)
+                :
+                int)
+              :
+              int))))
+      (fn "main"
+        (params)
+        nothing
+        pure
+        (examples)
+        (statements
+          (expr
+            (log
+              (concat
+                (text "20! = " : text)
+                (call "factorial" (int 20 : int) : int)
+                :
+                text)
+              :
+              nothing))
+          (expr
+            (log
+              (concat
+                (text "21! = " : text)
+                (call "factorial" (int 21 : int) : int)
+                :
+                text)
+              :
+              nothing))
+          (return (nothing : nothing)))))))

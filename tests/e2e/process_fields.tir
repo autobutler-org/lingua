@@ -1,0 +1,152 @@
+(program
+  (main "main")
+  (module "process_fields" "process_fields.lf"
+    (functions
+      (fn "base_name"
+        (params (param "path" text))
+        text
+        pure
+        (examples
+          (example "strips directories" function
+            (inputs (input "path" (text "/tmp/run/lingua-out" : text)))
+            (value (text "lingua-out" : text)))
+          (example "bare name" function
+            (inputs (input "path" (text "lingua-out" : text)))
+            (value (text "lingua-out" : text))))
+        (statements
+          (let "pieces"
+            (call "split" (local "path" : text) (text "/" : text) : (list text)))
+          (return
+            (match
+              (index
+                (local "pieces" : (list text))
+                (sub
+                  (call "length"
+                    (local "pieces" : (list text))
+                    :
+                    (bound 0 int-max))
+                  (int 1 : int)
+                  :
+                  int)
+                true
+                :
+                (result text (nominal "BoundsError")))
+              (arms
+                (arm (variant "Ok" (bind "last")) (expr (local "last" : text)))
+                (arm (variant "Err" wild) (expr (local "path" : text))))
+              :
+              text))))
+      (fn "main"
+        (params (param "process" (nominal "Process")))
+        nothing
+        pure
+        (examples)
+        (statements
+          (expr
+            (log
+              (concat
+                (text "os " : text)
+                (field (local "process" : (nominal "Process")) "os" : text)
+                :
+                text)
+              :
+              nothing))
+          (expr
+            (log
+              (concat
+                (text "arch " : text)
+                (field (local "process" : (nominal "Process")) "arch" : text)
+                :
+                text)
+              :
+              nothing))
+          (expr
+            (log
+              (concat
+                (text "args " : text)
+                (call "length"
+                  (field
+                    (local "process" : (nominal "Process"))
+                    "args"
+                    :
+                    (list text))
+                  :
+                  (bound 0 int-max))
+                :
+                text)
+              :
+              nothing))
+          (expr
+            (log
+              (concat
+                (text "program " : text)
+                (call "base_name"
+                  (field
+                    (local "process" : (nominal "Process"))
+                    "program"
+                    :
+                    text)
+                  :
+                  text)
+                :
+                text)
+              :
+              nothing))
+          (expr
+            (log
+              (concat
+                (text "thread " : text)
+                (field
+                  (field
+                    (local "process" : (nominal "Process"))
+                    "thread"
+                    :
+                    (nominal "Thread"))
+                  "name#22"
+                  :
+                  text)
+                :
+                text)
+              :
+              nothing))
+          (if
+            (cmp gt
+              (field
+                (local "process" : (nominal "Process"))
+                "pid"
+                :
+                (bound 1 int-max))
+              (int 0 : int)
+              :
+              bool)
+            (then (expr (log (text "pid positive" : text) : nothing)))
+            (else))
+          (if
+            (cmp gt
+              (field
+                (field
+                  (local "process" : (nominal "Process"))
+                  "thread"
+                  :
+                  (nominal "Thread"))
+                "id"
+                :
+                int)
+              (int 0 : int)
+              :
+              bool)
+            (then (expr (log (text "thread id positive" : text) : nothing)))
+            (else))
+          (if
+            (cmp gt
+              (field
+                (local "process" : (nominal "Process"))
+                "parallelism"
+                :
+                (bound 1 int-max))
+              (int 0 : int)
+              :
+              bool)
+            (then (expr (log (text "parallelism positive" : text) : nothing)))
+            (else))
+          (return (nothing : nothing)))))))

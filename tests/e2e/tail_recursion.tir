@@ -1,0 +1,71 @@
+(program
+  (main "main")
+  (module "tail_recursion" "tail_recursion.lf"
+    (functions
+      (fn "depth"
+        (params (param "n#38" int) (param "acc#39" int))
+        int
+        pure
+        (examples
+          (example "three levels" function
+            (inputs (input "n#38" (int 3 : int)) (input "acc#39" (int 0 : int)))
+            (value (int 3 : int))))
+        (statements
+          (if
+            (cmp eq (local "n#38" : int) (int 0 : int) : bool)
+            (then (return (local "acc#39" : int)))
+            (else))
+          (return
+            (call "depth"
+              (sub (local "n#38" : int) (int 1 : int) : int)
+              (add (local "acc#39" : int) (int 1 : int) : int)
+              :
+              int))))
+      (fn "count"
+        (params (param "n#40" int) (param "acc#41" int))
+        int
+        pure
+        (examples
+          (example "named arguments out of order" function
+            (inputs (input "n#40" (int 3 : int)) (input "acc#41" (int 0 : int)))
+            (value (int 3 : int))))
+        (statements
+          (if
+            (cmp eq (local "n#40" : int) (int 0 : int) : bool)
+            (then (return (local "acc#41" : int)))
+            (else))
+          (return
+            (let
+              (bindings
+                (binding "arg#42"
+                  (add (local "acc#41" : int) (int 1 : int) : int))
+                (binding "arg#43"
+                  (sub (local "n#40" : int) (int 1 : int) : int)))
+              (call "count" (local "arg#43" : int) (local "arg#42" : int) : int)
+              :
+              int))))
+      (fn "main"
+        (params)
+        nothing
+        pure
+        (examples)
+        (statements
+          (expr
+            (log
+              (concat
+                (text "deep " : text)
+                (call "depth" (int 100000000 : int) (int 0 : int) : int)
+                :
+                text)
+              :
+              nothing))
+          (expr
+            (log
+              (concat
+                (text "count " : text)
+                (call "count" (int 100000000 : int) (int 0 : int) : int)
+                :
+                text)
+              :
+              nothing))
+          (return (nothing : nothing)))))))

@@ -1,0 +1,54 @@
+(program
+  (main "main")
+  (module "assert_in_helper" "assert_in_helper.lf"
+    (functions
+      (fn "safe_half"
+        (params (param "n" int))
+        int
+        pure
+        (examples
+          (example "even" function
+            (inputs (input "n" (int 10 : int)))
+            (value (int 5 : int)))
+          (example "odd is a bug" function
+            (inputs (input "n" (int 3 : int)))
+            (exception "n must be even")))
+        (statements
+          (assert
+            (cmp eq
+              (rem (local "n" : int) (int 2 : int) : (bound -1 1))
+              (int 0 : int)
+              :
+              bool)
+            "n must be even")
+          (return
+            (div
+              (local "n" : int)
+              (int 2 : int)
+              :
+              (bound -4611686018427387904 4611686018427387903)))))
+      (fn "main"
+        (params)
+        nothing
+        pure
+        (examples)
+        (statements
+          (expr
+            (log
+              (concat
+                (text "half of 10 is " : text)
+                (call "safe_half" (int 10 : int) : int)
+                :
+                text)
+              :
+              nothing))
+          (expr
+            (log
+              (concat
+                (text "half of 7 is " : text)
+                (call "safe_half" (int 7 : int) : int)
+                :
+                text)
+              :
+              nothing))
+          (return (nothing : nothing)))))))

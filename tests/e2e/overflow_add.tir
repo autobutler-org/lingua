@@ -1,0 +1,32 @@
+(program
+  (main "main")
+  (module "overflow_add" "overflow_add.lf"
+    (functions
+      (fn "main"
+        (params)
+        nothing
+        pure
+        (examples)
+        (statements
+          (let "top" (int int-max : int))
+          (let "one" (int 1 : int))
+          (expr
+            (log
+              (concat
+                (text "before " : text)
+                (add
+                  (sub (local "top" : int) (local "one" : int) : int)
+                  (local "one" : int)
+                  :
+                  int)
+                :
+                text)
+              :
+              nothing))
+          (let "total" (add (local "top" : int) (local "one" : int) : int))
+          (expr
+            (log
+              (concat (text "after " : text) (local "total" : int) : text)
+              :
+              nothing))
+          (return (nothing : nothing)))))))

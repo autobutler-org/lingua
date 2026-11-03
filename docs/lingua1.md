@@ -192,6 +192,7 @@ Formatter input is the parse tree before splice. It does not need types. A file 
 |---|---|---|---|
 | Lex | `lingua lex FILE` | `.tokens` | One token per line: `line:col Kind(payload)`. The `Eof` token is omitted. |
 | Parse | `lingua parse FILE` | `.ast` | One S-expression for the untyped AST of the file, in the form below. Spans are omitted. |
+| Typed IR | `lingua tir PATH` | `.tir` | One S-expression for the checked link set, in the form below. Spans are omitted. |
 
 The `.ast` form:
 
@@ -210,7 +211,9 @@ The `.ast` form:
   stmt-arms)
 ```
 
-Each dump keeps everything the next stage reads. A `.tokens` file can feed the parser instead of re-lexing, and an `.ast` file can feed bind, typecheck, the interpreter, or `build` instead of re-parsing. This makes a stage testable on its own: golden tests compare a dump against a checked-in file, and a later phase can start from a hand-written `.ast` fixture. A tree read from an `.ast` file has no source positions, so its diagnostics have no span. lingua1 does not ship a reader for either form. The lossless rule exists so that one can be added later without changing the format.
+The `.tir` form is defined in `src/tir/dump.rs`. `lingua tir PATH` checks `PATH` the way `lingua lir` does, then prints one `(program (main "name") (module "key" "path" ...) ...)`. A shared symbol name is printed `name#id`. Every expression ends with `:` and its type. `int-min` and `int-max` stand for the limits of `i64`. There is no reader.
+
+Each dump keeps everything the next stage reads. A `.tokens` file can feed the parser instead of re-lexing, and an `.ast` file can feed bind, typecheck, the interpreter, or `build` instead of re-parsing. This makes a stage testable on its own: golden tests compare a dump against a checked-in file, and a later phase can start from a hand-written `.ast` fixture. A tree read from an `.ast` file has no source positions, so its diagnostics have no span. lingua1 does not ship a reader for these forms. The lossless rule exists so that one can be added later without changing the format.
 
 **Source generation.** The front end runs in both directions. Each inverse goes back exactly one phase, so source generation is unparse followed by unlex:
 
@@ -2059,6 +2062,7 @@ The lingua1 toolchain is `check`, `fmt`, `pack`, `expand`, and `build`. There is
 lingua --version
 lingua lex FILE
 lingua parse FILE
+lingua tir PATH
 lingua check [--source-root PATH] [--refresh | --offline] [PATH ...]
 lingua check --explain L031
 lingua fmt [--check] [--source-root PATH] [PATH ...]

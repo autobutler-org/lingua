@@ -1,0 +1,632 @@
+(program
+  (main "main")
+  (module "money" "money.lf"
+    (types
+      (type "Cents" (newtype int (range 0 int-max)))
+      (type "Rounding" sum)
+      (variant "half_up" "Rounding" 0 nil)
+      (type "PowStep" sum)
+      (variant "Go" "PowStep" 0 int)
+      (variant "Stop" "PowStep" 1 int)
+      (const "page_cap" (bound 1 int-max))
+      (type "Batch" (newtype int (range 1 128))))
+    (functions
+      (fn "percent"
+        (params
+          (param "part" (bound 1 100))
+          (param "of" (nominal "Cents"))
+          (param "round" (nominal "Rounding")))
+        (nominal "Cents")
+        pure
+        (examples
+          (example "ten percent of 1200 half up" function
+            (inputs
+              (input "part" (int 10 : (bound 1 100)))
+              (input "of" (int 1200 : (nominal "Cents")))
+              (input "round" (variant "half_up" : (nominal "Rounding"))))
+            (value (int 120 : (nominal "Cents"))))
+          (example "one percent of 150 rounds half up" function
+            (inputs
+              (input "part" (int 1 : (bound 1 100)))
+              (input "of" (int 150 : (nominal "Cents")))
+              (input "round" (variant "half_up" : (nominal "Rounding"))))
+            (value (int 2 : (nominal "Cents")))))
+        primitive)
+      (fn "next_pow2"
+        (params (param "n#48" (bound 1 int-max)))
+        (bound 1 int-max)
+        pure
+        (examples
+          (example "one stays one" function
+            (inputs (input "n#48" (int 1 : (bound 1 int-max))))
+            (value (int 1 : (bound 1 int-max))))
+          (example "three rounds to four" function
+            (inputs (input "n#48" (int 3 : (bound 1 int-max))))
+            (value (int 4 : (bound 1 int-max))))
+          (example "four stays four" function
+            (inputs (input "n#48" (int 4 : (bound 1 int-max))))
+            (value (int 4 : (bound 1 int-max))))
+          (example "one hundred rounds to one twenty eight" function
+            (inputs (input "n#48" (int 100 : (bound 1 int-max))))
+            (value (int 128 : (bound 1 int-max)))))
+        (statements
+          (let "state" (variant "Go" (int 1 : int) : (nominal "PowStep")))
+          (while-is "state" "Go" "p#50"
+            (statements
+              (if
+                (cmp ge
+                  (local "p#50" : int)
+                  (local "n#48" : (bound 1 int-max))
+                  :
+                  bool)
+                (then
+                  (set "state"
+                    (variant "Stop" (local "p#50" : int) : (nominal "PowStep"))))
+                (else
+                  (set "state"
+                    (variant "Go"
+                      (add (local "p#50" : int) (local "p#50" : int) : int)
+                      :
+                      (nominal "PowStep")))))))
+          (return
+            (match
+              (local "state" : (nominal "PowStep"))
+              (arms
+                (arm
+                  (variant "Stop" (bind "p#51"))
+                  (expr
+                    (call "max"
+                      (int 1 : int)
+                      (local "p#51" : int)
+                      :
+                      (bound 1 int-max))))
+                (arm (variant "Go" wild) (expr (int 1 : (bound 1 int-max)))))
+              :
+              (bound 1 int-max)))))))
+  (module "order" "order.lf"
+    (types
+      (type "Line" product)
+      (type "Discount" sum)
+      (variant "NoDiscount" "Discount" 0 nil)
+      (variant "Percent" "Discount" 1 (bound 1 100))
+      (variant "CentsOff" "Discount" 2 (nominal "Cents"))
+      (type "ParseError" sum)
+      (variant "Empty" "ParseError" 0 nil)
+      (variant "BadQuantity" "ParseError" 1 nil)
+      (variant "UnknownDiscount" "ParseError" 2 text))
+    (examples
+      (example "empty cart totals zero" package
+        (inputs)
+        (value
+          (cmp eq
+            (call "order_total"
+              (list : (list (nominal "Line")))
+              (variant "NoDiscount" : (nominal "Discount"))
+              :
+              (nominal "Cents"))
+            (int 0 : (nominal "Cents"))
+            :
+            bool))))
+    (functions
+      (fn "line_subtotal"
+        (params (param "line#64" (nominal "Line")))
+        (nominal "Cents")
+        pure
+        (examples
+          (example "two cups" function
+            (inputs
+              (input "line#64"
+                (record "Line"
+                  (text "cup" : text)
+                  (int 500 : (nominal "Cents"))
+                  (int 2 : (bound 1 int-max))
+                  :
+                  (nominal "Line"))))
+            (value (int 1000 : (nominal "Cents")))))
+        (statements
+          (return
+            (mul
+              (field (local "line#64" : (nominal "Line")) 1 : (nominal "Cents"))
+              (field (local "line#64" : (nominal "Line")) 2 : (bound 1 int-max))
+              :
+              (nominal "Cents")))))
+      (fn "order_total"
+        (params
+          (param "lines#65" (list (nominal "Line")))
+          (param "discount#66" (nominal "Discount")))
+        (nominal "Cents")
+        pure
+        (examples
+          (example "empty cart" function
+            (inputs
+              (input "lines#65" (list : (list (nominal "Line"))))
+              (input "discount#66"
+                (variant "NoDiscount" : (nominal "Discount"))))
+            (value (int 0 : (nominal "Cents"))))
+          (example "percent applies to the sum" function
+            (inputs
+              (input "lines#65"
+                (list
+                  (record "Line"
+                    (text "pen" : text)
+                    (int 200 : (nominal "Cents"))
+                    (int 1 : (bound 1 int-max))
+                    :
+                    (nominal "Line"))
+                  (record "Line"
+                    (text "cup" : text)
+                    (int 500 : (nominal "Cents"))
+                    (int 2 : (bound 1 int-max))
+                    :
+                    (nominal "Line"))
+                  :
+                  (list (nominal "Line"))))
+              (input "discount#66"
+                (variant "Percent"
+                  (int 10 : (bound 1 100))
+                  :
+                  (nominal "Discount"))))
+            (value (int 1080 : (nominal "Cents"))))
+          (example "cents off cannot go negative" function
+            (inputs
+              (input "lines#65"
+                (list
+                  (record "Line"
+                    (text "pen" : text)
+                    (int 200 : (nominal "Cents"))
+                    (int 1 : (bound 1 int-max))
+                    :
+                    (nominal "Line"))
+                  :
+                  (list (nominal "Line"))))
+              (input "discount#66"
+                (variant "CentsOff"
+                  (int 500 : (nominal "Cents"))
+                  :
+                  (nominal "Discount"))))
+            (value (int 0 : (nominal "Cents")))))
+        (statements
+          (let "sum" (int 0 : (nominal "Cents")))
+          (for-list "line#73"
+            (local "lines#65" : (list (nominal "Line")))
+            (statements
+              (set "sum"
+                (add
+                  (local "sum" : (nominal "Cents"))
+                  (call "line_subtotal"
+                    (local "line#73" : (nominal "Line"))
+                    :
+                    (nominal "Cents"))
+                  :
+                  (nominal "Cents")))))
+          (let "off"
+            (match
+              (local "discount#66" : (nominal "Discount"))
+              (arms
+                (arm (variant "NoDiscount") (expr (int 0 : (nominal "Cents"))))
+                (arm
+                  (variant "Percent" (bind "p#74"))
+                  (expr
+                    (call "percent"
+                      (local "p#74" : (bound 1 100))
+                      (local "sum" : (nominal "Cents"))
+                      (variant "half_up" : (nominal "Rounding"))
+                      :
+                      (nominal "Cents"))))
+                (arm
+                  (variant "CentsOff" (bind "c#75"))
+                  (expr (local "c#75" : (nominal "Cents")))))
+              :
+              (nominal "Cents")))
+          (return
+            (call "max"
+              (int 0 : int)
+              (sub
+                (local "sum" : (nominal "Cents"))
+                (local "off" : (nominal "Cents"))
+                :
+                int)
+              :
+              (nominal "Cents")))))
+      (fn "parse_discount"
+        (params (param "raw" text))
+        (result (nominal "Discount") (nominal "ParseError"))
+        pure
+        (examples
+          (example "percent" function
+            (inputs (input "raw" (text "percent:10" : text)))
+            (value
+              (variant "Ok"
+                (variant "Percent"
+                  (int 10 : (bound 1 100))
+                  :
+                  (nominal "Discount"))
+                :
+                (result (nominal "Discount") (nominal "ParseError")))))
+          (example "zero is not a percent discount" function
+            (inputs (input "raw" (text "percent:0" : text)))
+            (value
+              (variant "Err"
+                (variant "BadQuantity" : (nominal "ParseError"))
+                :
+                (result (nominal "Discount") (nominal "ParseError")))))
+          (example "unknown word" function
+            (inputs (input "raw" (text "bogof" : text)))
+            (value
+              (variant "Err"
+                (variant "UnknownDiscount"
+                  (text "bogof" : text)
+                  :
+                  (nominal "ParseError"))
+                :
+                (result (nominal "Discount") (nominal "ParseError"))))))
+        (statements
+          (let "text"
+            (call "lower" (call "trim" (local "raw" : text) : text) : text))
+          (if
+            (cmp eq (local "text" : text) (text "" : text) : bool)
+            (then
+              (return
+                (variant "Err"
+                  (variant "Empty" : (nominal "ParseError"))
+                  :
+                  (result (nominal "Discount") (nominal "ParseError")))))
+            (else))
+          (match
+            (call "split" (local "text" : text) (text ":" : text) : (list text))
+            (arms
+              (arm
+                (list (lit-text "none"))
+                (statements
+                  (return
+                    (variant "Ok"
+                      (variant "NoDiscount" : (nominal "Discount"))
+                      :
+                      (result (nominal "Discount") (nominal "ParseError"))))))
+              (arm
+                (list (lit-text "percent") (bind "n#78"))
+                (statements
+                  (let "p#80"
+                    (match
+                      (int-in
+                        (local "n#78" : text)
+                        1
+                        100
+                        :
+                        (result (bound 1 100) (nominal "BoundsError")))
+                      (arms
+                        (arm
+                          (variant "Ok" (bind "ok#79"))
+                          (expr (local "ok#79" : (bound 1 100))))
+                        (arm
+                          (variant "Err" wild)
+                          (statements
+                            (return
+                              (variant "Err"
+                                (variant "BadQuantity" : (nominal "ParseError"))
+                                :
+                                (result
+                                  (nominal "Discount")
+                                  (nominal "ParseError")))))))
+                      :
+                      (bound 1 100)))
+                  (return
+                    (variant "Ok"
+                      (variant "Percent"
+                        (local "p#80" : (bound 1 100))
+                        :
+                        (nominal "Discount"))
+                      :
+                      (result (nominal "Discount") (nominal "ParseError"))))))
+              (arm
+                (list (lit-text "off") (bind "n#81"))
+                (statements
+                  (let "c#83"
+                    (match
+                      (int-at-least
+                        (local "n#81" : text)
+                        0
+                        :
+                        (result (bound 0 int-max) (nominal "BoundsError")))
+                      (arms
+                        (arm
+                          (variant "Ok" (bind "ok#82"))
+                          (expr (local "ok#82" : (bound 0 int-max))))
+                        (arm
+                          (variant "Err" wild)
+                          (statements
+                            (return
+                              (variant "Err"
+                                (variant "BadQuantity" : (nominal "ParseError"))
+                                :
+                                (result
+                                  (nominal "Discount")
+                                  (nominal "ParseError")))))))
+                      :
+                      (nominal "Cents")))
+                  (return
+                    (variant "Ok"
+                      (variant "CentsOff"
+                        (local "c#83" : (nominal "Cents"))
+                        :
+                        (nominal "Discount"))
+                      :
+                      (result (nominal "Discount") (nominal "ParseError"))))))
+              (arm wild
+                (statements
+                  (return
+                    (variant "Err"
+                      (variant "UnknownDiscount"
+                        (local "text" : text)
+                        :
+                        (nominal "ParseError"))
+                      :
+                      (result (nominal "Discount") (nominal "ParseError"))))))))))))
+  (module "main" "main.lf"
+    (functions
+      (fn "apply_code"
+        (params
+          (param "lines#70" (list (nominal "Line")))
+          (param "code#71" text))
+        text
+        pure
+        (examples
+          (example "no discount" function
+            (inputs
+              (input "lines#70"
+                (list
+                  (record "Line"
+                    (text "pen" : text)
+                    (int 200 : (nominal "Cents"))
+                    (int 1 : (bound 1 int-max))
+                    :
+                    (nominal "Line"))
+                  :
+                  (list (nominal "Line"))))
+              (input "code#71" (text "none" : text)))
+            (value (text "[none] -> 200" : text))))
+        (statements
+          (return
+            (match
+              (call "parse_discount"
+                (local "code#71" : text)
+                :
+                (result (nominal "Discount") (nominal "ParseError")))
+              (arms
+                (arm
+                  (variant "Ok" (bind "discount#84"))
+                  (expr
+                    (concat
+                      (text "[" : text)
+                      (local "code#71" : text)
+                      (text "] -> " : text)
+                      (call "order_total"
+                        (local "lines#70" : (list (nominal "Line")))
+                        (local "discount#84" : (nominal "Discount"))
+                        :
+                        (nominal "Cents"))
+                      :
+                      text)))
+                (arm
+                  (variant "Err" wild)
+                  (expr
+                    (concat
+                      (text "[" : text)
+                      (local "code#71" : text)
+                      (text "] -> rejected" : text)
+                      :
+                      text))))
+              :
+              text))))
+      (fn "main"
+        (params)
+        nothing
+        pure
+        (examples)
+        (statements
+          (let "cart"
+            (list
+              (record "Line"
+                (text "pen" : text)
+                (int 200 : (nominal "Cents"))
+                (int 1 : (bound 1 int-max))
+                :
+                (nominal "Line"))
+              (record "Line"
+                (text "cup" : text)
+                (int 500 : (nominal "Cents"))
+                (int 2 : (bound 1 int-max))
+                :
+                (nominal "Line"))
+              :
+              (list (nominal "Line"))))
+          (expr
+            (log
+              (concat
+                (text "no discount " : text)
+                (call "order_total"
+                  (local "cart" : (list (nominal "Line")))
+                  (variant "NoDiscount" : (nominal "Discount"))
+                  :
+                  (nominal "Cents"))
+                :
+                text)
+              :
+              nothing))
+          (expr
+            (log
+              (concat
+                (text "ten percent " : text)
+                (call "order_total"
+                  (local "cart" : (list (nominal "Line")))
+                  (variant "Percent"
+                    (int 10 : (bound 1 100))
+                    :
+                    (nominal "Discount"))
+                  :
+                  (nominal "Cents"))
+                :
+                text)
+              :
+              nothing))
+          (expr
+            (log
+              (concat
+                (text "150 off " : text)
+                (call "order_total"
+                  (local "cart" : (list (nominal "Line")))
+                  (variant "CentsOff"
+                    (int 150 : (nominal "Cents"))
+                    :
+                    (nominal "Discount"))
+                  :
+                  (nominal "Cents"))
+                :
+                text)
+              :
+              nothing))
+          (expr
+            (log
+              (concat
+                (text "too much off " : text)
+                (call "order_total"
+                  (list
+                    (record "Line"
+                      (text "pen" : text)
+                      (int 200 : (nominal "Cents"))
+                      (int 1 : (bound 1 int-max))
+                      :
+                      (nominal "Line"))
+                    :
+                    (list (nominal "Line")))
+                  (variant "CentsOff"
+                    (int 500 : (nominal "Cents"))
+                    :
+                    (nominal "Discount"))
+                  :
+                  (nominal "Cents"))
+                :
+                text)
+              :
+              nothing))
+          (expr
+            (log
+              (concat
+                (text "empty " : text)
+                (call "order_total"
+                  (list : (list (nominal "Line")))
+                  (variant "NoDiscount" : (nominal "Discount"))
+                  :
+                  (nominal "Cents"))
+                :
+                text)
+              :
+              nothing))
+          (expr
+            (log
+              (concat
+                (text "percent 10 of 1200 " : text)
+                (call "percent"
+                  (int 10 : (bound 1 100))
+                  (int 1200 : (nominal "Cents"))
+                  (variant "half_up" : (nominal "Rounding"))
+                  :
+                  (nominal "Cents"))
+                :
+                text)
+              :
+              nothing))
+          (expr
+            (log
+              (concat
+                (text "percent 1 of 150 " : text)
+                (call "percent"
+                  (int 1 : (bound 1 100))
+                  (int 150 : (nominal "Cents"))
+                  (variant "half_up" : (nominal "Rounding"))
+                  :
+                  (nominal "Cents"))
+                :
+                text)
+              :
+              nothing))
+          (expr
+            (log
+              (concat
+                (text "percent 49 of 1 " : text)
+                (call "percent"
+                  (int 49 : (bound 1 100))
+                  (int 1 : (nominal "Cents"))
+                  (variant "half_up" : (nominal "Rounding"))
+                  :
+                  (nominal "Cents"))
+                :
+                text)
+              :
+              nothing))
+          (expr
+            (log
+              (concat
+                (text "percent 50 of 1 " : text)
+                (call "percent"
+                  (int 50 : (bound 1 100))
+                  (int 1 : (nominal "Cents"))
+                  (variant "half_up" : (nominal "Rounding"))
+                  :
+                  (nominal "Cents"))
+                :
+                text)
+              :
+              nothing))
+          (expr
+            (log
+              (concat
+                (text "percent 33 of 1000 " : text)
+                (call "percent"
+                  (int 33 : (bound 1 100))
+                  (int 1000 : (nominal "Cents"))
+                  (variant "half_up" : (nominal "Rounding"))
+                  :
+                  (nominal "Cents"))
+                :
+                text)
+              :
+              nothing))
+          (expr
+            (log
+              (concat
+                (text "percent 100 of max " : text)
+                (call "percent"
+                  (int 100 : (bound 1 100))
+                  (int int-max : (nominal "Cents"))
+                  (variant "half_up" : (nominal "Rounding"))
+                  :
+                  (nominal "Cents"))
+                :
+                text)
+              :
+              nothing))
+          (let "codes"
+            (list
+              (text "none" : text)
+              (text "percent:10" : text)
+              (text " OFF:300 " : text)
+              (text "percent:0" : text)
+              (text "percent:101" : text)
+              (text "bogof" : text)
+              (text "" : text)
+              :
+              (list text)))
+          (for-list "code#87"
+            (local "codes" : (list text))
+            (statements
+              (expr
+                (log
+                  (call "apply_code"
+                    (local "cart" : (list (nominal "Line")))
+                    (local "code#87" : text)
+                    :
+                    text)
+                  :
+                  nothing))))
+          (return (nothing : nothing)))))))

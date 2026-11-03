@@ -1,0 +1,82 @@
+(program
+  (main "main")
+  (module "text_trim_lower" "text_trim_lower.lf"
+    (functions
+      (fn "main"
+        (params)
+        nothing
+        pure
+        (examples)
+        (statements
+          (let "padded" (text " \t spaced out \n" : text))
+          (expr
+            (log
+              (concat
+                (text "[" : text)
+                (call "trim" (local "padded" : text) : text)
+                (text "]" : text)
+                :
+                text)
+              :
+              nothing))
+          (let "inner" (text "a  b" : text))
+          (expr
+            (log
+              (concat
+                (text "[" : text)
+                (call "trim" (local "inner" : text) : text)
+                (text "]" : text)
+                :
+                text)
+              :
+              nothing))
+          (let "blank" (text " \t\n " : text))
+          (expr
+            (log
+              (concat
+                (text "[" : text)
+                (call "trim" (local "blank" : text) : text)
+                (text "]" : text)
+                :
+                text)
+              :
+              nothing))
+          (let "nbsp" (text " x " : text))
+          (expr
+            (log
+              (concat
+                (text "[" : text)
+                (call "trim" (local "nbsp" : text) : text)
+                (text "]" : text)
+                :
+                text)
+              :
+              nothing))
+          (let "shout" (text "HeLLo, World 123" : text))
+          (expr (log (call "lower" (local "shout" : text) : text) : nothing))
+          (let "accented" (text "ÉCOLE Ünïcode" : text))
+          (expr (log (call "lower" (local "accented" : text) : text) : nothing))
+          (expr
+            (log
+              (concat
+                (text "[" : text)
+                (call "lower"
+                  (call "trim" (text "  MiXeD  " : text) : text)
+                  :
+                  text)
+                (text "]" : text)
+                :
+                text)
+              :
+              nothing))
+          (expr
+            (log
+              (concat
+                (text "[" : text)
+                (call "lower" (text "" : text) : text)
+                (text "]" : text)
+                :
+                text)
+              :
+              nothing))
+          (return (nothing : nothing)))))))

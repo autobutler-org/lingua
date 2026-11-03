@@ -1,0 +1,36 @@
+(program
+  (main "main")
+  (module "layout" "layout.lf"
+    (functions
+      (fn "add"
+        (params (param "left" int) (param "right" int))
+        int
+        pure
+        (examples
+          (example "small" function
+            (inputs (input "left" (int 2 : int)) (input "right" (int 3 : int)))
+            (value (int 5 : int))))
+        (statements
+          (return (add (local "left" : int) (local "right" : int) : int))))
+      (fn "main"
+        (params)
+        nothing
+        pure
+        (examples
+          (example "main may have an example" function
+            (inputs)
+            (value (nothing : nothing))))
+        (statements
+          (let "total" (call "add" (int 40 : int) (int 2 : int) : int))
+          (expr
+            (log
+              (concat (text "total " : text) (local "total" : int) : text)
+              :
+              nothing))
+          (expr (log (text "broken call" : text) : nothing))
+          (expr
+            (log
+              (text "a // b is not a comment inside a string" : text)
+              :
+              nothing))
+          (return (nothing : nothing)))))))

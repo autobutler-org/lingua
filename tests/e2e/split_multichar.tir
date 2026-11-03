@@ -1,0 +1,88 @@
+(program
+  (main "main")
+  (module "split_multichar" "split_multichar.lf"
+    (functions
+      (fn "show_parts"
+        (params (param "parts" (list text)))
+        text
+        pure
+        (examples
+          (example "two parts" function
+            (inputs
+              (input "parts"
+                (list (text "a" : text) (text "" : text) : (list text))))
+            (value (text "2 [a][]" : text))))
+        (statements
+          (let "shown"
+            (concat
+              (call "length" (local "parts" : (list text)) : (bound 0 int-max))
+              (text " " : text)
+              :
+              text))
+          (for-list "part"
+            (local "parts" : (list text))
+            (statements
+              (set "shown"
+                (concat
+                  (local "shown" : text)
+                  (text "[" : text)
+                  (local "part" : text)
+                  (text "]" : text)
+                  :
+                  text))))
+          (return (local "shown" : text))))
+      (fn "main"
+        (params)
+        nothing
+        pure
+        (examples)
+        (statements
+          (expr
+            (log
+              (call "show_parts"
+                (call "split"
+                  (text "a, b, c" : text)
+                  (text ", " : text)
+                  :
+                  (list text))
+                :
+                text)
+              :
+              nothing))
+          (expr
+            (log
+              (call "show_parts"
+                (call "split"
+                  (text "aXYbXY" : text)
+                  (text "XY" : text)
+                  :
+                  (list text))
+                :
+                text)
+              :
+              nothing))
+          (expr
+            (log
+              (call "show_parts"
+                (call "split"
+                  (text "no match here" : text)
+                  (text "::" : text)
+                  :
+                  (list text))
+                :
+                text)
+              :
+              nothing))
+          (expr
+            (log
+              (call "show_parts"
+                (call "split"
+                  (text "café→bar→" : text)
+                  (text "→" : text)
+                  :
+                  (list text))
+                :
+                text)
+              :
+              nothing))
+          (return (nothing : nothing)))))))

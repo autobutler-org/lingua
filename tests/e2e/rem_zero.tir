@@ -1,0 +1,28 @@
+(program
+  (main "main")
+  (module "rem_zero" "rem_zero.lf"
+    (functions
+      (fn "main"
+        (params)
+        nothing
+        pure
+        (examples)
+        (statements
+          (let "ten" (int 10 : int))
+          (let "zero" (int 0 : int))
+          (expr
+            (log
+              (concat
+                (text "before " : text)
+                (rem (local "zero" : int) (local "ten" : int) : int)
+                :
+                text)
+              :
+              nothing))
+          (let "remainder" (rem (local "ten" : int) (local "zero" : int) : int))
+          (expr
+            (log
+              (concat (text "after " : text) (local "remainder" : int) : text)
+              :
+              nothing))
+          (return (nothing : nothing)))))))

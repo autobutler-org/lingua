@@ -1,0 +1,53 @@
+(program
+  (main "main")
+  (module "text_equality" "text_equality.lf"
+    (functions
+      (fn "main"
+        (params)
+        nothing
+        pure
+        (examples)
+        (statements
+          (let "a" (text "lingua" : text))
+          (let "b" (text "lin" : text))
+          (let "joined" (concat (local "b" : text) (text "gua" : text) : text))
+          (if
+            (cmp eq (local "a" : text) (local "joined" : text) : bool)
+            (then
+              (expr (log (text "equal after interpolation" : text) : nothing)))
+            (else))
+          (if
+            (cmp ne (local "a" : text) (text "Lingua" : text) : bool)
+            (then (expr (log (text "case matters" : text) : nothing)))
+            (else))
+          (if
+            (cmp eq
+              (call "lower" (text "LINGUA" : text) : text)
+              (local "a" : text)
+              :
+              bool)
+            (then (expr (log (text "lower matches" : text) : nothing)))
+            (else))
+          (if
+            (cmp eq
+              (text "" : text)
+              (call "trim" (text "   " : text) : text)
+              :
+              bool)
+            (then (expr (log (text "trimmed to empty" : text) : nothing)))
+            (else))
+          (if
+            (cmp eq (local "a" : text) (local "b" : text) : bool)
+            (then (expr (log (text "never" : text) : nothing)))
+            (else (expr (log (text "prefix is not equal" : text) : nothing))))
+          (let "composed" (text "café" : text))
+          (let "decomposed" (text "café" : text))
+          (if
+            (cmp ne
+              (local "composed" : text)
+              (local "decomposed" : text)
+              :
+              bool)
+            (then (expr (log (text "no normalization" : text) : nothing)))
+            (else))
+          (return (nothing : nothing)))))))

@@ -1,0 +1,198 @@
+(program
+  (main "main")
+  (module "comptime_const" "comptime_const.lf"
+    (types
+      (type "Step" sum)
+      (variant "Go" "Step" 0 int)
+      (variant "Stop" "Step" 1 int)
+      (type "Pair" product)
+      (const "page_cap" (bound 1 int-max))
+      (const "greeting" text)
+      (const "table" (list int))
+      (const "pair" (nominal "Pair"))
+      (const "parsed" (result (bound 1 100) (nominal "BoundsError")))
+      (type "Batch" (newtype int (range 1 128))))
+    (functions
+      (fn "next_pow2"
+        (params (param "n#48" (bound 1 int-max)))
+        (bound 1 int-max)
+        pure
+        (examples
+          (example "one hundred" function
+            (inputs (input "n#48" (int 100 : (bound 1 int-max))))
+            (value (int 128 : (bound 1 int-max)))))
+        (statements
+          (let "state" (variant "Go" (int 1 : int) : (nominal "Step")))
+          (while-is "state" "Go" "p#51"
+            (statements
+              (if
+                (cmp ge
+                  (local "p#51" : int)
+                  (local "n#48" : (bound 1 int-max))
+                  :
+                  bool)
+                (then
+                  (set "state"
+                    (variant "Stop" (local "p#51" : int) : (nominal "Step"))))
+                (else
+                  (set "state"
+                    (variant "Go"
+                      (add (local "p#51" : int) (local "p#51" : int) : int)
+                      :
+                      (nominal "Step")))))))
+          (return
+            (match
+              (local "state" : (nominal "Step"))
+              (arms
+                (arm
+                  (variant "Stop" (bind "p#52"))
+                  (expr
+                    (call "max"
+                      (int 1 : int)
+                      (local "p#52" : int)
+                      :
+                      (bound 1 int-max))))
+                (arm (variant "Go" wild) (expr (int 1 : (bound 1 int-max)))))
+              :
+              (bound 1 int-max)))))
+      (fn "squares"
+        (params (param "n#49" int))
+        (list int)
+        pure
+        (examples
+          (example "three" function
+            (inputs (input "n#49" (int 3 : int)))
+            (value
+              (list (int 0 : int) (int 1 : int) (int 4 : int) : (list int)))))
+        (statements
+          (let "out" (list : (list int)))
+          (for-range "i"
+            (int 0 : int)
+            (local "n#49" : int)
+            (statements
+              (set "out"
+                (call "join"
+                  (local "out" : (list int))
+                  (list
+                    (mul
+                      (local "i" : (bound 0 int-max))
+                      (local "i" : (bound 0 int-max))
+                      :
+                      (bound 0 int-max))
+                    :
+                    (list int))
+                  :
+                  (list int)))))
+          (return (local "out" : (list int)))))
+      (fn "main"
+        (params)
+        nothing
+        pure
+        (examples)
+        (statements
+          (expr
+            (log
+              (concat
+                (text "page_cap " : text)
+                (int 128 : (bound 1 int-max))
+                :
+                text)
+              :
+              nothing))
+          (expr (log (text "hello from comptime" : text) : nothing))
+          (for-list "x"
+            (list
+              (int 0 : int)
+              (int 1 : int)
+              (int 4 : int)
+              (int 9 : int)
+              (int 16 : int)
+              :
+              (list int))
+            (statements
+              (expr
+                (log
+                  (concat (text "square " : text) (local "x" : int) : text)
+                  :
+                  nothing))))
+          (expr
+            (log
+              (concat
+                (text "pair " : text)
+                (field
+                  (record "Pair"
+                    (text "cups" : text)
+                    (int 4 : int)
+                    :
+                    (nominal "Pair"))
+                  0
+                  :
+                  text)
+                (text " " : text)
+                (field
+                  (record "Pair"
+                    (text "cups" : text)
+                    (int 4 : int)
+                    :
+                    (nominal "Pair"))
+                  1
+                  :
+                  int)
+                :
+                text)
+              :
+              nothing))
+          (expr
+            (match
+              (variant "Ok"
+                (int 42 : (bound 1 100))
+                :
+                (result (bound 1 100) (nominal "BoundsError")))
+              (arms
+                (arm
+                  (variant "Ok" (bind "n#56"))
+                  (expr
+                    (log
+                      (concat
+                        (text "parsed " : text)
+                        (local "n#56" : (bound 1 100))
+                        :
+                        text)
+                      :
+                      nothing)))
+                (arm
+                  (variant "Err" wild)
+                  (expr (log (text "parse failed" : text) : nothing))))
+              :
+              nothing))
+          (expr
+            (log
+              (concat
+                (text "folded " : text)
+                (int 1024 : (bound 1 int-max))
+                :
+                text)
+              :
+              nothing))
+          (let "marked"
+            (add (int 8 : (bound 1 int-max)) (int 1 : int) : (bound 0 int-max)))
+          (expr
+            (log
+              (concat
+                (text "marked " : text)
+                (local "marked" : (bound 0 int-max))
+                :
+                text)
+              :
+              nothing))
+          (let "batch" (int 128 : (nominal "Batch")))
+          (expr
+            (log
+              (concat
+                (text "batch " : text)
+                (local "batch" : (nominal "Batch"))
+                :
+                text)
+              :
+              nothing))
+          (return (nothing : nothing)))))))

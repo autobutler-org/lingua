@@ -1,0 +1,56 @@
+(program
+  (main "main")
+  (module "or_fail_ok" "or_fail_ok.lf"
+    (functions
+      (fn "main"
+        (params)
+        nothing
+        pure
+        (examples)
+        (statements
+          (let "digits"
+            (match
+              (int-at-least
+                (text "12" : text)
+                0
+                :
+                (result (bound 0 int-max) (nominal "BoundsError")))
+              (arms
+                (arm
+                  (variant "Ok" (bind "ok#36"))
+                  (expr (local "ok#36" : (bound 0 int-max))))
+                (arm (variant "Err" wild) (statements (fail "not a count"))))
+              :
+              (bound 0 int-max)))
+          (expr
+            (log
+              (concat
+                (text "digits " : text)
+                (local "digits" : (bound 0 int-max))
+                :
+                text)
+              :
+              nothing))
+          (let "items" (list (text "a" : text) (text "b" : text) : (list text)))
+          (let "second"
+            (match
+              (index
+                (local "items" : (list text))
+                (int 1 : int)
+                true
+                :
+                (result text (nominal "BoundsError")))
+              (arms
+                (arm
+                  (variant "Ok" (bind "ok#39"))
+                  (expr (local "ok#39" : text)))
+                (arm (variant "Err" wild) (statements (fail "no second item"))))
+              :
+              text))
+          (expr
+            (log
+              (concat (text "second " : text) (local "second" : text) : text)
+              :
+              nothing))
+          (expr (log (text "done" : text) : nothing))
+          (return (nothing : nothing)))))))

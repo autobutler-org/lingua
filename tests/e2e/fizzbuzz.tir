@@ -1,0 +1,63 @@
+(program
+  (main "main")
+  (module "fizzbuzz" "fizzbuzz.lf"
+    (functions
+      (fn "fizzbuzz"
+        (params (param "n" int))
+        text
+        pure
+        (examples
+          (example "fifteen" function
+            (inputs (input "n" (int 15 : int)))
+            (value (text "FizzBuzz" : text)))
+          (example "nine" function
+            (inputs (input "n" (int 9 : int)))
+            (value (text "Fizz" : text)))
+          (example "ten" function
+            (inputs (input "n" (int 10 : int)))
+            (value (text "Buzz" : text)))
+          (example "seven" function
+            (inputs (input "n" (int 7 : int)))
+            (value (text "7" : text))))
+        (statements
+          (if
+            (cmp eq
+              (rem (local "n" : int) (int 15 : int) : (bound -14 14))
+              (int 0 : int)
+              :
+              bool)
+            (then (return (text "FizzBuzz" : text)))
+            (else))
+          (if
+            (cmp eq
+              (rem (local "n" : int) (int 3 : int) : (bound -2 2))
+              (int 0 : int)
+              :
+              bool)
+            (then (return (text "Fizz" : text)))
+            (else))
+          (if
+            (cmp eq
+              (rem (local "n" : int) (int 5 : int) : (bound -4 4))
+              (int 0 : int)
+              :
+              bool)
+            (then (return (text "Buzz" : text)))
+            (else))
+          (return (concat (local "n" : int) : text))))
+      (fn "main"
+        (params)
+        nothing
+        pure
+        (examples)
+        (statements
+          (for-range "i"
+            (int 1 : int)
+            (int 16 : int)
+            (statements
+              (expr
+                (log
+                  (call "fizzbuzz" (local "i" : (bound 1 15)) : text)
+                  :
+                  nothing))))
+          (return (nothing : nothing)))))))

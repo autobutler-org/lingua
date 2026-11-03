@@ -1,0 +1,105 @@
+(program
+  (main "main")
+  (module "int_arith" "int_arith.lf"
+    (functions
+      (fn "main"
+        (params)
+        nothing
+        pure
+        (examples)
+        (statements
+          (let "a" (int 7 : int))
+          (let "b" (int 3 : int))
+          (expr
+            (log
+              (concat (add (local "a" : int) (local "b" : int) : int) : text)
+              :
+              nothing))
+          (expr
+            (log
+              (concat (sub (local "a" : int) (local "b" : int) : int) : text)
+              :
+              nothing))
+          (expr
+            (log
+              (concat (sub (local "b" : int) (local "a" : int) : int) : text)
+              :
+              nothing))
+          (expr
+            (log
+              (concat (mul (local "a" : int) (local "b" : int) : int) : text)
+              :
+              nothing))
+          (expr
+            (log
+              (concat
+                (add
+                  (local "a" : int)
+                  (mul (local "b" : int) (int 2 : int) : int)
+                  :
+                  int)
+                :
+                text)
+              :
+              nothing))
+          (expr
+            (log
+              (concat
+                (mul
+                  (add (local "a" : int) (local "b" : int) : int)
+                  (int 2 : int)
+                  :
+                  int)
+                :
+                text)
+              :
+              nothing))
+          (expr
+            (log
+              (concat
+                (sub
+                  (sub (local "a" : int) (local "b" : int) : int)
+                  (int 1 : int)
+                  :
+                  int)
+                :
+                text)
+              :
+              nothing))
+          (expr
+            (log
+              (concat
+                (add
+                  (mul (int 2 : int) (int 3 : int) : (bound 0 int-max))
+                  (mul (int 4 : int) (int 5 : int) : (bound 0 int-max))
+                  :
+                  (bound 0 int-max))
+                :
+                text)
+              :
+              nothing))
+          (expr
+            (log
+              (concat
+                (add (neg (local "a" : int) : int) (local "b" : int) : int)
+                :
+                text)
+              :
+              nothing))
+          (expr
+            (log
+              (concat
+                (neg (add (local "a" : int) (local "b" : int) : int) : int)
+                :
+                text)
+              :
+              nothing))
+          (expr
+            (log
+              (concat
+                (mul (local "a" : int) (neg (local "b" : int) : int) : int)
+                :
+                text)
+              :
+              nothing))
+          (return (nothing : nothing)))))))

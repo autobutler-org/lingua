@@ -1,0 +1,89 @@
+(program
+  (main "main")
+  (module "fibonacci" "fibonacci.lf"
+    (functions
+      (fn "fib"
+        (params (param "n#38" int))
+        int
+        pure
+        (examples
+          (example "zero" function
+            (inputs (input "n#38" (int 0 : int)))
+            (value (int 0 : int)))
+          (example "ten" function
+            (inputs (input "n#38" (int 10 : int)))
+            (value (int 55 : int))))
+        (statements
+          (if
+            (cmp lt (local "n#38" : int) (int 2 : int) : bool)
+            (then (return (local "n#38" : int)))
+            (else))
+          (return
+            (add
+              (call "fib" (sub (local "n#38" : int) (int 1 : int) : int) : int)
+              (call "fib" (sub (local "n#38" : int) (int 2 : int) : int) : int)
+              :
+              int))))
+      (fn "fib_loop"
+        (params (param "n#39" (bound 0 int-max)))
+        int
+        pure
+        (examples
+          (example "zero" function
+            (inputs (input "n#39" (int 0 : (bound 0 int-max))))
+            (value (int 0 : int)))
+          (example "ten" function
+            (inputs (input "n#39" (int 10 : (bound 0 int-max))))
+            (value (int 55 : int))))
+        (statements
+          (let "prev" (int 0 : int))
+          (let "curr" (int 1 : int))
+          (for-range "step"
+            (int 0 : int)
+            (local "n#39" : (bound 0 int-max))
+            (statements
+              (let "following"
+                (add (local "prev" : int) (local "curr" : int) : int))
+              (set "prev" (local "curr" : int))
+              (set "curr" (local "following" : int))))
+          (return (local "prev" : int))))
+      (fn "main"
+        (params)
+        nothing
+        pure
+        (examples)
+        (statements
+          (for-range "i"
+            (int 0 : int)
+            (int 11 : int)
+            (statements
+              (expr
+                (log
+                  (concat
+                    (text "fib(" : text)
+                    (local "i" : (bound 0 10))
+                    (text ") = " : text)
+                    (call "fib" (local "i" : (bound 0 10)) : int)
+                    :
+                    text)
+                  :
+                  nothing))))
+          (expr
+            (log
+              (concat
+                (text "fib(25) = " : text)
+                (call "fib" (int 25 : int) : int)
+                :
+                text)
+              :
+              nothing))
+          (expr
+            (log
+              (concat
+                (text "fib_loop(90) = " : text)
+                (call "fib_loop" (int 90 : (bound 0 int-max)) : int)
+                :
+                text)
+              :
+              nothing))
+          (return (nothing : nothing)))))))

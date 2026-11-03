@@ -1,0 +1,182 @@
+(program
+  (main "main")
+  (module "arg_order" "arg_order.lf"
+    (types (type "Pair" product))
+    (functions
+      (fn "noisy"
+        (params (param "n" int))
+        int
+        pure
+        (examples
+          (example "one" function
+            (inputs (input "n" (int 1 : int)))
+            (value (int 1 : int))))
+        (statements
+          (expr
+            (log
+              (concat (text "arg " : text) (local "n" : int) : text)
+              :
+              nothing))
+          (return (local "n" : int))))
+      (fn "noisy_text"
+        (params (param "t" text))
+        text
+        pure
+        (examples
+          (example "comma" function
+            (inputs (input "t" (text "," : text)))
+            (value (text "," : text))))
+        (statements
+          (expr
+            (log
+              (concat (text "arg " : text) (local "t" : text) : text)
+              :
+              nothing))
+          (return (local "t" : text))))
+      (fn "diff"
+        (params (param "a" int) (param "b" int))
+        int
+        pure
+        (examples
+          (example "three minus one" function
+            (inputs (input "a" (int 3 : int)) (input "b" (int 1 : int)))
+            (value (int 2 : int))))
+        (statements (return (sub (local "a" : int) (local "b" : int) : int))))
+      (fn "main"
+        (params)
+        nothing
+        pure
+        (examples)
+        (statements
+          (expr
+            (log
+              (concat
+                (text "diff " : text)
+                (let
+                  (bindings
+                    (binding "arg#44" (call "noisy" (int 1 : int) : int))
+                    (binding "arg#45" (call "noisy" (int 3 : int) : int)))
+                  (call "diff"
+                    (local "arg#45" : int)
+                    (local "arg#44" : int)
+                    :
+                    int)
+                  :
+                  int)
+                :
+                text)
+              :
+              nothing))
+          (let "p"
+            (let
+              (bindings
+                (binding "arg#46" (call "noisy" (int 2 : int) : int))
+                (binding "arg#47" (call "noisy" (int 1 : int) : int)))
+              (record "Pair"
+                (local "arg#47" : int)
+                (local "arg#46" : int)
+                :
+                (nominal "Pair"))
+              :
+              (nominal "Pair")))
+          (expr
+            (log
+              (concat
+                (text "pair " : text)
+                (field (local "p" : (nominal "Pair")) 0 : int)
+                (text " " : text)
+                (field (local "p" : (nominal "Pair")) 1 : int)
+                :
+                text)
+              :
+              nothing))
+          (expr
+            (log
+              (concat
+                (text "max " : text)
+                (let
+                  (bindings
+                    (binding "arg#49" (call "noisy" (int 5 : int) : int))
+                    (binding "arg#50" (call "noisy" (int 4 : int) : int)))
+                  (call "max"
+                    (local "arg#50" : int)
+                    (local "arg#49" : int)
+                    :
+                    int)
+                  :
+                  int)
+                :
+                text)
+              :
+              nothing))
+          (let "parts"
+            (let
+              (bindings
+                (binding "arg#51" (call "noisy_text" (text "," : text) : text))
+                (binding "arg#52"
+                  (call "noisy_text" (text "x,y" : text) : text)))
+              (call "split"
+                (local "arg#52" : text)
+                (local "arg#51" : text)
+                :
+                (list text))
+              :
+              (list text)))
+          (expr
+            (log
+              (concat
+                (text "split " : text)
+                (call "length"
+                  (local "parts" : (list text))
+                  :
+                  (bound 0 int-max))
+                :
+                text)
+              :
+              nothing))
+          (expr
+            (log
+              (concat
+                (text "join " : text)
+                (call "length"
+                  (let
+                    (bindings
+                      (binding "arg#54"
+                        (list (call "noisy" (int 7 : int) : int) : (list int)))
+                      (binding "arg#55"
+                        (list (call "noisy" (int 6 : int) : int) : (list int))))
+                    (call "join"
+                      (local "arg#55" : (list int))
+                      (local "arg#54" : (list int))
+                      :
+                      (list int))
+                    :
+                    (list int))
+                  :
+                  (bound 0 int-max))
+                :
+                text)
+              :
+              nothing))
+          (let "top" (int int-max : int))
+          (expr
+            (log
+              (concat
+                (text "never " : text)
+                (let
+                  (bindings
+                    (binding "arg#57"
+                      (add (local "top" : int) (int 1 : int) : int))
+                    (binding "arg#58" (call "noisy" (int 9 : int) : int)))
+                  (call "diff"
+                    (local "arg#58" : int)
+                    (local "arg#57" : int)
+                    :
+                    int)
+                  :
+                  int)
+                :
+                text)
+              :
+              nothing))
+          (return (nothing : nothing)))))))

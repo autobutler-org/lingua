@@ -1,0 +1,69 @@
+(program
+  (main "main")
+  (module "for_list" "for_list.lf"
+    (functions
+      (fn "main"
+        (params)
+        nothing
+        pure
+        (examples)
+        (statements
+          (let "names"
+            (list
+              (text "ada" : text)
+              (text "grace" : text)
+              (text "edsger" : text)
+              :
+              (list text)))
+          (for-list "name#37"
+            (local "names" : (list text))
+            (statements
+              (expr
+                (log
+                  (concat
+                    (text "hello " : text)
+                    (local "name#37" : text)
+                    :
+                    text)
+                  :
+                  nothing))))
+          (let "total" (int 0 : int))
+          (let "nums"
+            (list
+              (int 4 : int)
+              (int 8 : int)
+              (int 15 : int)
+              (int 16 : int)
+              (int 23 : int)
+              (int 42 : int)
+              :
+              (list int)))
+          (for-list "value"
+            (local "nums" : (list int))
+            (statements
+              (set "total"
+                (add (local "total" : int) (local "value" : int) : int))))
+          (expr
+            (log
+              (concat (text "total " : text) (local "total" : int) : text)
+              :
+              nothing))
+          (let "empty" (list : (list int)))
+          (for-list "item"
+            (local "empty" : (list int))
+            (statements
+              (expr
+                (log
+                  (concat (text "never " : text) (local "item" : int) : text)
+                  :
+                  nothing))))
+          (for-list "word"
+            (list (text "x" : text) (text "y" : text) : (list text))
+            (statements
+              (expr
+                (log
+                  (concat (text "literal " : text) (local "word" : text) : text)
+                  :
+                  nothing))))
+          (expr (log (text "done" : text) : nothing))
+          (return (nothing : nothing)))))))

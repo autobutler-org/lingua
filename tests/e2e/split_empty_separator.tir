@@ -1,0 +1,46 @@
+(program
+  (main "main")
+  (module "split_empty_separator" "split_empty_separator.lf"
+    (functions
+      (fn "main"
+        (params)
+        nothing
+        pure
+        (examples)
+        (statements
+          (let "sep" (text "" : text))
+          (expr
+            (log
+              (concat
+                (text "before " : text)
+                (call "length"
+                  (call "split"
+                    (text "a:b" : text)
+                    (text ":" : text)
+                    :
+                    (list text))
+                  :
+                  (bound 0 int-max))
+                :
+                text)
+              :
+              nothing))
+          (let "parts"
+            (call "split"
+              (text "abc" : text)
+              (local "sep" : text)
+              :
+              (list text)))
+          (expr
+            (log
+              (concat
+                (text "after " : text)
+                (call "length"
+                  (local "parts" : (list text))
+                  :
+                  (bound 0 int-max))
+                :
+                text)
+              :
+              nothing))
+          (return (nothing : nothing)))))))

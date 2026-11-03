@@ -1,0 +1,211 @@
+(program
+  (main "main")
+  (module "or_return" "or_return.lf"
+    (types
+      (type "AppError" sum)
+      (variant "Missing" "AppError" 0 nil)
+      (variant "Invalid" "AppError" 1 text))
+    (functions
+      (fn "lookup"
+        (params (param "key" text))
+        (result int (nominal "AppError"))
+        pure
+        (examples
+          (example "width" function
+            (inputs (input "key" (text "width" : text)))
+            (value
+              (variant "Ok" (int 4 : int) : (result int (nominal "AppError")))))
+          (example "missing" function
+            (inputs (input "key" (text "color" : text)))
+            (value
+              (variant "Err"
+                (variant "Missing" : (nominal "AppError"))
+                :
+                (result int (nominal "AppError"))))))
+        (statements
+          (expr
+            (log
+              (concat (text "lookup " : text) (local "key" : text) : text)
+              :
+              nothing))
+          (if
+            (cmp eq (local "key" : text) (text "width" : text) : bool)
+            (then
+              (return
+                (variant "Ok" (int 4 : int) : (result int (nominal "AppError")))))
+            (else))
+          (if
+            (cmp eq (local "key" : text) (text "height" : text) : bool)
+            (then
+              (return
+                (variant "Ok" (int 5 : int) : (result int (nominal "AppError")))))
+            (else))
+          (if
+            (cmp eq (local "key" : text) (text "depth" : text) : bool)
+            (then
+              (return
+                (variant "Err"
+                  (variant "Invalid"
+                    (text "depth" : text)
+                    :
+                    (nominal "AppError"))
+                  :
+                  (result int (nominal "AppError")))))
+            (else))
+          (return
+            (variant "Err"
+              (variant "Missing" : (nominal "AppError"))
+              :
+              (result int (nominal "AppError"))))))
+      (fn "area_of"
+        (params (param "first" text) (param "second" text))
+        (result int (nominal "AppError"))
+        pure
+        (examples
+          (example "width by height" function
+            (inputs
+              (input "first" (text "width" : text))
+              (input "second" (text "height" : text)))
+            (value
+              (variant "Ok" (int 20 : int) : (result int (nominal "AppError"))))))
+        (statements
+          (let "a"
+            (match
+              (call "lookup"
+                (local "first" : text)
+                :
+                (result int (nominal "AppError")))
+              (arms
+                (arm (variant "Ok" (bind "ok#49")) (expr (local "ok#49" : int)))
+                (arm
+                  (variant "Err" (bind "err#48"))
+                  (statements
+                    (return
+                      (variant "Err"
+                        (local "err#48" : (nominal "AppError"))
+                        :
+                        (result int (nominal "AppError")))))))
+              :
+              int))
+          (let "b"
+            (match
+              (call "lookup"
+                (local "second" : text)
+                :
+                (result int (nominal "AppError")))
+              (arms
+                (arm (variant "Ok" (bind "ok#52")) (expr (local "ok#52" : int)))
+                (arm
+                  (variant "Err" (bind "err#51"))
+                  (statements
+                    (return
+                      (variant "Err"
+                        (local "err#51" : (nominal "AppError"))
+                        :
+                        (result int (nominal "AppError")))))))
+              :
+              int))
+          (return
+            (variant "Ok"
+              (mul (local "a" : int) (local "b" : int) : int)
+              :
+              (result int (nominal "AppError"))))))
+      (fn "explain"
+        (params (param "problem#46" (nominal "AppError")))
+        text
+        pure
+        (examples
+          (example "missing" function
+            (inputs
+              (input "problem#46" (variant "Missing" : (nominal "AppError"))))
+            (value (text "missing" : text))))
+        (statements
+          (return
+            (match
+              (local "problem#46" : (nominal "AppError"))
+              (arms
+                (arm (variant "Missing") (expr (text "missing" : text)))
+                (arm
+                  (variant "Invalid" (bind "name#54"))
+                  (expr
+                    (concat
+                      (text "invalid " : text)
+                      (local "name#54" : text)
+                      :
+                      text))))
+              :
+              text))))
+      (fn "render"
+        (params (param "outcome" (result int (nominal "AppError"))))
+        text
+        pure
+        (examples
+          (example "ok" function
+            (inputs
+              (input "outcome"
+                (variant "Ok"
+                  (int 20 : int)
+                  :
+                  (result int (nominal "AppError")))))
+            (value (text "ok 20" : text))))
+        (statements
+          (return
+            (match
+              (local "outcome" : (result int (nominal "AppError")))
+              (arms
+                (arm
+                  (variant "Ok" (bind "value"))
+                  (expr
+                    (concat (text "ok " : text) (local "value" : int) : text)))
+                (arm
+                  (variant "Err" (bind "problem#56"))
+                  (expr
+                    (call "explain"
+                      (local "problem#56" : (nominal "AppError"))
+                      :
+                      text))))
+              :
+              text))))
+      (fn "main"
+        (params)
+        nothing
+        pure
+        (examples)
+        (statements
+          (expr
+            (log
+              (call "render"
+                (call "area_of"
+                  (text "width" : text)
+                  (text "height" : text)
+                  :
+                  (result int (nominal "AppError")))
+                :
+                text)
+              :
+              nothing))
+          (expr
+            (log
+              (call "render"
+                (call "area_of"
+                  (text "width" : text)
+                  (text "color" : text)
+                  :
+                  (result int (nominal "AppError")))
+                :
+                text)
+              :
+              nothing))
+          (expr
+            (log
+              (call "render"
+                (call "area_of"
+                  (text "depth" : text)
+                  (text "width" : text)
+                  :
+                  (result int (nominal "AppError")))
+                :
+                text)
+              :
+              nothing))
+          (return (nothing : nothing)))))))

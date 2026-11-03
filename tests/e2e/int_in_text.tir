@@ -1,0 +1,104 @@
+(program
+  (main "main")
+  (module "int_in_text" "int_in_text.lf"
+    (functions
+      (fn "bounds_name"
+        (params (param "problem#38" (nominal "BoundsError")))
+        text
+        pure
+        (examples
+          (example "out of range" function
+            (inputs
+              (input "problem#38"
+                (variant "OutOfRange" : (nominal "BoundsError"))))
+            (value (text "out of range" : text))))
+        (statements
+          (return
+            (match
+              (local "problem#38" : (nominal "BoundsError"))
+              (arms
+                (arm (variant "OutOfRange") (expr (text "out of range" : text)))
+                (arm
+                  (variant "NotAnInteger")
+                  (expr (text "not an integer" : text))))
+              :
+              text))))
+      (fn "probe"
+        (params (param "raw#39" text))
+        text
+        pure
+        (examples
+          (example "in range" function
+            (inputs (input "raw#39" (text "7" : text)))
+            (value (text "[7] -> 7" : text)))
+          (example "not a number" function
+            (inputs (input "raw#39" (text "x" : text)))
+            (value (text "[x] -> not an integer" : text))))
+        (statements
+          (return
+            (match
+              (int-in
+                (local "raw#39" : text)
+                -10
+                10
+                :
+                (result (bound -10 10) (nominal "BoundsError")))
+              (arms
+                (arm
+                  (variant "Ok" (bind "value"))
+                  (expr
+                    (concat
+                      (text "[" : text)
+                      (local "raw#39" : text)
+                      (text "] -> " : text)
+                      (local "value" : (bound -10 10))
+                      :
+                      text)))
+                (arm
+                  (variant "Err" (bind "problem#41"))
+                  (expr
+                    (concat
+                      (text "[" : text)
+                      (local "raw#39" : text)
+                      (text "] -> " : text)
+                      (call "bounds_name"
+                        (local "problem#41" : (nominal "BoundsError"))
+                        :
+                        text)
+                      :
+                      text))))
+              :
+              text))))
+      (fn "main"
+        (params)
+        nothing
+        pure
+        (examples)
+        (statements
+          (let "inputs"
+            (list
+              (text "7" : text)
+              (text "-10" : text)
+              (text "10" : text)
+              (text "11" : text)
+              (text "-11" : text)
+              (text "007" : text)
+              (text "-0" : text)
+              (text "" : text)
+              (text " 5" : text)
+              (text "5 " : text)
+              (text "+5" : text)
+              (text "1.5" : text)
+              (text "abc" : text)
+              (text "-" : text)
+              (text "--5" : text)
+              (text "9223372036854775807" : text)
+              (text "99999999999999999999" : text)
+              :
+              (list text)))
+          (for-list "raw#43"
+            (local "inputs" : (list text))
+            (statements
+              (expr
+                (log (call "probe" (local "raw#43" : text) : text) : nothing))))
+          (return (nothing : nothing)))))))

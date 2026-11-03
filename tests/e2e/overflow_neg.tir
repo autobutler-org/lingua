@@ -1,0 +1,29 @@
+(program
+  (main "main")
+  (module "overflow_neg" "overflow_neg.lf"
+    (functions
+      (fn "main"
+        (params)
+        nothing
+        pure
+        (examples)
+        (statements
+          (let "bottom"
+            (sub (int -9223372036854775807 : int) (int 1 : int) : int))
+          (let "top" (int int-max : int))
+          (expr
+            (log
+              (concat
+                (text "before " : text)
+                (neg (local "top" : int) : int)
+                :
+                text)
+              :
+              nothing))
+          (let "flipped" (neg (local "bottom" : int) : int))
+          (expr
+            (log
+              (concat (text "after " : text) (local "flipped" : int) : text)
+              :
+              nothing))
+          (return (nothing : nothing)))))))
