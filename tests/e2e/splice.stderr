@@ -1,0 +1,10 @@
+4
+3
+2
+1
+1
+exception: not positive
+  --> splice.lf:52:3
+   |
+52 |   comptime assert_positive(d - 7)
+   |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

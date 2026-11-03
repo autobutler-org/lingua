@@ -1,0 +1,4 @@
+example "zero is fatal"
+  assert 0 != 0, "nonzero"
+  -> exception "nonzero"
+end
