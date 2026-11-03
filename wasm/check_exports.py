@@ -3,7 +3,14 @@
 
 import sys
 
-REQUIRED = ("lingua_alloc", "lingua_dealloc", "lingua_compile", "lingua_free", "memory")
+REQUIRED = (
+    "lingua_alloc",
+    "lingua_dealloc",
+    "lingua_compile",
+    "lingua_compile_in",
+    "lingua_free",
+    "memory",
+)
 
 
 def uleb(data: bytes, index: int) -> tuple[int, int]:

@@ -1,10 +1,11 @@
 //! The playground compiler as a `wasm32-unknown-unknown` dynamic library.
 //!
-//! The page copies UTF-8 source into [`lingua_alloc`], calls [`lingua_compile`],
-//! and reads a little-endian `u32` length plus JSON bytes. [`lingua_free`]
-//! releases that pointer. The JSON is [`lingua::playground::compile_json`] for
-//! the module `factorial`. The native CLI, the ELF linker, and provider effects
-//! are not part of this entry.
+//! The page copies UTF-8 source into [`lingua_alloc`], calls [`lingua_compile`]
+//! or [`lingua_compile_in`], and reads a little-endian `u32` length plus JSON
+//! bytes. [`lingua_free`] releases that pointer. [`lingua_compile`] uses the
+//! module `factorial`. [`lingua_compile_in`] takes the module key as well, so a
+//! sample other than factorial keeps its name in the dumps. The native CLI, the
+//! ELF linker, and provider effects are not part of this entry.
 
 use std::alloc::{Layout, alloc, dealloc, handle_alloc_error};
 
@@ -53,25 +54,49 @@ pub unsafe extern "C" fn lingua_dealloc(ptr: *mut u8, size: usize) {
 #[must_use]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn lingua_compile(ptr: *const u8, len: usize) -> *mut u8 {
-    let bytes = if len == 0 {
+    leak_prefixed(compile_bytes(MODULE.as_bytes(), slice(ptr, len)).as_bytes())
+}
+
+/// Compiles the UTF-8 source at `src` as module `key`.
+///
+/// The return value has the same layout as [`lingua_compile`].
+///
+/// # Safety
+///
+/// `key` is readable for `key_len` bytes and `src` for `src_len` bytes. A
+/// length of 0 does not read that pointer.
+#[must_use]
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn lingua_compile_in(
+    key: *const u8,
+    key_len: usize,
+    src: *const u8,
+    src_len: usize,
+) -> *mut u8 {
+    leak_prefixed(compile_bytes(slice(key, key_len), slice(src, src_len)).as_bytes())
+}
+
+fn slice<'a>(ptr: *const u8, len: usize) -> &'a [u8] {
+    if len == 0 {
         &[]
     } else {
         unsafe { std::slice::from_raw_parts(ptr, len) }
-    };
-    let json = if let Ok(source) = std::str::from_utf8(bytes) {
-        lingua::playground::compile_json(MODULE, source)
-    } else {
+    }
+}
+
+fn compile_bytes(key: &[u8], source: &[u8]) -> String {
+    let (Ok(key), Ok(source)) = (std::str::from_utf8(key), std::str::from_utf8(source)) else {
         let message = "source is not UTF-8\n".to_owned();
-        lingua::playground::encode(&lingua::playground::Views {
+        return lingua::playground::encode(&lingua::playground::Views {
             tokens: message.clone(),
             ast: message.clone(),
             tir: message.clone(),
             lir: message.clone(),
             assembly: message.clone(),
             run: message,
-        })
+        });
     };
-    leak_prefixed(json.as_bytes())
+    lingua::playground::compile_json(key, source)
 }
 
 /// Releases a pointer from [`lingua_compile`].
@@ -151,5 +176,28 @@ mod tests {
         unsafe { lingua_free(out) };
         assert!(json.contains("source is not UTF-8"), "{json}");
         assert_eq!(json.matches("source is not UTF-8").count(), 6);
+    }
+
+    #[test]
+    fn compile_in_uses_the_module_key() {
+        let source = include_str!("../../tests/e2e/hello.lf");
+        let key = b"hello";
+        let src = source.as_bytes();
+        let key_ptr = unsafe { lingua_alloc(key.len()) };
+        let src_ptr = unsafe { lingua_alloc(src.len()) };
+        unsafe {
+            std::ptr::copy_nonoverlapping(key.as_ptr(), key_ptr, key.len());
+            std::ptr::copy_nonoverlapping(src.as_ptr(), src_ptr, src.len());
+        }
+        let out = unsafe { lingua_compile_in(key_ptr, key.len(), src_ptr, src.len()) };
+        unsafe {
+            lingua_dealloc(key_ptr, key.len());
+            lingua_dealloc(src_ptr, src.len());
+        }
+        let json = text_of(out);
+        unsafe { lingua_free(out) };
+        assert!(json.contains("(module \\\"hello\\\""));
+        assert!(json.contains("hello, world\\n"));
+        assert!(json.contains("TEXT hello.main(SB)\\n"));
     }
 }
