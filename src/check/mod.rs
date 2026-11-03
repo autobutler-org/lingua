@@ -170,12 +170,16 @@ pub struct Checked {
 /// # Errors
 /// A usage error, or every diagnostic.
 pub fn check(paths: &[PathBuf], options: &Options) -> Result<Checked, Error> {
-    let loaded = package::load(paths, options)?;
+    check_loaded(&package::load(paths, options)?)
+}
+
+/// Checks one module already in memory. Same rules as [`check`], including examples.
+fn check_loaded(loaded: &package::Loaded) -> Result<Checked, Error> {
     let mut diagnostics = loaded.diagnostics.clone();
     // Comptime roots and examples may recurse deeper than the main thread's stack allows
     let (checked, more) = crate::eval::on_big_stack(|| {
-        let (checked, mut more) = decl::check_package(&loaded);
-        let runnable = runnable(&loaded, &more);
+        let (checked, mut more) = decl::check_package(loaded);
+        let runnable = runnable(loaded, &more);
         more.extend(crate::eval::run_examples(
             &checked.symbols,
             &checked.modules,
@@ -244,7 +248,15 @@ fn runnable(loaded: &package::Loaded, diagnostics: &[Diagnostic]) -> HashSet<Str
 /// # Errors
 /// As [`check`], plus the link-set diagnostics.
 pub fn link(paths: &[PathBuf], options: &Options) -> Result<TirProgram, Error> {
-    let checked = check(paths, options)?;
+    link_checked(check(paths, options)?)
+}
+
+/// [`link`] for one source buffer. Used by the playground, which has no source root.
+pub(crate) fn link_source(key: &str, source: &str) -> Result<TirProgram, Error> {
+    link_checked(check_loaded(&package::load_memory(key, source))?)
+}
+
+fn link_checked(checked: Checked) -> Result<TirProgram, Error> {
     let mut diagnostics: Vec<Diagnostic> = checked
         .resource_calls
         .iter()

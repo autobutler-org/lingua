@@ -31,10 +31,15 @@ const FUEL: u64 = 100_000;
 // `L047` while holding little; count live bytes (drop of `Rc`s) if a real example trips it.
 const HEAP: usize = 64 << 20;
 /// Nested user calls per example, reported as `L047`. Fuel alone would allow about 33 000.
+/// wasm32 has no thread to give the interpreter a 256 MiB stack, so the cap stays inside a
+/// browser call stack. `factorial(20)` fits; a deeper recursion is `L047`.
+#[cfg(target_arch = "wasm32")]
+const DEPTH: usize = 256;
 // ponytail: a fixed cap instead of a stack probe; raise it with `STACK` if examples recurse
 // deeper.
+#[cfg(not(target_arch = "wasm32"))]
 const DEPTH: usize = 10_000;
-/// The runner's thread stack, sized so `DEPTH` nested calls fit.
+/// The runner's thread stack, sized so `DEPTH` nested calls fit. Unused on wasm32.
 const STACK: usize = 256 << 20;
 
 /// A runtime value. The checker turns a folded comptime value back into literal TIR.
@@ -1117,49 +1122,51 @@ pub(crate) fn fold(
 }
 
 /// Runs `f` on a thread with a stack deep enough for the interpreter's `DEPTH` nested calls.
+/// wasm32 has no such thread, so `f` runs on the caller.
 pub(crate) fn on_big_stack<T: Send>(f: impl FnOnce() -> T + Send) -> T {
-    std::thread::scope(|scope| {
-        std::thread::Builder::new()
-            .stack_size(STACK)
-            .spawn_scoped(scope, f)
-            .expect("the interpreter's thread starts")
-            .join()
-            .unwrap_or_else(|panic| std::panic::resume_unwind(panic))
-    })
+    #[cfg(target_arch = "wasm32")]
+    {
+        let _ = STACK;
+        return f();
+    }
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        std::thread::scope(|scope| {
+            std::thread::Builder::new()
+                .stack_size(STACK)
+                .spawn_scoped(scope, f)
+                .expect("the interpreter's thread starts")
+                .join()
+                .unwrap_or_else(|panic| std::panic::resume_unwind(panic))
+        })
+    }
 }
 
 /// Runs `main` with no arguments on the interpreter with `fuel` steps, and returns what the
-/// native binary would write to stderr; `None` when `main` takes a `Process`.
-#[cfg(test)]
+/// native binary would write to stderr; `None` when `main` takes parameters.
 pub(crate) fn run_main(program: &crate::tir::TirProgram, fuel: u64) -> Option<String> {
-    let run = || {
-        let mut machine = Machine::new(&program.symbols, &program.modules, &HashSet::new());
-        let &(m, f) = machine.functions.get(&program.main)?;
-        if !f.params.is_empty() {
-            return None;
+    on_big_stack(|| interpret_main(program, fuel))
+}
+
+fn interpret_main(program: &crate::tir::TirProgram, fuel: u64) -> Option<String> {
+    let mut machine = Machine::new(&program.symbols, &program.modules, &HashSet::new());
+    let &(m, f) = machine.functions.get(&program.main)?;
+    if !f.params.is_empty() {
+        return None;
+    }
+    machine.reset(m, fuel);
+    let result = machine.call_fn(f.span, f.id, Vec::new());
+    let module = |at: At| &program.modules[at.module];
+    let tail = match result {
+        Ok(_) => String::new(),
+        Err(Stop::Exception { message, at }) => {
+            crate::report::exception(&message, &module(at).path, &module(at).source, at.span)
         }
-        machine.reset(m, fuel);
-        let result = machine.call_fn(f.span, f.id, Vec::new());
-        let module = |at: At| &program.modules[at.module];
-        let tail = match result {
-            Ok(_) => String::new(),
-            Err(Stop::Exception { message, at }) => {
-                crate::report::exception(&message, &module(at).path, &module(at).source, at.span)
-            }
-            Err(Stop::Fault { code, at }) => {
-                crate::report::fault(code, &module(at).path, &module(at).source, Some(at.span))
-            }
-            Err(stop) => format!("{stop:?}\n"),
-        };
-        let logs: String = machine.logs.iter().map(|l| l.clone() + "\n").collect();
-        Some(logs + &tail)
+        Err(Stop::Fault { code, at }) => {
+            crate::report::fault(code, &module(at).path, &module(at).source, Some(at.span))
+        }
+        Err(stop) => format!("{stop:?}\n"),
     };
-    std::thread::scope(|scope| {
-        std::thread::Builder::new()
-            .stack_size(STACK)
-            .spawn_scoped(scope, run)
-            .unwrap()
-            .join()
-            .unwrap()
-    })
+    let logs: String = machine.logs.iter().map(|l| l.clone() + "\n").collect();
+    Some(logs + &tail)
 }
