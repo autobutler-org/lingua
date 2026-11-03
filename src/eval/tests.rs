@@ -458,6 +458,32 @@ fn the_interpreter_matches_the_e2e_fixtures() {
 }
 
 #[test]
+fn main_fuel_names_the_budget_it_was_given() {
+    let source = "type Loop
+  Go
+end type Loop
+
+fn main() -> Nothing
+  pure
+
+  var state: Loop = Go
+  while state is Go
+    set state = Go
+  end
+  return nothing
+end fn main
+";
+    let program = crate::check::link_source("spin", source).expect("spin checks");
+    let text = super::run_main(&program, 1_000).expect("spin runs");
+    assert!(
+        text.contains("fault L042: fuel exceeded (1_000 steps)\n"),
+        "{text}"
+    );
+    assert!(text.contains("a built binary has no fuel cap"), "{text}");
+    assert!(!text.contains("100_000"), "{text}");
+}
+
+#[test]
 fn unbounded_recursion_stops_at_the_depth_limit() {
     let source = "fn down(n: Int) -> Int
   pure
