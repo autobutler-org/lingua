@@ -1,0 +1,39 @@
+(program
+  (main "main")
+  (module "while_zero_payload" "while_zero_payload.lf"
+    (types
+      (type "Phase" sum)
+      (variant "Warmup" "Phase" 0 nil)
+      (variant "Working" "Phase" 1 int)
+      (variant "Cooldown" "Phase" 2 nil))
+    (functions
+      (fn "main"
+        (params)
+        nothing
+        pure
+        (examples)
+        (statements
+          (let "phase" (variant "Warmup" : (nominal "Phase")))
+          (while-is "phase" "Warmup" nil
+            (statements
+              (expr (log (text "warming up" : text) : nothing))
+              (set "phase"
+                (variant "Working" (int 2 : int) : (nominal "Phase")))))
+          (while-is "phase" "Working" "left"
+            (statements
+              (expr
+                (log
+                  (concat (text "working " : text) (local "left" : int) : text)
+                  :
+                  nothing))
+              (if
+                (cmp gt (local "left" : int) (int 1 : int) : bool)
+                (then
+                  (set "phase"
+                    (variant "Working"
+                      (sub (local "left" : int) (int 1 : int) : int)
+                      :
+                      (nominal "Phase"))))
+                (else (set "phase" (variant "Cooldown" : (nominal "Phase")))))))
+          (expr (log (text "cooled down" : text) : nothing))
+          (return (nothing : nothing)))))))

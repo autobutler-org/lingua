@@ -1,0 +1,31 @@
+(program
+  (main "main")
+  (module "rem_int_min" "rem_int_min.lf"
+    (functions
+      (fn "main"
+        (params)
+        nothing
+        pure
+        (examples)
+        (statements
+          (let "bottom"
+            (sub (int -9223372036854775807 : int) (int 1 : int) : int))
+          (let "two" (int 2 : int))
+          (let "minus_one" (int -1 : int))
+          (expr
+            (log
+              (concat
+                (text "before " : text)
+                (rem (local "bottom" : int) (local "two" : int) : int)
+                :
+                text)
+              :
+              nothing))
+          (let "remainder"
+            (rem (local "bottom" : int) (local "minus_one" : int) : int))
+          (expr
+            (log
+              (concat (text "after " : text) (local "remainder" : int) : text)
+              :
+              nothing))
+          (return (nothing : nothing)))))))

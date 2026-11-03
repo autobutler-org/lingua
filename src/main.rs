@@ -6,6 +6,7 @@ use lingua::build::{self, arch::amd64, lir};
 use lingua::check::{self, Cache, Diagnostic, Options};
 use lingua::lex::{TokenKind, lex_source};
 use lingua::parse::parse_source;
+use lingua::tir::dump as dump_tir;
 
 const USAGE: &str = "usage: lingua <command> [args]
 
@@ -21,6 +22,7 @@ commands:
                       each declaration that holds a macro splice, spliced
   pack FILE           print FILE for a prompt, its imports' declarations and signatures first
   build [PATH ...]    check, then build a static linux/amd64 executable at ./lingua-out
+  tir PATH            print the typed IR of PATH as an S-expression
   lir PATH            print the LIR that `build` lowers PATH to
   asm PATH            print the amd64 instructions that `build` selects for PATH
 
@@ -115,6 +117,8 @@ fn main() -> ExitCode {
         ["build", rest @ ..] => with_flags("build", rest, true, |paths, options| {
             build_paths(&paths, &options)
         }),
+        ["tir", path] => dump_program(path, |program| Ok(dump_tir(program))),
+        ["tir"] => usage_error("tir needs a path, e.g. `lingua tir tests/e2e/hello.lf`"),
         ["lir", path] => dump_program(path, |program| {
             let lowered = build::lower(program)?;
             Ok(lir::dump(&lowered.functions, &lowered.sites))

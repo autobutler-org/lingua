@@ -1,0 +1,137 @@
+(program
+  (main "main")
+  (module "nominal_int" "nominal_int.lf"
+    (types
+      (type "Cents" (newtype int (range 0 int-max)))
+      (type "Quantity" (newtype int (range 1 99))))
+    (functions
+      (fn "subtotal"
+        (params
+          (param "price#40" (nominal "Cents"))
+          (param "quantity" (nominal "Quantity")))
+        (nominal "Cents")
+        pure
+        (examples
+          (example "three at 250" function
+            (inputs
+              (input "price#40" (int 250 : (nominal "Cents")))
+              (input "quantity" (int 3 : (nominal "Quantity"))))
+            (value (int 750 : (nominal "Cents")))))
+        (statements
+          (return
+            (mul
+              (local "price#40" : (nominal "Cents"))
+              (local "quantity" : (nominal "Quantity"))
+              :
+              (nominal "Cents")))))
+      (fn "change"
+        (params
+          (param "paid" (nominal "Cents"))
+          (param "owed" (nominal "Cents")))
+        int
+        pure
+        (examples
+          (example "overpaid" function
+            (inputs
+              (input "paid" (int 1000 : (nominal "Cents")))
+              (input "owed" (int 750 : (nominal "Cents"))))
+            (value (int 250 : int))))
+        (statements
+          (return
+            (sub
+              (local "paid" : (nominal "Cents"))
+              (local "owed" : (nominal "Cents"))
+              :
+              int))))
+      (fn "main"
+        (params)
+        nothing
+        pure
+        (examples)
+        (statements
+          (let "price#44" (int 250 : (nominal "Cents")))
+          (let "qty" (int 3 : (nominal "Quantity")))
+          (let "line"
+            (call "subtotal"
+              (local "price#44" : (nominal "Cents"))
+              (local "qty" : (nominal "Quantity"))
+              :
+              (nominal "Cents")))
+          (expr
+            (log
+              (concat
+                (text "subtotal " : text)
+                (local "line" : (nominal "Cents"))
+                :
+                text)
+              :
+              nothing))
+          (let "tendered" (int 1000 : (nominal "Cents")))
+          (expr
+            (log
+              (concat
+                (text "change " : text)
+                (call "change"
+                  (local "tendered" : (nominal "Cents"))
+                  (local "line" : (nominal "Cents"))
+                  :
+                  int)
+                :
+                text)
+              :
+              nothing))
+          (expr
+            (log
+              (concat
+                (text "short " : text)
+                (call "change"
+                  (local "price#44" : (nominal "Cents"))
+                  (local "line" : (nominal "Cents"))
+                  :
+                  int)
+                :
+                text)
+              :
+              nothing))
+          (let "total" (int 0 : (nominal "Cents")))
+          (set "total"
+            (add
+              (local "total" : (nominal "Cents"))
+              (local "line" : (nominal "Cents"))
+              :
+              (nominal "Cents")))
+          (set "total"
+            (add
+              (local "total" : (nominal "Cents"))
+              (local "price#44" : (nominal "Cents"))
+              :
+              (nominal "Cents")))
+          (expr
+            (log
+              (concat
+                (text "total " : text)
+                (local "total" : (nominal "Cents"))
+                :
+                text)
+              :
+              nothing))
+          (let "widened" (local "total" : (nominal "Cents")))
+          (expr
+            (log
+              (concat
+                (text "widened " : text)
+                (add (local "widened" : int) (int -2000 : int) : int)
+                :
+                text)
+              :
+              nothing))
+          (expr
+            (log
+              (concat
+                (text "quantity " : text)
+                (local "qty" : (nominal "Quantity"))
+                :
+                text)
+              :
+              nothing))
+          (return (nothing : nothing)))))))

@@ -1,0 +1,142 @@
+(program
+  (main "main")
+  (module "result_match" "result_match.lf"
+    (types
+      (type "NameError" sum)
+      (variant "Empty" "NameError" 0 nil)
+      (variant "TooLong" "NameError" 1 int))
+    (functions
+      (fn "check_name"
+        (params (param "raw#42" text))
+        (result text (nominal "NameError"))
+        pure
+        (examples
+          (example "trimmed" function
+            (inputs (input "raw#42" (text "  ada  " : text)))
+            (value
+              (variant "Ok"
+                (text "ada" : text)
+                :
+                (result text (nominal "NameError")))))
+          (example "empty" function
+            (inputs (input "raw#42" (text "" : text)))
+            (value
+              (variant "Err"
+                (variant "Empty" : (nominal "NameError"))
+                :
+                (result text (nominal "NameError")))))
+          (example "too long" function
+            (inputs (input "raw#42" (text "a b c" : text)))
+            (value
+              (variant "Err"
+                (variant "TooLong" (int 3 : int) : (nominal "NameError"))
+                :
+                (result text (nominal "NameError"))))))
+        (statements
+          (let "cleaned" (call "trim" (local "raw#42" : text) : text))
+          (if
+            (cmp eq (local "cleaned" : text) (text "" : text) : bool)
+            (then
+              (return
+                (variant "Err"
+                  (variant "Empty" : (nominal "NameError"))
+                  :
+                  (result text (nominal "NameError")))))
+            (else))
+          (let "words"
+            (call "split"
+              (local "cleaned" : text)
+              (text " " : text)
+              :
+              (list text)))
+          (if
+            (cmp gt
+              (call "length" (local "words" : (list text)) : (bound 0 int-max))
+              (int 2 : int)
+              :
+              bool)
+            (then
+              (return
+                (variant "Err"
+                  (variant "TooLong"
+                    (call "length"
+                      (local "words" : (list text))
+                      :
+                      (bound 0 int-max))
+                    :
+                    (nominal "NameError"))
+                  :
+                  (result text (nominal "NameError")))))
+            (else))
+          (return
+            (variant "Ok"
+              (local "cleaned" : text)
+              :
+              (result text (nominal "NameError"))))))
+      (fn "explain"
+        (params (param "problem#43" (nominal "NameError")))
+        text
+        pure
+        (examples
+          (example "empty" function
+            (inputs
+              (input "problem#43" (variant "Empty" : (nominal "NameError"))))
+            (value (text "error: empty" : text))))
+        (statements
+          (return
+            (match
+              (local "problem#43" : (nominal "NameError"))
+              (arms
+                (arm (variant "Empty") (expr (text "error: empty" : text)))
+                (arm
+                  (variant "TooLong" (bind "count"))
+                  (expr
+                    (concat
+                      (text "error: " : text)
+                      (local "count" : int)
+                      (text " words" : text)
+                      :
+                      text))))
+              :
+              text))))
+      (fn "report"
+        (params (param "raw#44" text))
+        text
+        pure
+        (examples
+          (example "ok" function
+            (inputs (input "raw#44" (text " ada " : text)))
+            (value (text "ok ada" : text))))
+        (statements
+          (return
+            (match
+              (call "check_name"
+                (local "raw#44" : text)
+                :
+                (result text (nominal "NameError")))
+              (arms
+                (arm
+                  (variant "Ok" (bind "name#48"))
+                  (expr
+                    (concat (text "ok " : text) (local "name#48" : text) : text)))
+                (arm
+                  (variant "Err" (bind "problem#49"))
+                  (expr
+                    (call "explain"
+                      (local "problem#49" : (nominal "NameError"))
+                      :
+                      text))))
+              :
+              text))))
+      (fn "main"
+        (params)
+        nothing
+        pure
+        (examples)
+        (statements
+          (expr (log (call "report" (text "  ada  " : text) : text) : nothing))
+          (expr
+            (log (call "report" (text "grace hopper" : text) : text) : nothing))
+          (expr (log (call "report" (text "   " : text) : text) : nothing))
+          (expr (log (call "report" (text "a b c d" : text) : text) : nothing))
+          (return (nothing : nothing)))))))

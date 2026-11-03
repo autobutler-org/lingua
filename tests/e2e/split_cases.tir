@@ -1,0 +1,121 @@
+(program
+  (main "main")
+  (module "split_cases" "split_cases.lf"
+    (functions
+      (fn "show_parts"
+        (params (param "parts" (list text)))
+        text
+        pure
+        (examples
+          (example "two parts" function
+            (inputs
+              (input "parts"
+                (list (text "a" : text) (text "" : text) : (list text))))
+            (value (text "2 [a][]" : text))))
+        (statements
+          (let "shown"
+            (concat
+              (call "length" (local "parts" : (list text)) : (bound 0 int-max))
+              (text " " : text)
+              :
+              text))
+          (for-list "part"
+            (local "parts" : (list text))
+            (statements
+              (set "shown"
+                (concat
+                  (local "shown" : text)
+                  (text "[" : text)
+                  (local "part" : text)
+                  (text "]" : text)
+                  :
+                  text))))
+          (return (local "shown" : text))))
+      (fn "main"
+        (params)
+        nothing
+        pure
+        (examples)
+        (statements
+          (expr
+            (log
+              (call "show_parts"
+                (call "split"
+                  (text "percent:10" : text)
+                  (text ":" : text)
+                  :
+                  (list text))
+                :
+                text)
+              :
+              nothing))
+          (expr
+            (log
+              (call "show_parts"
+                (call "split"
+                  (text "bogof" : text)
+                  (text ":" : text)
+                  :
+                  (list text))
+                :
+                text)
+              :
+              nothing))
+          (expr
+            (log
+              (call "show_parts"
+                (call "split"
+                  (text "a::b" : text)
+                  (text ":" : text)
+                  :
+                  (list text))
+                :
+                text)
+              :
+              nothing))
+          (expr
+            (log
+              (call "show_parts"
+                (call "split"
+                  (text ":a:" : text)
+                  (text ":" : text)
+                  :
+                  (list text))
+                :
+                text)
+              :
+              nothing))
+          (expr
+            (log
+              (call "show_parts"
+                (call "split" (text ":" : text) (text ":" : text) : (list text))
+                :
+                text)
+              :
+              nothing))
+          (expr
+            (log
+              (call "show_parts"
+                (call "split"
+                  (text "x,y" : text)
+                  (text "," : text)
+                  :
+                  (list text))
+                :
+                text)
+              :
+              nothing))
+          (let "sep" (text ";" : text))
+          (expr
+            (log
+              (call "show_parts"
+                (call "split"
+                  (text "1;2;3" : text)
+                  (local "sep" : text)
+                  :
+                  (list text))
+                :
+                text)
+              :
+              nothing))
+          (return (nothing : nothing)))))))

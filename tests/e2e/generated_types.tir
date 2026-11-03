@@ -1,0 +1,235 @@
+(program
+  (main "main")
+  (module "money" "money.lf"
+    (types (type "Cents" (newtype int (range 0 int-max))))
+    (functions))
+  (module "shapes" "shapes.lf"
+    (types
+      (const "order_columns" (list (nominal "Column")))
+      (type "OrderRow" product)
+      (type "Point" product)
+      (type "Promo" sum)
+      (type "Offer" product)
+      (variant "NoPromo" "Promo" 0 nil)
+      (variant "PercentOff" "Promo" 1 (bound 1 100))
+      (variant "AmountOff" "Promo" 2 (nominal "Cents")))
+    (functions))
+  (module "main" "main.lf"
+    (functions
+      (fn "describe"
+        (params (param "row" (nominal "OrderRow")))
+        text
+        pure
+        (examples
+          (example "active" function
+            (inputs
+              (input "row"
+                (record "OrderRow"
+                  (int 7 : int)
+                  (text "ada" : text)
+                  (bool true : bool)
+                  :
+                  (nominal "OrderRow"))))
+            (value (text "order 7 ada active" : text))))
+        (statements
+          (if
+            (field (local "row" : (nominal "OrderRow")) 2 : bool)
+            (then
+              (return
+                (concat
+                  (text "order " : text)
+                  (field (local "row" : (nominal "OrderRow")) 0 : int)
+                  (text " " : text)
+                  (field (local "row" : (nominal "OrderRow")) 1 : text)
+                  (text " active" : text)
+                  :
+                  text)))
+            (else))
+          (return
+            (concat
+              (text "order " : text)
+              (field (local "row" : (nominal "OrderRow")) 0 : int)
+              (text " " : text)
+              (field (local "row" : (nominal "OrderRow")) 1 : text)
+              (text " closed" : text)
+              :
+              text))))
+      (fn "promo_text"
+        (params (param "promo" (nominal "Promo")))
+        text
+        pure
+        (examples
+          (example "none" function
+            (inputs (input "promo" (variant "NoPromo" : (nominal "Promo"))))
+            (value (text "no promo" : text)))
+          (example "percent" function
+            (inputs
+              (input "promo"
+                (variant "PercentOff"
+                  (int 15 : (bound 1 100))
+                  :
+                  (nominal "Promo"))))
+            (value (text "15% off" : text))))
+        (statements
+          (return
+            (match
+              (local "promo" : (nominal "Promo"))
+              (arms
+                (arm (variant "NoPromo") (expr (text "no promo" : text)))
+                (arm
+                  (variant "PercentOff" (bind "percent"))
+                  (expr
+                    (concat
+                      (local "percent" : (bound 1 100))
+                      (text "% off" : text)
+                      :
+                      text)))
+                (arm
+                  (variant "AmountOff" (bind "amount"))
+                  (expr
+                    (concat
+                      (local "amount" : (nominal "Cents"))
+                      (text " off" : text)
+                      :
+                      text))))
+              :
+              text))))
+      (fn "offer_text"
+        (params (param "offer" (nominal "Offer")))
+        text
+        pure
+        (examples
+          (example "amount" function
+            (inputs
+              (input "offer"
+                (record "Offer"
+                  (int 1 : int)
+                  (int 250 : (nominal "Cents"))
+                  (int 2 : (bound 1 100))
+                  (variant "AmountOff"
+                    (int 50 : (nominal "Cents"))
+                    :
+                    (nominal "Promo"))
+                  :
+                  (nominal "Offer"))))
+            (value (text "offer 1: 2 x 250, 50 off" : text))))
+        (statements
+          (return
+            (concat
+              (text "offer " : text)
+              (field (local "offer" : (nominal "Offer")) 0 : int)
+              (text ": " : text)
+              (field (local "offer" : (nominal "Offer")) 2 : (bound 1 100))
+              (text " x " : text)
+              (field (local "offer" : (nominal "Offer")) 1 : (nominal "Cents"))
+              (text ", " : text)
+              (call "promo_text"
+                (field
+                  (local "offer" : (nominal "Offer"))
+                  3
+                  :
+                  (nominal "Promo"))
+                :
+                text)
+              :
+              text))))
+      (fn "main"
+        (params)
+        nothing
+        pure
+        (examples)
+        (statements
+          (expr
+            (log
+              (call "describe"
+                (record "OrderRow"
+                  (int 7 : int)
+                  (text "ada" : text)
+                  (bool true : bool)
+                  :
+                  (nominal "OrderRow"))
+                :
+                text)
+              :
+              nothing))
+          (expr
+            (log
+              (call "describe"
+                (record "OrderRow"
+                  (int 8 : int)
+                  (text "bob" : text)
+                  (bool false : bool)
+                  :
+                  (nominal "OrderRow"))
+                :
+                text)
+              :
+              nothing))
+          (let "p"
+            (record "Point" (int 3 : int) (int 4 : int) : (nominal "Point")))
+          (expr
+            (log
+              (concat
+                (text "point " : text)
+                (field (local "p" : (nominal "Point")) 0 : int)
+                (text "," : text)
+                (field (local "p" : (nominal "Point")) 1 : int)
+                (text " sum " : text)
+                (add
+                  (field (local "p" : (nominal "Point")) 0 : int)
+                  (field (local "p" : (nominal "Point")) 1 : int)
+                  :
+                  int)
+                :
+                text)
+              :
+              nothing))
+          (expr
+            (log
+              (call "offer_text"
+                (record "Offer"
+                  (int 1 : int)
+                  (int 250 : (nominal "Cents"))
+                  (int 2 : (bound 1 100))
+                  (variant "NoPromo" : (nominal "Promo"))
+                  :
+                  (nominal "Offer"))
+                :
+                text)
+              :
+              nothing))
+          (expr
+            (log
+              (call "offer_text"
+                (record "Offer"
+                  (int 2 : int)
+                  (int 999 : (nominal "Cents"))
+                  (int 100 : (bound 1 100))
+                  (variant "PercentOff"
+                    (int 10 : (bound 1 100))
+                    :
+                    (nominal "Promo"))
+                  :
+                  (nominal "Offer"))
+                :
+                text)
+              :
+              nothing))
+          (expr
+            (log
+              (call "offer_text"
+                (record "Offer"
+                  (int 3 : int)
+                  (int 0 : (nominal "Cents"))
+                  (int 1 : (bound 1 100))
+                  (variant "AmountOff"
+                    (int 75 : (nominal "Cents"))
+                    :
+                    (nominal "Promo"))
+                  :
+                  (nominal "Offer"))
+                :
+                text)
+              :
+              nothing))
+          (return (nothing : nothing)))))))

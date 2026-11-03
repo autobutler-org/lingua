@@ -1,0 +1,67 @@
+(program
+  (main "main")
+  (module "primes" "primes.lf"
+    (functions
+      (fn "is_prime"
+        (params (param "n" int))
+        bool
+        pure
+        (examples
+          (example "seven" function
+            (inputs (input "n" (int 7 : int)))
+            (value (bool true : bool)))
+          (example "nine" function
+            (inputs (input "n" (int 9 : int)))
+            (value (bool false : bool)))
+          (example "one" function
+            (inputs (input "n" (int 1 : int)))
+            (value (bool false : bool))))
+        (statements
+          (if
+            (cmp lt (local "n" : int) (int 2 : int) : bool)
+            (then (return (bool false : bool)))
+            (else))
+          (for-range "divisor"
+            (int 2 : int)
+            (local "n" : int)
+            (statements
+              (if
+                (cmp eq
+                  (rem
+                    (local "n" : int)
+                    (local "divisor" : (bound 2 int-max))
+                    :
+                    (bound -9223372036854775806 9223372036854775806))
+                  (int 0 : int)
+                  :
+                  bool)
+                (then (return (bool false : bool)))
+                (else))))
+          (return (bool true : bool))))
+      (fn "main"
+        (params)
+        nothing
+        pure
+        (examples)
+        (statements
+          (let "found" (int 0 : int))
+          (for-range "candidate"
+            (int 2 : int)
+            (int 50 : int)
+            (statements
+              (if
+                (call "is_prime" (local "candidate" : (bound 2 49)) : bool)
+                (then
+                  (expr
+                    (log
+                      (concat (local "candidate" : (bound 2 49)) : text)
+                      :
+                      nothing))
+                  (set "found" (add (local "found" : int) (int 1 : int) : int)))
+                (else))))
+          (expr
+            (log
+              (concat (text "count " : text) (local "found" : int) : text)
+              :
+              nothing))
+          (return (nothing : nothing)))))))

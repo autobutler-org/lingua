@@ -1,0 +1,172 @@
+(program
+  (main "main")
+  (module "bool_compare" "bool_compare.lf"
+    (functions
+      (fn "show"
+        (params (param "flag" bool))
+        text
+        pure
+        (examples
+          (example "true" function
+            (inputs (input "flag" (bool true : bool)))
+            (value (text "true" : text)))
+          (example "false" function
+            (inputs (input "flag" (bool false : bool)))
+            (value (text "false" : text))))
+        (statements
+          (if (local "flag" : bool) (then (return (text "true" : text))) (else))
+          (return (text "false" : text))))
+      (fn "main"
+        (params)
+        nothing
+        pure
+        (examples)
+        (statements
+          (let "a" (int 3 : int))
+          (let "b" (int 5 : int))
+          (let "word" (text "lingua" : text))
+          (expr
+            (log
+              (concat
+                (text "a < b " : text)
+                (call "show"
+                  (cmp lt (local "a" : int) (local "b" : int) : bool)
+                  :
+                  text)
+                :
+                text)
+              :
+              nothing))
+          (expr
+            (log
+              (concat
+                (text "a > b " : text)
+                (call "show"
+                  (cmp gt (local "a" : int) (local "b" : int) : bool)
+                  :
+                  text)
+                :
+                text)
+              :
+              nothing))
+          (expr
+            (log
+              (concat
+                (text "a <= 3 " : text)
+                (call "show"
+                  (cmp le (local "a" : int) (int 3 : int) : bool)
+                  :
+                  text)
+                :
+                text)
+              :
+              nothing))
+          (expr
+            (log
+              (concat
+                (text "a >= 4 " : text)
+                (call "show"
+                  (cmp ge (local "a" : int) (int 4 : int) : bool)
+                  :
+                  text)
+                :
+                text)
+              :
+              nothing))
+          (expr
+            (log
+              (concat
+                (text "a == 3 " : text)
+                (call "show"
+                  (cmp eq (local "a" : int) (int 3 : int) : bool)
+                  :
+                  text)
+                :
+                text)
+              :
+              nothing))
+          (expr
+            (log
+              (concat
+                (text "a != 3 " : text)
+                (call "show"
+                  (cmp ne (local "a" : int) (int 3 : int) : bool)
+                  :
+                  text)
+                :
+                text)
+              :
+              nothing))
+          (expr
+            (log
+              (concat
+                (text "-a < -b " : text)
+                (call "show"
+                  (cmp lt
+                    (neg (local "a" : int) : int)
+                    (neg (local "b" : int) : int)
+                    :
+                    bool)
+                  :
+                  text)
+                :
+                text)
+              :
+              nothing))
+          (expr
+            (log
+              (concat
+                (text "a + 2 == b " : text)
+                (call "show"
+                  (cmp eq
+                    (add (local "a" : int) (int 2 : int) : int)
+                    (local "b" : int)
+                    :
+                    bool)
+                  :
+                  text)
+                :
+                text)
+              :
+              nothing))
+          (expr
+            (log
+              (concat
+                (text "word == lingua " : text)
+                (call "show"
+                  (cmp eq (local "word" : text) (text "lingua" : text) : bool)
+                  :
+                  text)
+                :
+                text)
+              :
+              nothing))
+          (expr
+            (log
+              (concat
+                (text "word != Lingua " : text)
+                (call "show"
+                  (cmp ne (local "word" : text) (text "Lingua" : text) : bool)
+                  :
+                  text)
+                :
+                text)
+              :
+              nothing))
+          (expr
+            (log
+              (concat
+                (text "bool == bool " : text)
+                (call "show"
+                  (cmp eq
+                    (cmp lt (local "a" : int) (local "b" : int) : bool)
+                    (bool true : bool)
+                    :
+                    bool)
+                  :
+                  text)
+                :
+                text)
+              :
+              nothing))
+          (return (nothing : nothing)))))))

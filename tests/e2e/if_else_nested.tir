@@ -1,0 +1,79 @@
+(program
+  (main "main")
+  (module "if_else_nested" "if_else_nested.lf"
+    (functions
+      (fn "classify"
+        (params (param "n" int))
+        text
+        pure
+        (examples
+          (example "negative" function
+            (inputs (input "n" (int -5 : int)))
+            (value (text "negative" : text)))
+          (example "zero" function
+            (inputs (input "n" (int 0 : int)))
+            (value (text "zero" : text)))
+          (example "small" function
+            (inputs (input "n" (int 7 : int)))
+            (value (text "small" : text)))
+          (example "large" function
+            (inputs (input "n" (int 10 : int)))
+            (value (text "large" : text))))
+        (statements
+          (if
+            (cmp lt (local "n" : int) (int 0 : int) : bool)
+            (then (return (text "negative" : text)))
+            (else
+              (if
+                (cmp eq (local "n" : int) (int 0 : int) : bool)
+                (then (return (text "zero" : text)))
+                (else
+                  (if
+                    (cmp lt (local "n" : int) (int 10 : int) : bool)
+                    (then (return (text "small" : text)))
+                    (else))))))
+          (return (text "large" : text))))
+      (fn "main"
+        (params)
+        nothing
+        pure
+        (examples)
+        (statements
+          (let "samples"
+            (list
+              (int -5 : int)
+              (int 0 : int)
+              (int 7 : int)
+              (int 10 : int)
+              (int 1000 : int)
+              :
+              (list int)))
+          (for-list "sample"
+            (local "samples" : (list int))
+            (statements
+              (expr
+                (log
+                  (concat
+                    (local "sample" : int)
+                    (text " is " : text)
+                    (call "classify" (local "sample" : int) : text)
+                    :
+                    text)
+                  :
+                  nothing))))
+          (let "limit" (int 2 : int))
+          (if
+            (cmp gt (local "limit" : int) (int 1 : int) : bool)
+            (then
+              (expr (log (text "outer then" : text) : nothing))
+              (if
+                (cmp gt (local "limit" : int) (int 5 : int) : bool)
+                (then (expr (log (text "inner then" : text) : nothing)))
+                (else (expr (log (text "inner else" : text) : nothing)))))
+            (else (expr (log (text "outer else" : text) : nothing))))
+          (if
+            (cmp lt (local "limit" : int) (int 0 : int) : bool)
+            (then (expr (log (text "never" : text) : nothing)))
+            (else))
+          (expr (log (text "done" : text) : nothing))
+          (return (nothing : nothing)))))))

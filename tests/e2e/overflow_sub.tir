@@ -1,0 +1,33 @@
+(program
+  (main "main")
+  (module "overflow_sub" "overflow_sub.lf"
+    (functions
+      (fn "main"
+        (params)
+        nothing
+        pure
+        (examples)
+        (statements
+          (let "bottom"
+            (sub (int -9223372036854775807 : int) (int 1 : int) : int))
+          (let "one" (int 1 : int))
+          (expr
+            (log
+              (concat
+                (text "before " : text)
+                (sub
+                  (add (local "bottom" : int) (local "one" : int) : int)
+                  (local "one" : int)
+                  :
+                  int)
+                :
+                text)
+              :
+              nothing))
+          (let "below" (sub (local "bottom" : int) (local "one" : int) : int))
+          (expr
+            (log
+              (concat (text "after " : text) (local "below" : int) : text)
+              :
+              nothing))
+          (return (nothing : nothing)))))))

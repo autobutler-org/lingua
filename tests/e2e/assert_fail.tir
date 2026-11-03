@@ -1,0 +1,20 @@
+(program
+  (main "main")
+  (module "assert_fail" "assert_fail.lf"
+    (functions
+      (fn "main"
+        (params)
+        nothing
+        pure
+        (examples)
+        (statements
+          (let "count" (int 3 : int))
+          (assert
+            (cmp gt (local "count" : int) (int 0 : int) : bool)
+            "count must be positive")
+          (expr (log (text "count ok" : text) : nothing))
+          (assert
+            (cmp gt (local "count" : int) (int 5 : int) : bool)
+            "count must exceed five")
+          (expr (log (text "unreachable" : text) : nothing))
+          (return (nothing : nothing)))))))

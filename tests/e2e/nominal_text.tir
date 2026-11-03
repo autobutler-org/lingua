@@ -1,0 +1,77 @@
+(program
+  (main "main")
+  (module "nominal_text" "nominal_text.lf"
+    (types (type "CustomerId" (newtype text)) (type "Cursor" (newtype text)))
+    (functions
+      (fn "greet"
+        (params (param "customer" (nominal "CustomerId")))
+        text
+        pure
+        (examples
+          (example "greets by id" function
+            (inputs (input "customer" (text "c1" : (nominal "CustomerId"))))
+            (value (text "hello c1" : text))))
+        (statements
+          (return
+            (concat
+              (text "hello " : text)
+              (local "customer" : (nominal "CustomerId"))
+              :
+              text))))
+      (fn "main"
+        (params)
+        nothing
+        pure
+        (examples)
+        (statements
+          (let "id#40" (text "c-42" : (nominal "CustomerId")))
+          (expr
+            (log
+              (call "greet" (local "id#40" : (nominal "CustomerId")) : text)
+              :
+              nothing))
+          (expr
+            (log
+              (concat
+                (text "id is " : text)
+                (local "id#40" : (nominal "CustomerId"))
+                :
+                text)
+              :
+              nothing))
+          (let "raw" (text "  c-7  " : text))
+          (let "wrapped"
+            (call "trim" (local "raw" : text) : (nominal "CustomerId")))
+          (expr
+            (log
+              (call "greet" (local "wrapped" : (nominal "CustomerId")) : text)
+              :
+              nothing))
+          (if
+            (cmp eq
+              (local "wrapped" : (nominal "CustomerId"))
+              (text "c-7" : (nominal "CustomerId"))
+              :
+              bool)
+            (then
+              (expr (log (text "wrapped matches literal" : text) : nothing)))
+            (else))
+          (let "cursor" (text "page-2" : (nominal "Cursor")))
+          (let "rewrapped" (local "cursor" : (nominal "CustomerId")))
+          (expr
+            (log
+              (call "greet" (local "rewrapped" : (nominal "CustomerId")) : text)
+              :
+              nothing))
+          (expr
+            (log
+              (call "greet" (text "literal" : (nominal "CustomerId")) : text)
+              :
+              nothing))
+          (let "plain" (local "id#40" : (nominal "CustomerId")))
+          (expr
+            (log
+              (concat (text "eliminated " : text) (local "plain" : text) : text)
+              :
+              nothing))
+          (return (nothing : nothing)))))))

@@ -1,0 +1,151 @@
+(program
+  (main "main")
+  (module "mutual_recursion" "mutual_recursion.lf"
+    (functions
+      (fn "is_even"
+        (params (param "n#43" int))
+        bool
+        pure
+        (examples
+          (example "zero is even" function
+            (inputs (input "n#43" (int 0 : int)))
+            (value (bool true : bool)))
+          (example "three is odd" function
+            (inputs (input "n#43" (int 3 : int)))
+            (value (bool false : bool))))
+        (statements
+          (if
+            (cmp eq (local "n#43" : int) (int 0 : int) : bool)
+            (then (return (bool true : bool)))
+            (else))
+          (return
+            (call "is_odd"
+              (sub (local "n#43" : int) (int 1 : int) : int)
+              :
+              bool))))
+      (fn "is_odd"
+        (params (param "n#44" int))
+        bool
+        pure
+        (examples
+          (example "zero is not odd" function
+            (inputs (input "n#44" (int 0 : int)))
+            (value (bool false : bool)))
+          (example "three is odd" function
+            (inputs (input "n#44" (int 3 : int)))
+            (value (bool true : bool))))
+        (statements
+          (if
+            (cmp eq (local "n#44" : int) (int 0 : int) : bool)
+            (then (return (bool false : bool)))
+            (else))
+          (return
+            (call "is_even"
+              (sub (local "n#44" : int) (int 1 : int) : int)
+              :
+              bool))))
+      (fn "down"
+        (params (param "n#45" int))
+        int
+        pure
+        (examples
+          (example "counts down by twos" function
+            (inputs (input "n#45" (int 4 : int)))
+            (value (int 0 : int))))
+        (statements
+          (if
+            (cmp le (local "n#45" : int) (int 0 : int) : bool)
+            (then (return (local "n#45" : int)))
+            (else))
+          (return (call "step" (local "n#45" : int) (int 2 : int) : int))))
+      (fn "step"
+        (params (param "n#46" int) (param "by" int))
+        int
+        pure
+        (examples
+          (example "one step" function
+            (inputs (input "n#46" (int 4 : int)) (input "by" (int 2 : int)))
+            (value (int 0 : int))))
+        (statements
+          (return
+            (call "down"
+              (sub (local "n#46" : int) (local "by" : int) : int)
+              :
+              int))))
+      (fn "tally"
+        (params (param "n#48" int))
+        int
+        pure
+        (examples
+          (example "named arguments out of order" function
+            (inputs (input "n#48" (int 3 : int)))
+            (value (int 3 : int))))
+        (statements
+          (return (call "add" (local "n#48" : int) (int 0 : int) : int))))
+      (fn "add"
+        (params (param "n#49" int) (param "acc#50" int))
+        int
+        pure
+        (examples
+          (example "adds one per level" function
+            (inputs (input "n#49" (int 3 : int)) (input "acc#50" (int 0 : int)))
+            (value (int 3 : int))))
+        (statements
+          (if
+            (cmp eq (local "n#49" : int) (int 0 : int) : bool)
+            (then (return (local "acc#50" : int)))
+            (else))
+          (return
+            (let
+              (bindings
+                (binding "arg#53"
+                  (add (local "acc#50" : int) (int 1 : int) : int))
+                (binding "arg#54"
+                  (sub (local "n#49" : int) (int 1 : int) : int)))
+              (call "again" (local "arg#54" : int) (local "arg#53" : int) : int)
+              :
+              int))))
+      (fn "again"
+        (params (param "n#51" int) (param "acc#52" int))
+        int
+        pure
+        (examples
+          (example "hands back" function
+            (inputs (input "n#51" (int 0 : int)) (input "acc#52" (int 2 : int)))
+            (value (int 2 : int))))
+        (statements
+          (return
+            (call "add" (local "n#51" : int) (local "acc#52" : int) : int))))
+      (fn "main"
+        (params)
+        nothing
+        pure
+        (examples)
+        (statements
+          (if
+            (call "is_even" (int 100000000 : int) : bool)
+            (then (expr (log (text "even 100000000" : text) : nothing)))
+            (else))
+          (if
+            (call "is_odd" (int 100000001 : int) : bool)
+            (then (expr (log (text "odd 100000001" : text) : nothing)))
+            (else))
+          (expr
+            (log
+              (concat
+                (text "down " : text)
+                (call "down" (int 100000000 : int) : int)
+                :
+                text)
+              :
+              nothing))
+          (expr
+            (log
+              (concat
+                (text "tally " : text)
+                (call "tally" (int 100000000 : int) : int)
+                :
+                text)
+              :
+              nothing))
+          (return (nothing : nothing)))))))

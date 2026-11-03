@@ -1,0 +1,141 @@
+(program
+  (main "main")
+  (module "int_div_rem" "int_div_rem.lf"
+    (functions
+      (fn "main"
+        (params)
+        nothing
+        pure
+        (examples)
+        (statements
+          (let "seven" (int 7 : int))
+          (let "neg_seven" (int -7 : int))
+          (let "two" (int 2 : int))
+          (let "neg_two" (int -2 : int))
+          (expr
+            (log
+              (concat
+                (div (local "seven" : int) (local "two" : int) : int)
+                :
+                text)
+              :
+              nothing))
+          (expr
+            (log
+              (concat
+                (div (local "neg_seven" : int) (local "two" : int) : int)
+                :
+                text)
+              :
+              nothing))
+          (expr
+            (log
+              (concat
+                (div (local "seven" : int) (local "neg_two" : int) : int)
+                :
+                text)
+              :
+              nothing))
+          (expr
+            (log
+              (concat
+                (div (local "neg_seven" : int) (local "neg_two" : int) : int)
+                :
+                text)
+              :
+              nothing))
+          (expr
+            (log
+              (concat
+                (rem (local "seven" : int) (local "two" : int) : int)
+                :
+                text)
+              :
+              nothing))
+          (expr
+            (log
+              (concat
+                (rem (local "neg_seven" : int) (local "two" : int) : int)
+                :
+                text)
+              :
+              nothing))
+          (expr
+            (log
+              (concat
+                (rem (local "seven" : int) (local "neg_two" : int) : int)
+                :
+                text)
+              :
+              nothing))
+          (expr
+            (log
+              (concat
+                (rem (local "neg_seven" : int) (local "neg_two" : int) : int)
+                :
+                text)
+              :
+              nothing))
+          (expr
+            (log
+              (concat
+                (add
+                  (mul
+                    (div (local "neg_seven" : int) (local "two" : int) : int)
+                    (local "two" : int)
+                    :
+                    int)
+                  (rem (local "neg_seven" : int) (local "two" : int) : int)
+                  :
+                  int)
+                :
+                text)
+              :
+              nothing))
+          (expr
+            (log
+              (concat (div (int 0 : int) (local "seven" : int) : int) : text)
+              :
+              nothing))
+          (expr
+            (log
+              (concat (div (int 1 : int) (local "seven" : int) : int) : text)
+              :
+              nothing))
+          (expr
+            (log
+              (concat
+                (mul
+                  (div (int 100 : int) (local "seven" : int) : int)
+                  (local "seven" : int)
+                  :
+                  int)
+                :
+                text)
+              :
+              nothing))
+          (expr
+            (log
+              (concat
+                (rem
+                  (rem (int 100 : int) (local "seven" : int) : int)
+                  (int 4 : int)
+                  :
+                  (bound -3 3))
+                :
+                text)
+              :
+              nothing))
+          (expr
+            (log
+              (concat
+                (add
+                  (int 2 : int)
+                  (div (int 100 : int) (local "seven" : int) : int)
+                  :
+                  int)
+                :
+                text)
+              :
+              nothing))
+          (return (nothing : nothing)))))))

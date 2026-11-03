@@ -1,0 +1,47 @@
+(program
+  (main "main")
+  (module "while_countdown" "while_countdown.lf"
+    (types
+      (type "Countdown" sum)
+      (variant "Tick" "Countdown" 0 int)
+      (variant "Liftoff" "Countdown" 1 nil))
+    (functions
+      (fn "main"
+        (params)
+        nothing
+        pure
+        (examples)
+        (statements
+          (let "state" (variant "Tick" (int 3 : int) : (nominal "Countdown")))
+          (while-is "state" "Tick" "remaining"
+            (statements
+              (expr
+                (log
+                  (concat
+                    (text "tick " : text)
+                    (local "remaining" : int)
+                    :
+                    text)
+                  :
+                  nothing))
+              (if
+                (cmp eq (local "remaining" : int) (int 1 : int) : bool)
+                (then (set "state" (variant "Liftoff" : (nominal "Countdown"))))
+                (else
+                  (set "state"
+                    (variant "Tick"
+                      (sub (local "remaining" : int) (int 1 : int) : int)
+                      :
+                      (nominal "Countdown")))))))
+          (expr (log (text "liftoff" : text) : nothing))
+          (let "idle" (variant "Liftoff" : (nominal "Countdown")))
+          (while-is "idle" "Tick" "never"
+            (statements
+              (expr
+                (log
+                  (concat (text "never " : text) (local "never" : int) : text)
+                  :
+                  nothing))
+              (set "idle" (variant "Liftoff" : (nominal "Countdown")))))
+          (expr (log (text "done" : text) : nothing))
+          (return (nothing : nothing)))))))

@@ -1,0 +1,55 @@
+(program
+  (main "main")
+  (module "or_fail" "or_fail.lf"
+    (functions
+      (fn "main"
+        (params)
+        nothing
+        pure
+        (examples)
+        (statements
+          (let "good"
+            (match
+              (int-in
+                (text "42" : text)
+                1
+                100
+                :
+                (result (bound 1 100) (nominal "BoundsError")))
+              (arms
+                (arm
+                  (variant "Ok" (bind "ok#36"))
+                  (expr (local "ok#36" : (bound 1 100))))
+                (arm (variant "Err" wild) (statements (fail "not a percent"))))
+              :
+              (bound 1 100)))
+          (expr
+            (log
+              (concat
+                (text "good " : text)
+                (local "good" : (bound 1 100))
+                :
+                text)
+              :
+              nothing))
+          (let "bad"
+            (match
+              (int-in
+                (text "420" : text)
+                1
+                100
+                :
+                (result (bound 1 100) (nominal "BoundsError")))
+              (arms
+                (arm
+                  (variant "Ok" (bind "ok#38"))
+                  (expr (local "ok#38" : (bound 1 100))))
+                (arm (variant "Err" wild) (statements (fail "not a percent"))))
+              :
+              (bound 1 100)))
+          (expr
+            (log
+              (concat (text "bad " : text) (local "bad" : (bound 1 100)) : text)
+              :
+              nothing))
+          (return (nothing : nothing)))))))

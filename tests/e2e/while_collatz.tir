@@ -1,0 +1,65 @@
+(program
+  (main "main")
+  (module "while_collatz" "while_collatz.lf"
+    (types
+      (type "Collatz" sum)
+      (variant "Running" "Collatz" 0 int)
+      (variant "Finished" "Collatz" 1 nil))
+    (functions
+      (fn "main"
+        (params)
+        nothing
+        pure
+        (examples)
+        (statements
+          (let "state" (variant "Running" (int 27 : int) : (nominal "Collatz")))
+          (let "steps" (int 0 : int))
+          (let "peak" (int 27 : int))
+          (while-is "state" "Running" "n"
+            (statements
+              (if
+                (cmp gt (local "n" : int) (local "peak" : int) : bool)
+                (then (set "peak" (local "n" : int)))
+                (else))
+              (if
+                (cmp eq (local "n" : int) (int 1 : int) : bool)
+                (then (set "state" (variant "Finished" : (nominal "Collatz"))))
+                (else
+                  (set "steps" (add (local "steps" : int) (int 1 : int) : int))
+                  (if
+                    (cmp eq
+                      (rem (local "n" : int) (int 2 : int) : (bound -1 1))
+                      (int 0 : int)
+                      :
+                      bool)
+                    (then
+                      (set "state"
+                        (variant "Running"
+                          (div
+                            (local "n" : int)
+                            (int 2 : int)
+                            :
+                            (bound -4611686018427387904 4611686018427387903))
+                          :
+                          (nominal "Collatz"))))
+                    (else
+                      (set "state"
+                        (variant "Running"
+                          (add
+                            (mul (int 3 : int) (local "n" : int) : int)
+                            (int 1 : int)
+                            :
+                            int)
+                          :
+                          (nominal "Collatz")))))))))
+          (expr
+            (log
+              (concat (text "steps " : text) (local "steps" : int) : text)
+              :
+              nothing))
+          (expr
+            (log
+              (concat (text "peak " : text) (local "peak" : int) : text)
+              :
+              nothing))
+          (return (nothing : nothing)))))))

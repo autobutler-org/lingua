@@ -1,0 +1,76 @@
+(program
+  (main "main")
+  (module "int_holes" "int_holes.lf"
+    (functions
+      (fn "main"
+        (params)
+        nothing
+        pure
+        (examples)
+        (statements
+          (let "zero" (int 0 : int))
+          (let "neg" (int -42 : int))
+          (let "top" (int int-max : int))
+          (let "bottom"
+            (sub (int -9223372036854775807 : int) (int 1 : int) : int))
+          (expr
+            (log
+              (concat (text "zero=" : text) (local "zero" : int) : text)
+              :
+              nothing))
+          (expr
+            (log
+              (concat (text "neg=" : text) (local "neg" : int) : text)
+              :
+              nothing))
+          (expr
+            (log
+              (concat (text "max=" : text) (local "top" : int) : text)
+              :
+              nothing))
+          (expr
+            (log
+              (concat (text "min=" : text) (local "bottom" : int) : text)
+              :
+              nothing))
+          (expr
+            (log
+              (concat
+                (text "literals " : text)
+                (int 5 : int)
+                (text " and " : text)
+                (int -5 : int)
+                :
+                text)
+              :
+              nothing))
+          (expr
+            (log
+              (concat
+                (text "braces { " : text)
+                (local "zero" : int)
+                (text " }" : text)
+                :
+                text)
+              :
+              nothing))
+          (expr
+            (log
+              (concat
+                (text "sum " : text)
+                (add (local "top" : int) (local "bottom" : int) : int)
+                :
+                text)
+              :
+              nothing))
+          (expr
+            (log
+              (concat
+                (local "neg" : int)
+                (local "zero" : int)
+                (local "neg" : int)
+                :
+                text)
+              :
+              nothing))
+          (return (nothing : nothing)))))))

@@ -1,0 +1,136 @@
+(program
+  (main "main")
+  (module "or_return_mapped" "or_return_mapped.lf"
+    (types (type "OrderError" sum) (variant "BadQuantity" "OrderError" 0 nil))
+    (functions
+      (fn "parse_quantity"
+        (params (param "raw#40" text))
+        (result int (nominal "OrderError"))
+        pure
+        (examples
+          (example "three" function
+            (inputs (input "raw#40" (text "3" : text)))
+            (value
+              (variant "Ok" (int 3 : int) : (result int (nominal "OrderError")))))
+          (example "zero" function
+            (inputs (input "raw#40" (text "0" : text)))
+            (value
+              (variant "Err"
+                (variant "BadQuantity" : (nominal "OrderError"))
+                :
+                (result int (nominal "OrderError"))))))
+        (statements
+          (let "n#43"
+            (match
+              (int-in
+                (local "raw#40" : text)
+                1
+                99
+                :
+                (result (bound 1 99) (nominal "BoundsError")))
+              (arms
+                (arm
+                  (variant "Ok" (bind "ok#42"))
+                  (expr (local "ok#42" : (bound 1 99))))
+                (arm
+                  (variant "Err" wild)
+                  (statements
+                    (return
+                      (variant "Err"
+                        (variant "BadQuantity" : (nominal "OrderError"))
+                        :
+                        (result int (nominal "OrderError")))))))
+              :
+              (bound 1 99)))
+          (return
+            (variant "Ok"
+              (local "n#43" : (bound 1 99))
+              :
+              (result int (nominal "OrderError"))))))
+      (fn "render"
+        (params (param "raw#41" text))
+        text
+        pure
+        (examples
+          (example "ok" function
+            (inputs (input "raw#41" (text "3" : text)))
+            (value (text "3 -> 3" : text))))
+        (statements
+          (return
+            (match
+              (call "parse_quantity"
+                (local "raw#41" : text)
+                :
+                (result int (nominal "OrderError")))
+              (arms
+                (arm
+                  (variant "Ok" (bind "n#44"))
+                  (expr
+                    (concat
+                      (local "raw#41" : text)
+                      (text " -> " : text)
+                      (local "n#44" : int)
+                      :
+                      text)))
+                (arm
+                  (variant "Err" (variant "BadQuantity"))
+                  (expr
+                    (concat
+                      (local "raw#41" : text)
+                      (text " -> bad quantity" : text)
+                      :
+                      text))))
+              :
+              text))))
+      (fn "main"
+        (params)
+        nothing
+        pure
+        (examples)
+        (statements
+          (expr (log (call "render" (text "3" : text) : text) : nothing))
+          (expr (log (call "render" (text "99" : text) : text) : nothing))
+          (expr (log (call "render" (text "0" : text) : text) : nothing))
+          (expr (log (call "render" (text "100" : text) : text) : nothing))
+          (expr (log (call "render" (text "abc" : text) : text) : nothing))
+          (let "first"
+            (match
+              (call "parse_quantity"
+                (text "7" : text)
+                :
+                (result int (nominal "OrderError")))
+              (arms
+                (arm (variant "Ok" (bind "ok#45")) (expr (local "ok#45" : int)))
+                (arm
+                  (variant "Err" wild)
+                  (statements (return (nothing : nothing)))))
+              :
+              int))
+          (expr
+            (log
+              (concat (text "first " : text) (local "first" : int) : text)
+              :
+              nothing))
+          (let "second"
+            (match
+              (call "parse_quantity"
+                (text "x" : text)
+                :
+                (result int (nominal "OrderError")))
+              (arms
+                (arm (variant "Ok" (bind "ok#47")) (expr (local "ok#47" : int)))
+                (arm
+                  (variant "Err" wild)
+                  (statements (return (nothing : nothing)))))
+              :
+              int))
+          (expr
+            (log
+              (concat
+                (text "unreachable " : text)
+                (local "second" : int)
+                :
+                text)
+              :
+              nothing))
+          (return (nothing : nothing)))))))

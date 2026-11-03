@@ -1,0 +1,138 @@
+(program
+  (main "main")
+  (module "list_basics" "list_basics.lf"
+    (functions
+      (fn "main"
+        (params)
+        nothing
+        pure
+        (examples)
+        (statements
+          (let "first"
+            (list (int 1 : int) (int 2 : int) (int 3 : int) : (list int)))
+          (let "second" (list (int 4 : int) (int 5 : int) : (list int)))
+          (let "both"
+            (call "join"
+              (local "first" : (list int))
+              (local "second" : (list int))
+              :
+              (list int)))
+          (expr
+            (log
+              (concat
+                (text "length " : text)
+                (call "length" (local "both" : (list int)) : (bound 0 int-max))
+                :
+                text)
+              :
+              nothing))
+          (for-list "n"
+            (local "both" : (list int))
+            (statements
+              (expr (log (concat (local "n" : int) : text) : nothing))))
+          (let "none" (list : (list int)))
+          (expr
+            (log
+              (concat
+                (text "empty " : text)
+                (call "length" (local "none" : (list int)) : (bound 0 int-max))
+                :
+                text)
+              :
+              nothing))
+          (let "same"
+            (call "join"
+              (local "none" : (list int))
+              (local "first" : (list int))
+              :
+              (list int)))
+          (expr
+            (log
+              (concat
+                (text "joined empty " : text)
+                (call "length" (local "same" : (list int)) : (bound 0 int-max))
+                :
+                text)
+              :
+              nothing))
+          (let "literal_empty"
+            (call "join"
+              (list : (list int))
+              (local "second" : (list int))
+              :
+              (list int)))
+          (expr
+            (log
+              (concat
+                (text "literal empty " : text)
+                (call "length"
+                  (local "literal_empty" : (list int))
+                  :
+                  (bound 0 int-max))
+                :
+                text)
+              :
+              nothing))
+          (let "reversed"
+            (call "join"
+              (local "second" : (list int))
+              (local "first" : (list int))
+              :
+              (list int)))
+          (for-list "r"
+            (local "reversed" : (list int))
+            (statements
+              (expr
+                (log
+                  (concat (text "reversed " : text) (local "r" : int) : text)
+                  :
+                  nothing))))
+          (expr
+            (log
+              (concat
+                (text "trailing comma " : text)
+                (call "length"
+                  (list (int 7 : int) (int 8 : int) (int 9 : int) : (list int))
+                  :
+                  (bound 0 int-max))
+                :
+                text)
+              :
+              nothing))
+          (let "words"
+            (list (text "alpha" : text) (text "beta" : text) : (list text)))
+          (expr
+            (log
+              (concat
+                (text "words " : text)
+                (call "length"
+                  (local "words" : (list text))
+                  :
+                  (bound 0 int-max))
+                :
+                text)
+              :
+              nothing))
+          (let "grid"
+            (list
+              (list (int 1 : int) (int 2 : int) : (list int))
+              (list (int 3 : int) : (list int))
+              (list : (list int))
+              :
+              (list (list int))))
+          (for-list "row"
+            (local "grid" : (list (list int)))
+            (statements
+              (expr
+                (log
+                  (concat
+                    (text "row " : text)
+                    (call "length"
+                      (local "row" : (list int))
+                      :
+                      (bound 0 int-max))
+                    :
+                    text)
+                  :
+                  nothing))))
+          (return (nothing : nothing)))))))

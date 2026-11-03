@@ -1,0 +1,229 @@
+(program
+  (main "main")
+  (module "int_at_least" "int_at_least.lf"
+    (types (type "Cents" (newtype int (range 0 int-max))))
+    (functions
+      (fn "bounds_name"
+        (params (param "problem#40" (nominal "BoundsError")))
+        text
+        pure
+        (examples
+          (example "out of range" function
+            (inputs
+              (input "problem#40"
+                (variant "OutOfRange" : (nominal "BoundsError"))))
+            (value (text "out of range" : text))))
+        (statements
+          (return
+            (match
+              (local "problem#40" : (nominal "BoundsError"))
+              (arms
+                (arm (variant "OutOfRange") (expr (text "out of range" : text)))
+                (arm
+                  (variant "NotAnInteger")
+                  (expr (text "not an integer" : text))))
+              :
+              text))))
+      (fn "at_least_zero"
+        (params (param "n#41" int))
+        text
+        pure
+        (examples
+          (example "zero" function
+            (inputs (input "n#41" (int 0 : int)))
+            (value (text "0 ok 0" : text)))
+          (example "negative" function
+            (inputs (input "n#41" (int -1 : int)))
+            (value (text "-1 out of range" : text))))
+        (statements
+          (return
+            (match
+              (int-at-least
+                (local "n#41" : int)
+                0
+                :
+                (result (bound 0 int-max) (nominal "BoundsError")))
+              (arms
+                (arm
+                  (variant "Ok" (bind "value"))
+                  (expr
+                    (concat
+                      (local "n#41" : int)
+                      (text " ok " : text)
+                      (local "value" : (bound 0 int-max))
+                      :
+                      text)))
+                (arm
+                  (variant "Err" (bind "problem#44"))
+                  (expr
+                    (concat
+                      (local "n#41" : int)
+                      (text " " : text)
+                      (call "bounds_name"
+                        (local "problem#44" : (nominal "BoundsError"))
+                        :
+                        text)
+                      :
+                      text))))
+              :
+              text))))
+      (fn "to_cents"
+        (params (param "n#42" int))
+        (result (nominal "Cents") (nominal "BoundsError"))
+        pure
+        (examples
+          (example "five" function
+            (inputs (input "n#42" (int 5 : int)))
+            (value
+              (variant "Ok"
+                (int 5 : (nominal "Cents"))
+                :
+                (result (nominal "Cents") (nominal "BoundsError"))))))
+        (statements
+          (let "amount"
+            (match
+              (int-at-least
+                (local "n#42" : int)
+                0
+                :
+                (result (bound 0 int-max) (nominal "BoundsError")))
+              (arms
+                (arm
+                  (variant "Ok" (bind "ok#46"))
+                  (expr (local "ok#46" : (bound 0 int-max))))
+                (arm
+                  (variant "Err" (bind "err"))
+                  (statements
+                    (return
+                      (variant "Err"
+                        (local "err" : (nominal "BoundsError"))
+                        :
+                        (result (nominal "Cents") (nominal "BoundsError")))))))
+              :
+              (nominal "Cents")))
+          (return
+            (variant "Ok"
+              (local "amount" : (nominal "Cents"))
+              :
+              (result (nominal "Cents") (nominal "BoundsError"))))))
+      (fn "main"
+        (params)
+        nothing
+        pure
+        (examples)
+        (statements
+          (let "top" (int int-max : int))
+          (let "bottom"
+            (sub (int -9223372036854775807 : int) (int 1 : int) : int))
+          (let "samples"
+            (list
+              (int 5 : int)
+              (int 0 : int)
+              (int -1 : int)
+              (local "top" : int)
+              (local "bottom" : int)
+              :
+              (list int)))
+          (for-list "sample"
+            (local "samples" : (list int))
+            (statements
+              (expr
+                (log
+                  (call "at_least_zero" (local "sample" : int) : text)
+                  :
+                  nothing))))
+          (let "hundred" (int 100 : int))
+          (let "ninety_nine" (int 99 : int))
+          (let "high"
+            (match
+              (int-at-least
+                (local "hundred" : int)
+                100
+                :
+                (result (bound 100 int-max) (nominal "BoundsError")))
+              (arms
+                (arm
+                  (variant "Ok" (bind "ok#54"))
+                  (expr (local "ok#54" : (bound 100 int-max))))
+                (arm
+                  (variant "Err" wild)
+                  (statements (fail "hundred is at least 100"))))
+              :
+              (bound 100 int-max)))
+          (expr
+            (log
+              (concat
+                (text "high " : text)
+                (local "high" : (bound 100 int-max))
+                :
+                text)
+              :
+              nothing))
+          (let "low"
+            (match
+              (int-at-least
+                (local "ninety_nine" : int)
+                100
+                :
+                (result (bound 100 int-max) (nominal "BoundsError")))
+              (arms
+                (arm (variant "Ok" wild) (expr (text "unexpected" : text)))
+                (arm
+                  (variant "Err" (bind "problem#56"))
+                  (expr
+                    (call "bounds_name"
+                      (local "problem#56" : (nominal "BoundsError"))
+                      :
+                      text))))
+              :
+              text))
+          (expr
+            (log
+              (concat (text "99 " : text) (local "low" : text) : text)
+              :
+              nothing))
+          (let "cents"
+            (match
+              (call "to_cents"
+                (int 250 : int)
+                :
+                (result (nominal "Cents") (nominal "BoundsError")))
+              (arms
+                (arm
+                  (variant "Ok" (bind "ok#58"))
+                  (expr (local "ok#58" : (nominal "Cents"))))
+                (arm (variant "Err" wild) (statements (fail "250 is cents"))))
+              :
+              (nominal "Cents")))
+          (expr
+            (log
+              (concat
+                (text "cents " : text)
+                (local "cents" : (nominal "Cents"))
+                :
+                text)
+              :
+              nothing))
+          (let "refused"
+            (match
+              (call "to_cents"
+                (int -250 : int)
+                :
+                (result (nominal "Cents") (nominal "BoundsError")))
+              (arms
+                (arm (variant "Ok" wild) (expr (text "unexpected" : text)))
+                (arm
+                  (variant "Err" (bind "problem#60"))
+                  (expr
+                    (call "bounds_name"
+                      (local "problem#60" : (nominal "BoundsError"))
+                      :
+                      text))))
+              :
+              text))
+          (expr
+            (log
+              (concat (text "-250 " : text) (local "refused" : text) : text)
+              :
+              nothing))
+          (return (nothing : nothing)))))))

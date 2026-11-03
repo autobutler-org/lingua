@@ -1,0 +1,308 @@
+(program
+  (main "main")
+  (module "settings" "settings.lf"
+    (types
+      (type "Port" (newtype int (range 1 65535)))
+      (type "Host" (newtype text))
+      (type "ConfigError" sum)
+      (variant "MissingValue" "ConfigError" 0 text)
+      (variant "BadPort" "ConfigError" 1 text))
+    (functions
+      (fn "parse_port"
+        (params (param "raw#42" text))
+        (result (nominal "Port") (nominal "ConfigError"))
+        pure
+        (examples
+          (example "http" function
+            (inputs (input "raw#42" (text "80" : text)))
+            (value
+              (variant "Ok"
+                (int 80 : (nominal "Port"))
+                :
+                (result (nominal "Port") (nominal "ConfigError")))))
+          (example "zero" function
+            (inputs (input "raw#42" (text "0" : text)))
+            (value
+              (variant "Err"
+                (variant "BadPort" (text "0" : text) : (nominal "ConfigError"))
+                :
+                (result (nominal "Port") (nominal "ConfigError"))))))
+        (statements
+          (let "port#53"
+            (match
+              (int-in
+                (local "raw#42" : text)
+                1
+                65535
+                :
+                (result (bound 1 65535) (nominal "BoundsError")))
+              (arms
+                (arm
+                  (variant "Ok" (bind "ok#52"))
+                  (expr (local "ok#52" : (bound 1 65535))))
+                (arm
+                  (variant "Err" wild)
+                  (statements
+                    (return
+                      (variant "Err"
+                        (variant "BadPort"
+                          (local "raw#42" : text)
+                          :
+                          (nominal "ConfigError"))
+                        :
+                        (result (nominal "Port") (nominal "ConfigError")))))))
+              :
+              (nominal "Port")))
+          (return
+            (variant "Ok"
+              (local "port#53" : (nominal "Port"))
+              :
+              (result (nominal "Port") (nominal "ConfigError"))))))
+      (fn "parse_host"
+        (params (param "raw#43" text))
+        (result (nominal "Host") (nominal "ConfigError"))
+        pure
+        (examples
+          (example "trimmed" function
+            (inputs (input "raw#43" (text " db " : text)))
+            (value
+              (variant "Ok"
+                (text "db" : (nominal "Host"))
+                :
+                (result (nominal "Host") (nominal "ConfigError")))))
+          (example "blank" function
+            (inputs (input "raw#43" (text " " : text)))
+            (value
+              (variant "Err"
+                (variant "MissingValue"
+                  (text "host" : text)
+                  :
+                  (nominal "ConfigError"))
+                :
+                (result (nominal "Host") (nominal "ConfigError"))))))
+        (statements
+          (let "cleaned" (call "trim" (local "raw#43" : text) : text))
+          (if
+            (cmp eq (local "cleaned" : text) (text "" : text) : bool)
+            (then
+              (return
+                (variant "Err"
+                  (variant "MissingValue"
+                    (text "host" : text)
+                    :
+                    (nominal "ConfigError"))
+                  :
+                  (result (nominal "Host") (nominal "ConfigError")))))
+            (else))
+          (return
+            (variant "Ok"
+              (local "cleaned" : (nominal "Host"))
+              :
+              (result (nominal "Host") (nominal "ConfigError"))))))))
+  (module "main" "main.lf"
+    (types (type "Endpoint" product))
+    (functions
+      (fn "parse_endpoint"
+        (params (param "raw#49" text))
+        (result (nominal "Endpoint") (nominal "ConfigError"))
+        pure
+        (examples
+          (example "host and port" function
+            (inputs (input "raw#49" (text "h:1" : text)))
+            (value
+              (variant "Ok"
+                (record "Endpoint"
+                  (text "h" : (nominal "Host"))
+                  (int 1 : (nominal "Port"))
+                  :
+                  (nominal "Endpoint"))
+                :
+                (result (nominal "Endpoint") (nominal "ConfigError")))))
+          (example "no port" function
+            (inputs (input "raw#49" (text "h" : text)))
+            (value
+              (variant "Err"
+                (variant "MissingValue"
+                  (text "port" : text)
+                  :
+                  (nominal "ConfigError"))
+                :
+                (result (nominal "Endpoint") (nominal "ConfigError"))))))
+        (statements
+          (match
+            (call "split"
+              (local "raw#49" : text)
+              (text ":" : text)
+              :
+              (list text))
+            (arms
+              (arm
+                (list (bind "host_part") (bind "port_part"))
+                (statements
+                  (let "host"
+                    (match
+                      (call "parse_host"
+                        (local "host_part" : text)
+                        :
+                        (result (nominal "Host") (nominal "ConfigError")))
+                      (arms
+                        (arm
+                          (variant "Ok" (bind "ok#58"))
+                          (expr (local "ok#58" : (nominal "Host"))))
+                        (arm
+                          (variant "Err" (bind "err#57"))
+                          (statements
+                            (return
+                              (variant "Err"
+                                (local "err#57" : (nominal "ConfigError"))
+                                :
+                                (result
+                                  (nominal "Endpoint")
+                                  (nominal "ConfigError")))))))
+                      :
+                      (nominal "Host")))
+                  (let "port#62"
+                    (match
+                      (call "parse_port"
+                        (local "port_part" : text)
+                        :
+                        (result (nominal "Port") (nominal "ConfigError")))
+                      (arms
+                        (arm
+                          (variant "Ok" (bind "ok#61"))
+                          (expr (local "ok#61" : (nominal "Port"))))
+                        (arm
+                          (variant "Err" (bind "err#60"))
+                          (statements
+                            (return
+                              (variant "Err"
+                                (local "err#60" : (nominal "ConfigError"))
+                                :
+                                (result
+                                  (nominal "Endpoint")
+                                  (nominal "ConfigError")))))))
+                      :
+                      (nominal "Port")))
+                  (return
+                    (variant "Ok"
+                      (record "Endpoint"
+                        (local "host" : (nominal "Host"))
+                        (local "port#62" : (nominal "Port"))
+                        :
+                        (nominal "Endpoint"))
+                      :
+                      (result (nominal "Endpoint") (nominal "ConfigError"))))))
+              (arm wild
+                (statements
+                  (return
+                    (variant "Err"
+                      (variant "MissingValue"
+                        (text "port" : text)
+                        :
+                        (nominal "ConfigError"))
+                      :
+                      (result (nominal "Endpoint") (nominal "ConfigError"))))))))))
+      (fn "explain"
+        (params (param "problem#50" (nominal "ConfigError")))
+        text
+        pure
+        (examples
+          (example "missing" function
+            (inputs
+              (input "problem#50"
+                (variant "MissingValue"
+                  (text "host" : text)
+                  :
+                  (nominal "ConfigError"))))
+            (value (text "missing host" : text))))
+        (statements
+          (return
+            (match
+              (local "problem#50" : (nominal "ConfigError"))
+              (arms
+                (arm
+                  (variant "MissingValue" (bind "field"))
+                  (expr
+                    (concat
+                      (text "missing " : text)
+                      (local "field" : text)
+                      :
+                      text)))
+                (arm
+                  (variant "BadPort" (bind "given"))
+                  (expr
+                    (concat
+                      (text "bad port [" : text)
+                      (local "given" : text)
+                      (text "]" : text)
+                      :
+                      text))))
+              :
+              text))))
+      (fn "render"
+        (params (param "raw#51" text))
+        text
+        pure
+        (examples
+          (example "ok" function
+            (inputs (input "raw#51" (text "h:1" : text)))
+            (value (text "h port 1" : text))))
+        (statements
+          (return
+            (match
+              (call "parse_endpoint"
+                (local "raw#51" : text)
+                :
+                (result (nominal "Endpoint") (nominal "ConfigError")))
+              (arms
+                (arm
+                  (variant "Ok" (bind "endpoint"))
+                  (expr
+                    (concat
+                      (field
+                        (local "endpoint" : (nominal "Endpoint"))
+                        0
+                        :
+                        (nominal "Host"))
+                      (text " port " : text)
+                      (field
+                        (local "endpoint" : (nominal "Endpoint"))
+                        1
+                        :
+                        (nominal "Port"))
+                      :
+                      text)))
+                (arm
+                  (variant "Err" (bind "problem#66"))
+                  (expr
+                    (call "explain"
+                      (local "problem#66" : (nominal "ConfigError"))
+                      :
+                      text))))
+              :
+              text))))
+      (fn "main"
+        (params)
+        nothing
+        pure
+        (examples)
+        (statements
+          (let "inputs"
+            (list
+              (text "localhost:8080" : text)
+              (text " example.org :443" : text)
+              (text "db:65535" : text)
+              (text "db:0" : text)
+              (text "db:70000" : text)
+              (text "web: 80" : text)
+              (text ":80" : text)
+              (text "nohost" : text)
+              (text "a:b:c" : text)
+              :
+              (list text)))
+          (for-list "raw#68"
+            (local "inputs" : (list text))
+            (statements
+              (expr
+                (log (call "render" (local "raw#68" : text) : text) : nothing))))
+          (return (nothing : nothing)))))))

@@ -1,0 +1,94 @@
+(program
+  (main "main")
+  (module "match_open" "match_open.lf"
+    (functions
+      (fn "describe"
+        (params (param "n" int))
+        text
+        pure
+        (examples
+          (example "zero" function
+            (inputs (input "n" (int 0 : int)))
+            (value (text "zero" : text)))
+          (example "other" function
+            (inputs (input "n" (int 7 : int)))
+            (value (text "many" : text))))
+        (statements
+          (return
+            (match
+              (local "n" : int)
+              (arms
+                (arm (lit-int 0) (expr (text "zero" : text)))
+                (arm (lit-int 1) (expr (text "one" : text)))
+                (arm (lit-int -1) (expr (text "minus one" : text)))
+                (arm wild (expr (text "many" : text))))
+              :
+              text))))
+      (fn "command"
+        (params (param "word#39" text))
+        text
+        pure
+        (examples
+          (example "go" function
+            (inputs (input "word#39" (text "go" : text)))
+            (value (text "moving" : text)))
+          (example "unknown" function
+            (inputs (input "word#39" (text "jump" : text)))
+            (value (text "unknown jump" : text))))
+        (statements
+          (return
+            (match
+              (local "word#39" : text)
+              (arms
+                (arm (lit-text "go") (expr (text "moving" : text)))
+                (arm (lit-text "stop") (expr (text "halted" : text)))
+                (arm wild
+                  (expr
+                    (concat
+                      (text "unknown " : text)
+                      (local "word#39" : text)
+                      :
+                      text))))
+              :
+              text))))
+      (fn "main"
+        (params)
+        nothing
+        pure
+        (examples)
+        (statements
+          (let "numbers"
+            (list
+              (int 0 : int)
+              (int 1 : int)
+              (int -1 : int)
+              (int 7 : int)
+              :
+              (list int)))
+          (for-list "number"
+            (local "numbers" : (list int))
+            (statements
+              (expr
+                (log
+                  (concat
+                    (local "number" : int)
+                    (text " " : text)
+                    (call "describe" (local "number" : int) : text)
+                    :
+                    text)
+                  :
+                  nothing))))
+          (let "words"
+            (list
+              (text "go" : text)
+              (text "stop" : text)
+              (text "jump" : text)
+              (text "" : text)
+              :
+              (list text)))
+          (for-list "word#43"
+            (local "words" : (list text))
+            (statements
+              (expr
+                (log (call "command" (local "word#43" : text) : text) : nothing))))
+          (return (nothing : nothing)))))))

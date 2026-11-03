@@ -1,0 +1,28 @@
+(program
+  (main "main")
+  (module "div_zero" "div_zero.lf"
+    (functions
+      (fn "main"
+        (params)
+        nothing
+        pure
+        (examples)
+        (statements
+          (let "ten" (int 10 : int))
+          (let "zero" (int 0 : int))
+          (expr
+            (log
+              (concat
+                (text "before " : text)
+                (div (local "zero" : int) (local "ten" : int) : int)
+                :
+                text)
+              :
+              nothing))
+          (let "quotient" (div (local "ten" : int) (local "zero" : int) : int))
+          (expr
+            (log
+              (concat (text "after " : text) (local "quotient" : int) : text)
+              :
+              nothing))
+          (return (nothing : nothing)))))))

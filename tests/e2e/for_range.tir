@@ -1,0 +1,87 @@
+(program
+  (main "main")
+  (module "for_range" "for_range.lf"
+    (functions
+      (fn "main"
+        (params)
+        nothing
+        pure
+        (examples)
+        (statements
+          (for-range "i"
+            (int 0 : int)
+            (int 3 : int)
+            (statements
+              (expr
+                (log
+                  (concat (text "i=" : text) (local "i" : (bound 0 2)) : text)
+                  :
+                  nothing))))
+          (for-range "j"
+            (int 5 : int)
+            (int 5 : int)
+            (statements
+              (expr
+                (log
+                  (concat
+                    (text "never " : text)
+                    (local "j" : (bound 5 int-max))
+                    :
+                    text)
+                  :
+                  nothing))))
+          (let "lo" (int -2 : int))
+          (let "hi" (int 1 : int))
+          (for-range "m"
+            (local "lo" : int)
+            (local "hi" : int)
+            (statements
+              (expr
+                (log
+                  (concat (text "m=" : text) (local "m" : int) : text)
+                  :
+                  nothing))))
+          (for-range "k"
+            (local "hi" : int)
+            (local "lo" : int)
+            (statements
+              (expr
+                (log
+                  (concat (text "never " : text) (local "k" : int) : text)
+                  :
+                  nothing))))
+          (let "neg" (int -3 : int))
+          (for-range "q"
+            (int 0 : int)
+            (local "neg" : int)
+            (statements
+              (expr
+                (log
+                  (concat
+                    (text "never " : text)
+                    (local "q" : (bound 0 int-max))
+                    :
+                    text)
+                  :
+                  nothing))))
+          (let "limit" (int 2 : int))
+          (for-range "p"
+            (int 0 : int)
+            (local "limit" : int)
+            (statements
+              (set "limit" (add (local "limit" : int) (int 10 : int) : int))
+              (expr
+                (log
+                  (concat
+                    (text "p=" : text)
+                    (local "p" : (bound 0 int-max))
+                    :
+                    text)
+                  :
+                  nothing))))
+          (expr
+            (log
+              (concat (text "limit " : text) (local "limit" : int) : text)
+              :
+              nothing))
+          (return (nothing : nothing)))))))

@@ -1,0 +1,33 @@
+(program
+  (main "main")
+  (module "main_param_name" "main_param_name.lf"
+    (functions
+      (fn "main"
+        (params (param "env" (nominal "Process")))
+        nothing
+        pure
+        (examples)
+        (statements
+          (for-list "arg"
+            (field (local "env" : (nominal "Process")) "args" : (list text))
+            (statements
+              (expr
+                (log
+                  (concat
+                    (text "unexpected arg " : text)
+                    (local "arg" : text)
+                    :
+                    text)
+                  :
+                  nothing))))
+          (expr
+            (log
+              (concat
+                (field (local "env" : (nominal "Process")) "os" : text)
+                (text "/" : text)
+                (field (local "env" : (nominal "Process")) "arch" : text)
+                :
+                text)
+              :
+              nothing))
+          (return (nothing : nothing)))))))

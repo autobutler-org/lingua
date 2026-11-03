@@ -1,0 +1,12 @@
+(program
+  (main "main")
+  (module "hello" "hello.lf"
+    (functions
+      (fn "main"
+        (params)
+        nothing
+        pure
+        (examples)
+        (statements
+          (expr (log (text "hello, world" : text) : nothing))
+          (return (nothing : nothing)))))))

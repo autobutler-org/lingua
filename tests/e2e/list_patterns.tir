@@ -1,0 +1,114 @@
+(program
+  (main "main")
+  (module "list_patterns" "list_patterns.lf"
+    (functions
+      (fn "shape_of"
+        (params (param "items" (list text)))
+        text
+        pure
+        (examples
+          (example "empty" function
+            (inputs (input "items" (list : (list text))))
+            (value (text "empty" : text)))
+          (example "command" function
+            (inputs
+              (input "items"
+                (list (text "cmd" : text) (text "run" : text) : (list text))))
+            (value (text "command run" : text))))
+        (statements
+          (return
+            (match
+              (local "items" : (list text))
+              (arms
+                (arm (list) (expr (text "empty" : text)))
+                (arm
+                  (list (bind "only"))
+                  (expr
+                    (concat (text "one: " : text) (local "only" : text) : text)))
+                (arm
+                  (list (lit-text "cmd") (bind "arg"))
+                  (expr
+                    (concat
+                      (text "command " : text)
+                      (local "arg" : text)
+                      :
+                      text)))
+                (arm
+                  (list (bind "first") (bind "second"))
+                  (expr
+                    (concat
+                      (text "pair " : text)
+                      (local "first" : text)
+                      (text " " : text)
+                      (local "second" : text)
+                      :
+                      text)))
+                (arm wild (expr (text "many" : text))))
+              :
+              text))))
+      (fn "main"
+        (params)
+        nothing
+        pure
+        (examples)
+        (statements
+          (expr (log (call "shape_of" (list : (list text)) : text) : nothing))
+          (expr
+            (log
+              (call "shape_of" (list (text "solo" : text) : (list text)) : text)
+              :
+              nothing))
+          (expr
+            (log
+              (call "shape_of"
+                (list (text "cmd" : text) (text "run" : text) : (list text))
+                :
+                text)
+              :
+              nothing))
+          (expr
+            (log
+              (call "shape_of"
+                (list (text "a" : text) (text "b" : text) : (list text))
+                :
+                text)
+              :
+              nothing))
+          (expr
+            (log
+              (call "shape_of"
+                (list
+                  (text "cmd" : text)
+                  (text "a" : text)
+                  (text "b" : text)
+                  :
+                  (list text))
+                :
+                text)
+              :
+              nothing))
+          (expr
+            (log
+              (call "shape_of"
+                (call "split"
+                  (text "cmd:build" : text)
+                  (text ":" : text)
+                  :
+                  (list text))
+                :
+                text)
+              :
+              nothing))
+          (expr
+            (log
+              (call "shape_of"
+                (call "split"
+                  (text "none" : text)
+                  (text ":" : text)
+                  :
+                  (list text))
+                :
+                text)
+              :
+              nothing))
+          (return (nothing : nothing)))))))

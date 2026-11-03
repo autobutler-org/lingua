@@ -1,0 +1,129 @@
+(program
+  (main "main")
+  (module "shapes" "shapes.lf"
+    (types
+      (type "Point" product)
+      (type "Shape" sum)
+      (variant "Circle" "Shape" 0 int)
+      (variant "Box" "Shape" 1 (nominal "Point")))
+    (functions
+      (fn "area"
+        (params (param "shape#41" (nominal "Shape")))
+        int
+        pure
+        (examples
+          (example "circle" function
+            (inputs
+              (input "shape#41"
+                (variant "Circle" (int 2 : int) : (nominal "Shape"))))
+            (value (int 12 : int)))
+          (example "box" function
+            (inputs
+              (input "shape#41"
+                (variant "Box"
+                  (record "Point"
+                    (int 3 : int)
+                    (int 4 : int)
+                    :
+                    (nominal "Point"))
+                  :
+                  (nominal "Shape"))))
+            (value (int 12 : int))))
+        (statements
+          (match
+            (local "shape#41" : (nominal "Shape"))
+            (arms
+              (arm
+                (variant "Circle" (bind "radius"))
+                (statements
+                  (return
+                    (mul
+                      (mul (int 3 : int) (local "radius" : int) : int)
+                      (local "radius" : int)
+                      :
+                      int))))
+              (arm
+                (variant "Box" (bind "corner"))
+                (statements
+                  (return
+                    (mul
+                      (field (local "corner" : (nominal "Point")) 0 : int)
+                      (field (local "corner" : (nominal "Point")) 1 : int)
+                      :
+                      int))))))))
+      (fn "shape_name"
+        (params (param "shape#42" (nominal "Shape")))
+        text
+        pure
+        (examples
+          (example "circle" function
+            (inputs
+              (input "shape#42"
+                (variant "Circle" (int 1 : int) : (nominal "Shape"))))
+            (value (text "circle" : text))))
+        (statements
+          (return
+            (match
+              (local "shape#42" : (nominal "Shape"))
+              (arms
+                (arm (variant "Circle" wild) (expr (text "circle" : text)))
+                (arm (variant "Box" wild) (expr (text "box" : text))))
+              :
+              text))))))
+  (module "report" "report.lf"
+    (functions
+      (fn "describe"
+        (params (param "shape#44" (nominal "Shape")))
+        text
+        pure
+        (examples
+          (example "circle" function
+            (inputs
+              (input "shape#44"
+                (variant "Circle" (int 2 : int) : (nominal "Shape"))))
+            (value (text "circle with area 12" : text))))
+        (statements
+          (return
+            (concat
+              (call "shape_name" (local "shape#44" : (nominal "Shape")) : text)
+              (text " with area " : text)
+              (call "area" (local "shape#44" : (nominal "Shape")) : int)
+              :
+              text))))))
+  (module "main" "main.lf"
+    (functions
+      (fn "main"
+        (params)
+        nothing
+        pure
+        (examples)
+        (statements
+          (let "shapes"
+            (list
+              (variant "Circle" (int 3 : int) : (nominal "Shape"))
+              (variant "Box"
+                (record "Point" (int 3 : int) (int 4 : int) : (nominal "Point"))
+                :
+                (nominal "Shape"))
+              (variant "Box"
+                (record "Point"
+                  (int -2 : int)
+                  (int 5 : int)
+                  :
+                  (nominal "Point"))
+                :
+                (nominal "Shape"))
+              :
+              (list (nominal "Shape"))))
+          (for-list "shape#49"
+            (local "shapes" : (list (nominal "Shape")))
+            (statements
+              (expr
+                (log
+                  (call "describe"
+                    (local "shape#49" : (nominal "Shape"))
+                    :
+                    text)
+                  :
+                  nothing))))
+          (return (nothing : nothing)))))))

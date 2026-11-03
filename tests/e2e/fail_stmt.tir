@@ -1,0 +1,22 @@
+(program
+  (main "main")
+  (module "fail_stmt" "fail_stmt.lf"
+    (functions
+      (fn "main"
+        (params)
+        nothing
+        pure
+        (examples)
+        (statements
+          (expr (log (text "start" : text) : nothing))
+          (let "mode" (text "broken" : text))
+          (if
+            (cmp eq (local "mode" : text) (text "fine" : text) : bool)
+            (then (fail "mode is fine"))
+            (else))
+          (if
+            (cmp eq (local "mode" : text) (text "broken" : text) : bool)
+            (then (fail "mode is broken"))
+            (else))
+          (expr (log (text "unreachable" : text) : nothing))
+          (return (nothing : nothing)))))))

@@ -1,0 +1,118 @@
+(program
+  (main "main")
+  (module "arm_join" "arm_join.lf"
+    (types
+      (type "Cents" (newtype int (range 0 int-max)))
+      (type "Coupon" sum)
+      (variant "NoCoupon" "Coupon" 0 nil)
+      (variant "Flat" "Coupon" 1 (nominal "Cents"))
+      (variant "Bonus" "Coupon" 2 int))
+    (functions
+      (fn "coupon_value"
+        (params (param "coupon#42" (nominal "Coupon")))
+        (nominal "Cents")
+        pure
+        (examples
+          (example "none" function
+            (inputs
+              (input "coupon#42" (variant "NoCoupon" : (nominal "Coupon"))))
+            (value (int 0 : (nominal "Cents"))))
+          (example "flat" function
+            (inputs
+              (input "coupon#42"
+                (variant "Flat"
+                  (int 250 : (nominal "Cents"))
+                  :
+                  (nominal "Coupon"))))
+            (value (int 250 : (nominal "Cents")))))
+        (statements
+          (let "off"
+            (match
+              (local "coupon#42" : (nominal "Coupon"))
+              (arms
+                (arm (variant "NoCoupon") (expr (int 0 : (nominal "Cents"))))
+                (arm
+                  (variant "Flat" (bind "amount"))
+                  (expr (local "amount" : (nominal "Cents"))))
+                (arm (variant "Bonus" wild) (expr (int 5 : (nominal "Cents")))))
+              :
+              (nominal "Cents")))
+          (return (local "off" : (nominal "Cents")))))
+      (fn "main"
+        (params)
+        nothing
+        pure
+        (examples)
+        (statements
+          (expr
+            (log
+              (concat
+                (text "none " : text)
+                (call "coupon_value"
+                  (variant "NoCoupon" : (nominal "Coupon"))
+                  :
+                  (nominal "Cents"))
+                :
+                text)
+              :
+              nothing))
+          (expr
+            (log
+              (concat
+                (text "flat " : text)
+                (call "coupon_value"
+                  (variant "Flat"
+                    (int 250 : (nominal "Cents"))
+                    :
+                    (nominal "Coupon"))
+                  :
+                  (nominal "Cents"))
+                :
+                text)
+              :
+              nothing))
+          (expr
+            (log
+              (concat
+                (text "bonus " : text)
+                (call "coupon_value"
+                  (variant "Bonus" (int -9 : int) : (nominal "Coupon"))
+                  :
+                  (nominal "Cents"))
+                :
+                text)
+              :
+              nothing))
+          (let "coupon#45" (variant "Bonus" (int 3 : int) : (nominal "Coupon")))
+          (let "code"
+            (match
+              (local "coupon#45" : (nominal "Coupon"))
+              (arms
+                (arm (variant "NoCoupon") (expr (int 0 : int)))
+                (arm (variant "Flat" wild) (expr (int 1 : int)))
+                (arm (variant "Bonus" wild) (expr (int -1 : int))))
+              :
+              int))
+          (expr
+            (log
+              (concat (text "code " : text) (local "code" : int) : text)
+              :
+              nothing))
+          (let "label"
+            (match
+              (local "coupon#45" : (nominal "Coupon"))
+              (arms
+                (arm (variant "NoCoupon") (expr (text "none" : text)))
+                (arm (variant "Flat" wild) (expr (text "flat" : text)))
+                (arm
+                  (variant "Bonus" (bind "points"))
+                  (expr
+                    (concat
+                      (text "bonus " : text)
+                      (local "points" : int)
+                      :
+                      text))))
+              :
+              text))
+          (expr (log (local "label" : text) : nothing))
+          (return (nothing : nothing)))))))

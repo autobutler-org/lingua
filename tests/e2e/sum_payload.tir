@@ -1,0 +1,78 @@
+(program
+  (main "main")
+  (module "sum_payload" "sum_payload.lf"
+    (types
+      (type "Dims" product)
+      (type "Shape" sum)
+      (variant "Square" "Shape" 0 int)
+      (variant "Rect" "Shape" 1 (nominal "Dims"))
+      (variant "Dot" "Shape" 2 nil))
+    (functions
+      (fn "area"
+        (params (param "shape#42" (nominal "Shape")))
+        int
+        pure
+        (examples
+          (example "square" function
+            (inputs
+              (input "shape#42"
+                (variant "Square" (int 3 : int) : (nominal "Shape"))))
+            (value (int 9 : int)))
+          (example "rect" function
+            (inputs
+              (input "shape#42"
+                (variant "Rect"
+                  (record "Dims" (int 2 : int) (int 5 : int) : (nominal "Dims"))
+                  :
+                  (nominal "Shape"))))
+            (value (int 10 : int)))
+          (example "dot" function
+            (inputs (input "shape#42" (variant "Dot" : (nominal "Shape"))))
+            (value (int 0 : int))))
+        (statements
+          (match
+            (local "shape#42" : (nominal "Shape"))
+            (arms
+              (arm
+                (variant "Square" (bind "side"))
+                (statements
+                  (return (mul (local "side" : int) (local "side" : int) : int))))
+              (arm
+                (variant "Rect" (bind "dims"))
+                (statements
+                  (return
+                    (mul
+                      (field (local "dims" : (nominal "Dims")) 0 : int)
+                      (field (local "dims" : (nominal "Dims")) 1 : int)
+                      :
+                      int))))
+              (arm (variant "Dot") (statements (return (int 0 : int))))))))
+      (fn "main"
+        (params)
+        nothing
+        pure
+        (examples)
+        (statements
+          (let "shapes"
+            (list
+              (variant "Square" (int 4 : int) : (nominal "Shape"))
+              (variant "Rect"
+                (record "Dims" (int 3 : int) (int 7 : int) : (nominal "Dims"))
+                :
+                (nominal "Shape"))
+              (variant "Dot" : (nominal "Shape"))
+              :
+              (list (nominal "Shape"))))
+          (for-list "shape#46"
+            (local "shapes" : (list (nominal "Shape")))
+            (statements
+              (expr
+                (log
+                  (concat
+                    (text "area " : text)
+                    (call "area" (local "shape#46" : (nominal "Shape")) : int)
+                    :
+                    text)
+                  :
+                  nothing))))
+          (return (nothing : nothing)))))))

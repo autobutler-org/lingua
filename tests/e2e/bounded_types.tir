@@ -1,0 +1,173 @@
+(program
+  (main "main")
+  (module "bounded_types" "bounded_types.lf"
+    (types
+      (type "Percent" (newtype int (range 0 100)))
+      (type "Score" (newtype int (range 0 10))))
+    (functions
+      (fn "widen"
+        (params (param "score" (nominal "Score")))
+        (bound 0 int-max)
+        pure
+        (examples
+          (example "seven" function
+            (inputs (input "score" (int 7 : (nominal "Score"))))
+            (value (int 7 : (bound 0 int-max)))))
+        (statements (return (local "score" : (nominal "Score")))))
+      (fn "half"
+        (params (param "p#44" (nominal "Percent")))
+        (bound 0 50)
+        pure
+        (examples
+          (example "odd" function
+            (inputs (input "p#44" (int 85 : (nominal "Percent"))))
+            (value (int 42 : (bound 0 50)))))
+        (statements
+          (return
+            (div
+              (local "p#44" : (nominal "Percent"))
+              (int 2 : int)
+              :
+              (bound 0 50)))))
+      (fn "last_digit"
+        (params (param "n#45" (bound 0 int-max)))
+        (bound 0 9)
+        pure
+        (examples
+          (example "1234" function
+            (inputs (input "n#45" (int 1234 : (bound 0 int-max))))
+            (value (int 4 : (bound 0 9)))))
+        (statements
+          (return
+            (rem
+              (local "n#45" : (bound 0 int-max))
+              (int 10 : int)
+              :
+              (bound 0 9)))))
+      (fn "signed_digit"
+        (params (param "n#46" int))
+        (bound -9 9)
+        pure
+        (examples
+          (example "negative" function
+            (inputs (input "n#46" (int -1234 : int)))
+            (value (int -4 : (bound -9 9)))))
+        (statements
+          (return (rem (local "n#46" : int) (int 10 : int) : (bound -9 9)))))
+      (fn "triple"
+        (params (param "x" (bound 0 100)))
+        int
+        pure
+        (examples
+          (example "seven" function
+            (inputs (input "x" (int 7 : (bound 0 100))))
+            (value (int 21 : int))))
+        (statements
+          (return
+            (mul (local "x" : (bound 0 100)) (int 3 : int) : (bound 0 int-max)))))
+      (fn "main"
+        (params)
+        nothing
+        pure
+        (examples)
+        (statements
+          (let "s" (int 7 : (nominal "Score")))
+          (expr
+            (log
+              (concat
+                (text "widened " : text)
+                (call "widen"
+                  (local "s" : (nominal "Score"))
+                  :
+                  (bound 0 int-max))
+                :
+                text)
+              :
+              nothing))
+          (let "p#49" (int 85 : (nominal "Percent")))
+          (expr
+            (log
+              (concat
+                (text "half " : text)
+                (call "half"
+                  (local "p#49" : (nominal "Percent"))
+                  :
+                  (bound 0 50))
+                :
+                text)
+              :
+              nothing))
+          (expr
+            (log
+              (concat
+                (text "digit " : text)
+                (call "last_digit" (int 1234 : (bound 0 int-max)) : (bound 0 9))
+                :
+                text)
+              :
+              nothing))
+          (expr
+            (log
+              (concat
+                (text "signed " : text)
+                (call "signed_digit" (int -1234 : int) : (bound -9 9))
+                :
+                text)
+              :
+              nothing))
+          (expr
+            (log
+              (concat
+                (text "tripled " : text)
+                (call "triple" (local "s" : (nominal "Score")) : int)
+                :
+                text)
+              :
+              nothing))
+          (expr
+            (log
+              (concat
+                (text "tripled max " : text)
+                (call "triple" (int 100 : (bound 0 100)) : int)
+                :
+                text)
+              :
+              nothing))
+          (let "as_int" (local "p#49" : (nominal "Percent")))
+          (expr
+            (log
+              (concat
+                (text "as int " : text)
+                (sub (local "as_int" : int) (int 100 : int) : int)
+                :
+                text)
+              :
+              nothing))
+          (for-range "i"
+            (int 0 : int)
+            (int 3 : int)
+            (statements
+              (let "letter"
+                (index
+                  (list
+                    (text "a" : text)
+                    (text "b" : text)
+                    (text "c" : text)
+                    :
+                    (list text))
+                  (local "i" : (bound 0 2))
+                  false
+                  :
+                  text))
+              (expr
+                (log
+                  (concat
+                    (text "letter " : text)
+                    (local "i" : (bound 0 2))
+                    (text " " : text)
+                    (local "letter" : text)
+                    :
+                    text)
+                  :
+                  nothing))))
+          (return (nothing : nothing)))))))

@@ -1,4 +1,4 @@
-//! `lingua build`, `lingua lir`, and `lingua asm` through the real binary. These run on every
+//! `lingua build`, `lingua tir`, `lingua lir`, and `lingua asm` through the real binary. These run on every
 //! host; running the executable is `tests/e2e.rs`'s job.
 
 use std::path::{Path, PathBuf};
@@ -135,10 +135,11 @@ fn first_difference(got: &str, want: &str) -> String {
     )
 }
 
-// Every e2e case has a `NAME.lir` and `NAME.amd64.asm` golden beside it. The dumps are text, so
-// this runs on every host. `LINGUA_BLESS=1 cargo test --test build_cli` rewrites the goldens.
+// Every e2e case has a `NAME.tir`, `NAME.lir`, and `NAME.amd64.asm` golden beside it. The dumps
+// are text, so this runs on every host. `LINGUA_BLESS=1 cargo test --test build_cli` rewrites
+// the goldens.
 #[test]
-fn lir_and_asm_dumps_match_goldens() {
+fn stage_dumps_match_goldens() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
     let bless = std::env::var_os("LINGUA_BLESS").is_some();
     let dir = root.join("tests/e2e");
@@ -151,7 +152,9 @@ fn lir_and_asm_dumps_match_goldens() {
     assert!(!cases.is_empty(), "no .lf cases under tests/e2e");
     let failures: Vec<String> = cases
         .iter()
-        .flat_map(|source| [("lir", "lir"), ("asm", "amd64.asm")].map(|dump| (source, dump)))
+        .flat_map(|source| {
+            [("tir", "tir"), ("lir", "lir"), ("asm", "amd64.asm")].map(|dump| (source, dump))
+        })
         .filter_map(|(source, (command, extension))| {
             let golden = source.with_extension(extension);
             let name = golden.file_name().unwrap().to_string_lossy().into_owned();
@@ -179,7 +182,7 @@ fn lir_and_asm_dumps_match_goldens() {
         "{} of {} dumps differ from their goldens\n{}\n\nif the change is intended, regenerate \
          them with `LINGUA_BLESS=1 cargo test --test build_cli` and review the diff",
         failures.len(),
-        cases.len() * 2,
+        cases.len() * 3,
         failures.join("\n")
     );
 }

@@ -1,0 +1,181 @@
+(program
+  (main "main")
+  (module "records" "records.lf"
+    (types
+      (type "Point" product)
+      (type "Segment" product)
+      (type "Person" product))
+    (functions
+      (fn "magnitude"
+        (params (param "n" int))
+        int
+        pure
+        (examples
+          (example "negative" function
+            (inputs (input "n" (int -3 : int)))
+            (value (int 3 : int)))
+          (example "positive" function
+            (inputs (input "n" (int 4 : int)))
+            (value (int 4 : int))))
+        (statements
+          (if
+            (cmp lt (local "n" : int) (int 0 : int) : bool)
+            (then (return (neg (local "n" : int) : int)))
+            (else))
+          (return (local "n" : int))))
+      (fn "manhattan"
+        (params (param "segment" (nominal "Segment")))
+        int
+        pure
+        (examples
+          (example "unit diagonal" function
+            (inputs
+              (input "segment"
+                (record "Segment"
+                  (record "Point"
+                    (int 0 : int)
+                    (int 0 : int)
+                    :
+                    (nominal "Point"))
+                  (record "Point"
+                    (int 1 : int)
+                    (int 1 : int)
+                    :
+                    (nominal "Point"))
+                  :
+                  (nominal "Segment"))))
+            (value (int 2 : int))))
+        (statements
+          (let "dx"
+            (sub
+              (field
+                (field
+                  (local "segment" : (nominal "Segment"))
+                  1
+                  :
+                  (nominal "Point"))
+                0
+                :
+                int)
+              (field
+                (field
+                  (local "segment" : (nominal "Segment"))
+                  0
+                  :
+                  (nominal "Point"))
+                0
+                :
+                int)
+              :
+              int))
+          (let "dy"
+            (sub
+              (field
+                (field
+                  (local "segment" : (nominal "Segment"))
+                  1
+                  :
+                  (nominal "Point"))
+                1
+                :
+                int)
+              (field
+                (field
+                  (local "segment" : (nominal "Segment"))
+                  0
+                  :
+                  (nominal "Point"))
+                1
+                :
+                int)
+              :
+              int))
+          (return
+            (add
+              (call "magnitude" (local "dx" : int) : int)
+              (call "magnitude" (local "dy" : int) : int)
+              :
+              int))))
+      (fn "main"
+        (params)
+        nothing
+        pure
+        (examples)
+        (statements
+          (let "origin"
+            (record "Point" (int 0 : int) (int 0 : int) : (nominal "Point")))
+          (let "corner"
+            (record "Point" (int 3 : int) (int -4 : int) : (nominal "Point")))
+          (let "seg"
+            (record "Segment"
+              (local "origin" : (nominal "Point"))
+              (local "corner" : (nominal "Point"))
+              :
+              (nominal "Segment")))
+          (expr
+            (log
+              (concat
+                (text "corner " : text)
+                (field (local "corner" : (nominal "Point")) 0 : int)
+                (text "," : text)
+                (field (local "corner" : (nominal "Point")) 1 : int)
+                :
+                text)
+              :
+              nothing))
+          (expr
+            (log
+              (concat
+                (text "distance " : text)
+                (call "manhattan" (local "seg" : (nominal "Segment")) : int)
+                :
+                text)
+              :
+              nothing))
+          (expr
+            (log
+              (concat
+                (text "start y " : text)
+                (field
+                  (field
+                    (local "seg" : (nominal "Segment"))
+                    0
+                    :
+                    (nominal "Point"))
+                  1
+                  :
+                  int)
+                :
+                text)
+              :
+              nothing))
+          (let "flipped"
+            (record "Point" (int 1 : int) (int 9 : int) : (nominal "Point")))
+          (expr
+            (log
+              (concat
+                (text "flipped " : text)
+                (field (local "flipped" : (nominal "Point")) 0 : int)
+                (text " " : text)
+                (field (local "flipped" : (nominal "Point")) 1 : int)
+                :
+                text)
+              :
+              nothing))
+          (let "ada"
+            (record "Person"
+              (text "Ada" : text)
+              (int 36 : int)
+              :
+              (nominal "Person")))
+          (expr
+            (log
+              (concat
+                (field (local "ada" : (nominal "Person")) 0 : text)
+                (text " is " : text)
+                (field (local "ada" : (nominal "Person")) 1 : int)
+                :
+                text)
+              :
+              nothing))
+          (return (nothing : nothing)))))))

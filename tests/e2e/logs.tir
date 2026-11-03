@@ -1,0 +1,20 @@
+(program
+  (main "main")
+  (module "logs" "logs.lf"
+    (functions
+      (fn "main"
+        (params)
+        nothing
+        pure
+        (examples
+          (example "logs are discarded in examples" function
+            (inputs)
+            (value (nothing : nothing))))
+        (statements
+          (expr (log (text "first" : text) : nothing))
+          (expr (log (text "" : text) : nothing))
+          (expr
+            (log (text "tab\there, quote \" and backslash \\" : text) : nothing))
+          (expr (log (text "héllo, 世界" : text) : nothing))
+          (expr (log (text "first" : text) : nothing))
+          (return (nothing : nothing)))))))
