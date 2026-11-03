@@ -102,7 +102,12 @@ pub fn compile(module: &str, source: &str) -> Views {
 /// `tir`, `lir`, `assembly`, and `run`.
 #[must_use]
 pub fn compile_json(module: &str, source: &str) -> String {
-    let views = compile(module, source);
+    encode(&compile(module, source))
+}
+
+/// `views` as the JSON object [`compile_json`] returns.
+#[must_use]
+pub fn encode(views: &Views) -> String {
     let mut out = String::from("{");
     for (index, (key, value)) in [
         ("tokens", views.tokens.as_str()),
