@@ -1148,6 +1148,19 @@ pub(crate) fn run_main(program: &crate::tir::TirProgram, fuel: u64) -> Option<St
     on_big_stack(|| interpret_main(program, fuel))
 }
 
+/// `50_000_000`, matching the `100_000` spelling in the `L042` catalog line.
+fn fuel_digits(fuel: u64) -> String {
+    let raw = fuel.to_string();
+    let mut out = String::new();
+    for (index, ch) in raw.chars().enumerate() {
+        if index > 0 && (raw.len() - index).is_multiple_of(3) {
+            out.push('_');
+        }
+        out.push(ch);
+    }
+    out
+}
+
 fn interpret_main(program: &crate::tir::TirProgram, fuel: u64) -> Option<String> {
     let mut machine = Machine::new(&program.symbols, &program.modules, &HashSet::new());
     let &(m, f) = machine.functions.get(&program.main)?;
@@ -1163,7 +1176,22 @@ fn interpret_main(program: &crate::tir::TirProgram, fuel: u64) -> Option<String>
             crate::report::exception(&message, &module(at).path, &module(at).source, at.span)
         }
         Err(Stop::Fault { code, at }) => {
-            crate::report::fault(code, &module(at).path, &module(at).source, Some(at.span))
+            let file = module(at);
+            if code == "L042" {
+                // Examples and comptime roots use the catalog's 100_000. `main` is given
+                // its own budget, and the native binary has none.
+                let header = format!("fault L042: fuel exceeded ({} steps)", fuel_digits(fuel));
+                crate::report::block(
+                    &header,
+                    &file.path,
+                    Some((at.span, crate::report::line_of(&file.source, at.span))),
+                    Some(
+                        "the playground stops `main` after this many steps so a loop cannot hang the page; a built binary has no fuel cap",
+                    ),
+                )
+            } else {
+                crate::report::fault(code, &file.path, &file.source, Some(at.span))
+            }
         }
         Err(stop) => format!("{stop:?}\n"),
     };
