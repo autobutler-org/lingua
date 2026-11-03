@@ -11,6 +11,7 @@ pub mod eval;
 pub mod fmt;
 pub mod lex;
 pub mod parse;
+pub mod playground;
 pub mod provider;
 pub mod report;
 pub mod tir;

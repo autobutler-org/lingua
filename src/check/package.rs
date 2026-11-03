@@ -410,6 +410,56 @@ pub fn load(paths: &[PathBuf], options: &Options) -> Result<Loaded, Error> {
     })
 }
 
+/// Not a directory. A provider-cache read misses, and `--offline` does not write one.
+const MEMORY_ROOT: &str = "/lingua-playground";
+
+/// One module from `source`, with no filesystem walk. Imports are `L016`: the playground
+/// compiles this file alone. The cache policy is [`Cache::Offline`], so a provider effect
+/// is not run.
+pub(super) fn load_memory(key: &str, source: &str) -> Loaded {
+    let path = format!("{key}.lf");
+    let mut diagnostics = Vec::new();
+    let module = match parse_source(source.as_bytes(), key) {
+        Ok(module) => {
+            for import in &module.imports {
+                diagnostics.push(
+                    Diagnostic::new(
+                        "L016",
+                        format!(
+                            "module `{}` is not loaded; the playground compiles this file alone",
+                            import.path
+                        ),
+                        &path,
+                    )
+                    .at(source, import.span)
+                    .help("paste the other module into this file, or drop the import"),
+                );
+            }
+            Some(module)
+        }
+        Err(errors) => {
+            diagnostics.extend(
+                errors
+                    .iter()
+                    .map(|d| Diagnostic::from_parse(d, &path, source)),
+            );
+            None
+        }
+    };
+    Loaded {
+        root: PathBuf::from(MEMORY_ROOT),
+        cache: Cache::Offline,
+        sources: vec![Source {
+            key: key.to_owned(),
+            path,
+            text: source.to_owned(),
+            module,
+        }],
+        requested: vec![key.to_owned()],
+        diagnostics,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
