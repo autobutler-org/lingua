@@ -49,3 +49,31 @@ jobs:
         run: |
           docker build -t lingua .
           docker run --rm -v "$PWD":/src -w /src lingua check tests/corpus/money.lf
+
+  wasm:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v2
+        with:
+          target: wasm32-unknown-unknown
+          rustflags: ""
+
+      - name: Lint the wasm32 library
+        run: cargo clippy --locked --target wasm32-unknown-unknown -p lingua --lib -p lingua-wasm -- -D warnings
+
+      - name: Build the playground compiler
+        run: cargo build --locked --release -p lingua-wasm --target wasm32-unknown-unknown
+
+      - name: Check the wasm exports
+        run: python3 wasm/check_exports.py target/wasm32-unknown-unknown/release/lingua_wasm.wasm
+
+      - name: Upload the playground compiler
+        uses: actions/upload-artifact@v7
+        with:
+          name: lingua-wasm
+          path: target/wasm32-unknown-unknown/release/lingua_wasm.wasm
+          if-no-files-found: error

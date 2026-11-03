@@ -1,0 +1,19 @@
+[package]
+name = "lingua-wasm"
+version = "0.1.0"
+edition = "2024"
+license = "CC0-1.0"
+publish = false
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+lingua = { path = ".." }
+
+[lints.rust]
+unsafe_code = "allow"
+
+[lints.clippy]
+all = { level = "warn", priority = -1 }
+pedantic = { level = "warn", priority = -1 }

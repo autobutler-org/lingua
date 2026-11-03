@@ -1127,7 +1127,7 @@ pub(crate) fn on_big_stack<T: Send>(f: impl FnOnce() -> T + Send) -> T {
     #[cfg(target_arch = "wasm32")]
     {
         let _ = STACK;
-        return f();
+        f()
     }
     #[cfg(not(target_arch = "wasm32"))]
     {

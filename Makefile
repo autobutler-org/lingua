@@ -37,6 +37,11 @@ setup: ## Install rustup (if missing) and the pinned toolchain
 build: ## Build codebase
 	$(CARGO) build --locked $(CARGO_FLAGS)
 
+.PHONY: wasm
+wasm: ## Build the playground compiler for wasm32-unknown-unknown
+	rustup target add wasm32-unknown-unknown
+	$(CARGO) build --locked --release -p lingua-wasm --target wasm32-unknown-unknown
+
 .PHONY: clean
 clean: ## Clean build space
 	$(CARGO) clean
@@ -47,7 +52,7 @@ run: build ## Build and run the application
 
 .PHONY: test
 test: ## Run tests
-	$(CARGO) test --locked
+	$(CARGO) test --locked --workspace
 
 RUST_IMAGE := $(shell sed -n 's/^FROM \(rust:[^ ]*\).*/\1/p' Dockerfile)
 
@@ -86,7 +91,7 @@ upgrade: ## Upgrade dependencies
 
 .PHONY: check
 check: ## Check code quality
-	$(CARGO) clippy --locked --all-targets -- -D warnings
+	$(CARGO) clippy --locked --workspace --all-targets -- -D warnings
 
 .PHONY: format
 format: ## Format code
