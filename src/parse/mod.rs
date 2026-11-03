@@ -6,7 +6,13 @@ use crate::ast::{
     FnBody, Import, Module, Param, Pattern, QuoteBody, ResourceEffect, ResourceOp, Span, Stmt,
     TextPart, TypeExpr, Variant,
 };
-use crate::lex::{Keyword, LexError, Lexer, Location, StringPart, Token, TokenKind, lex_source};
+use crate::lex::{
+    Keyword, LexError, Lexer, Location, StringPart, Token, TokenKind, lex_source, lexeme,
+};
+
+mod unparse;
+
+pub use unparse::{unparse, unparse_type};
 
 #[derive(Debug, PartialEq)]
 pub struct Diagnostic {
@@ -49,7 +55,15 @@ impl From<LexError> for Diagnostic {
 /// The lex error, or every syntax diagnostic (`L001`, `L002`, `L003`, ...) found
 /// while recovering to the next `end fn` / `end type` / `end resource`.
 pub fn parse_source(bytes: &[u8], key: &str) -> Result<Module, Vec<Diagnostic>> {
-    let tokens = lex_source(bytes).map_err(|err| vec![err.into()])?;
+    parse_tokens(lex_source(bytes).map_err(|err| vec![err.into()])?, key)
+}
+
+/// Parses a token list that ends with `Eof`, from lex or from `unparse`.
+///
+/// # Errors
+///
+/// Every syntax diagnostic, as `parse_source`.
+pub fn parse_tokens(tokens: Vec<Token>, key: &str) -> Result<Module, Vec<Diagnostic>> {
     let mut parser = Parser::new(tokens, false);
     let module = parser.parse_module(key);
     if parser.diagnostics.is_empty() {
@@ -108,37 +122,12 @@ fn syntax_error(message: String, location: Location) -> Diagnostic {
 }
 
 fn describe(kind: &TokenKind) -> String {
-    let spelling = match kind {
-        TokenKind::Eof => return "end of file".to_string(),
-        TokenKind::Newline => return "newline".to_string(),
-        TokenKind::String(_) => return "a string".to_string(),
-        TokenKind::Identifier(name) => name,
-        TokenKind::Integer(value) => return format!("`{value}`"),
-        TokenKind::Keyword(keyword) => keyword.spelling(),
-        TokenKind::Wildcard => "_",
-        TokenKind::LeftParen => "(",
-        TokenKind::RightParen => ")",
-        TokenKind::LeftBracket => "[",
-        TokenKind::RightBracket => "]",
-        TokenKind::Comma => ",",
-        TokenKind::Dot => ".",
-        TokenKind::Colon => ":",
-        TokenKind::Plus => "+",
-        TokenKind::Minus => "-",
-        TokenKind::Asterisk => "*",
-        TokenKind::Slash => "/",
-        TokenKind::Percent => "%",
-        TokenKind::Equals => "=",
-        TokenKind::Arrow => "->",
-        TokenKind::PlusEquals => "+=",
-        TokenKind::EqualsEquals => "==",
-        TokenKind::BangEquals => "!=",
-        TokenKind::LessThan => "<",
-        TokenKind::GreaterThan => ">",
-        TokenKind::LessEquals => "<=",
-        TokenKind::GreaterEquals => ">=",
-    };
-    format!("`{spelling}`")
+    match kind {
+        TokenKind::Eof => "end of file".to_string(),
+        TokenKind::Newline => "newline".to_string(),
+        TokenKind::String(_) => "a string".to_string(),
+        _ => format!("`{}`", lexeme(kind)),
+    }
 }
 
 fn is_keyword(kind: &TokenKind, keyword: Keyword) -> bool {
@@ -1527,15 +1516,17 @@ impl Parser {
         Ok(Some(name))
     }
 
-    // "(" expr ")" with an optional fixed argument name; returns the expr and `broken`
-    fn parse_parenthesized(&mut self, name: Option<&str>) -> Parsed<(Expr, bool)> {
+    // "(" [ name ":" ] expr ")"; `named` is whether that name was written, then `broken`
+    fn parse_parenthesized(&mut self, name: Option<&str>) -> Parsed<(Expr, bool, bool)> {
         let opened_at = self.open(&TokenKind::LeftParen, true)?;
-        if name.is_some() {
-            self.parse_arg_name(name)?;
-        }
+        let named = if name.is_some() {
+            self.parse_arg_name(name)?.is_some()
+        } else {
+            false
+        };
         let expr = self.parse_expr()?;
         let broken = self.close(&TokenKind::RightParen, opened_at)?;
-        Ok((expr, broken))
+        Ok((expr, named, broken))
     }
 
     // keyword "." member, as in `clock.now`, `fs.read`, `catalog.columns`
@@ -1609,7 +1600,7 @@ impl Parser {
                 self.advance();
                 let callee = Expr::Name(self.span_from(start), keyword.spelling().to_string());
                 let arg_start = self.location();
-                let (value, broken) = self.parse_parenthesized(None)?;
+                let (value, _, broken) = self.parse_parenthesized(None)?;
                 let arg = Arg {
                     span: self.span_from(arg_start),
                     name: None,
@@ -1627,14 +1618,14 @@ impl Parser {
             // fs-read = "fs" "." "read" "(" [ "path" ":" ] expr ")"
             TokenKind::Keyword(Keyword::Fs) => {
                 self.parse_member("read")?;
-                let (path, _) = self.parse_parenthesized(Some("path"))?;
-                Expr::FsRead(self.span_from(start), Box::new(path))
+                let (path, named, broken) = self.parse_parenthesized(Some("path"))?;
+                Expr::FsRead(self.span_from(start), Box::new(path), named, broken)
             }
             // catalog-columns = "catalog" "." "columns" "(" [ "table" ":" ] expr ")"
             TokenKind::Keyword(Keyword::Catalog) => {
                 self.parse_member("columns")?;
-                let (table, _) = self.parse_parenthesized(Some("table"))?;
-                Expr::CatalogColumns(self.span_from(start), Box::new(table))
+                let (table, named, broken) = self.parse_parenthesized(Some("table"))?;
+                Expr::CatalogColumns(self.span_from(start), Box::new(table), named, broken)
             }
             // quote-expr = "quote" "(" { newline } ( stmt | expr ) { newline } ")"
             TokenKind::Keyword(Keyword::Quote) => {
@@ -1653,7 +1644,7 @@ impl Parser {
             // unquote-expr = "unquote" "(" expr ")"
             TokenKind::Keyword(Keyword::Unquote) => {
                 self.advance();
-                let (value, _) = self.parse_parenthesized(None)?;
+                let (value, _, _) = self.parse_parenthesized(None)?;
                 Expr::Unquote(self.span_from(start), Box::new(value))
             }
             TokenKind::Identifier(name) => {

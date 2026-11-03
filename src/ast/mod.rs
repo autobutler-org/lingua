@@ -290,8 +290,8 @@ pub enum Expr {
     Quote(Span, QuoteBody),
     Unquote(Span, Box<Expr>),
     ClockNow(Span),
-    FsRead(Span, Box<Expr>),
-    CatalogColumns(Span, Box<Expr>),
+    FsRead(Span, Box<Expr>, bool, bool),         // named, broken
+    CatalogColumns(Span, Box<Expr>, bool, bool), // named, broken
 }
 
 impl Expr {

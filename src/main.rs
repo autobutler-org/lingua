@@ -15,6 +15,8 @@ commands:
   check [PATH ...]    typecheck modules and their imports; silent when clean
   check --explain L031
                       print the catalog text for a diagnostic code
+  fmt [--check] [--source-root PATH] [PATH ...]
+                      rewrite modules in canonical layout; --check lists files that would change
   expand [PATH ...]   print the types that generative types and `provide` expand to
   build [PATH ...]    check, then build a static linux/amd64 executable at ./lingua-out
   lir PATH            print the LIR that `build` lowers PATH to
@@ -75,6 +77,7 @@ fn main() -> ExitCode {
                 }
             })
         }
+        ["fmt", rest @ ..] => lingua::fmt::command(rest),
         ["expand", rest @ ..] => {
             with_flags(
                 "expand",

@@ -30,6 +30,16 @@ const MAX_SOURCE_BYTES: usize = 1024 * 1024;
 ///
 /// `L047` for a source over 1 MiB, `L004` for invalid UTF-8, or the first token error.
 pub fn lex_source(bytes: &[u8]) -> Result<Vec<Token>, LexError> {
+    lex_with_comments(bytes).map(|(tokens, _)| tokens)
+}
+
+/// `lex_source`, plus each `//` comment's start and text (trailing whitespace removed), for
+/// the formatter: comments are not tokens.
+///
+/// # Errors
+///
+/// The same as `lex_source`.
+pub fn lex_with_comments(bytes: &[u8]) -> Result<(Vec<Token>, Vec<Comment>), LexError> {
     let start = Location { line: 1, column: 1 };
     if bytes.len() > MAX_SOURCE_BYTES {
         return Err(LexError {
@@ -50,16 +60,20 @@ pub fn lex_source(bytes: &[u8]) -> Result<Vec<Token>, LexError> {
         let is_eof = token.kind == TokenKind::Eof;
         tokens.push(token);
         if is_eof {
-            return Ok(tokens);
+            return Ok((tokens, lexer.comments));
         }
     }
 }
+
+/// A `//` comment: where it starts, and its text without trailing whitespace.
+pub type Comment = (Location, String);
 
 pub struct Lexer {
     contents: Vec<char>,
     position: usize,
     line: usize,
     column: usize,
+    comments: Vec<Comment>,
 }
 
 impl Lexer {
@@ -76,6 +90,7 @@ impl Lexer {
             position: 0,
             line: location.line,
             column: location.column,
+            comments: Vec::new(),
         }
     }
 
@@ -152,9 +167,12 @@ impl Lexer {
                 ' ' | '\t' => self.advance(),
                 // A comment stops before the newline so the newline is still a token
                 '/' if self.peek(1) == Some('/') => {
+                    let (location, start) = (self.location(), self.position);
                     while self.peek(0).is_some_and(|c| c != '\n' && c != '\r') {
                         self.advance();
                     }
+                    let text: String = self.contents[start..self.position].iter().collect();
+                    self.comments.push((location, text.trim_end().to_string()));
                 }
                 _ => return,
             }

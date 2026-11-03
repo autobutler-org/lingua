@@ -421,8 +421,14 @@ fn expr_sexpr(expr: &Expr) -> Sexpr {
         ),
         Expr::Unquote(_, value) => node("unquote", [expr_sexpr(value)]),
         Expr::ClockNow(_) => node("clock-now", []),
-        Expr::FsRead(_, path) => node("fs-read", [expr_sexpr(path)]),
-        Expr::CatalogColumns(_, table) => node("catalog-columns", [expr_sexpr(table)]),
+        Expr::FsRead(_, path, named, broken) => node(
+            "fs-read",
+            [expr_sexpr(path), boolean(*named), boolean(*broken)],
+        ),
+        Expr::CatalogColumns(_, table, named, broken) => node(
+            "catalog-columns",
+            [expr_sexpr(table), boolean(*named), boolean(*broken)],
+        ),
     }
 }
 

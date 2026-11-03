@@ -34,7 +34,7 @@ use crate::report;
 use crate::tir::{SymbolId, SymbolKind, TirModule, TirProgram, Type};
 
 pub use catalog::explain;
-pub use package::{Cache, Options, is_module_key};
+pub use package::{Cache, Options, is_module_key, resolve};
 
 /// The code for a construct that is legal Lingua but that this checker cannot handle yet.
 /// Not an `L` code.

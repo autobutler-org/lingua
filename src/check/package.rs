@@ -294,11 +294,18 @@ impl Loader {
     }
 }
 
-/// Resolves the source root and loads every requested module and its import closure.
+/// One requested module file: the path to show the user, and its module key.
+pub type Requested = (PathBuf, String);
+
+/// The source root and the module files `paths` name (the root itself means each `*.lf`
+/// directly in it), with `L016` for a path outside the root. `paths` defaults to `.`.
 ///
 /// # Errors
 /// A usage error: a path that does not exist, or paths that imply different roots.
-pub fn load(paths: &[PathBuf], options: &Options) -> Result<Loaded, Error> {
+pub fn resolve(
+    paths: &[PathBuf],
+    source_root: Option<&Path>,
+) -> Result<(PathBuf, Vec<Requested>, Vec<Diagnostic>), Error> {
     let paths: Vec<PathBuf> = if paths.is_empty() {
         vec![PathBuf::from(".")]
     } else {
@@ -308,7 +315,7 @@ pub fn load(paths: &[PathBuf], options: &Options) -> Result<Loaded, Error> {
         .iter()
         .map(|p| canonical(p))
         .collect::<Result<_, _>>()?;
-    let root = if let Some(root) = &options.source_root {
+    let root = if let Some(root) = source_root {
         canonical(root)?
     } else {
         let roots: Vec<PathBuf> = canon.iter().map(|p| root_for(p)).collect();
@@ -322,19 +329,27 @@ pub fn load(paths: &[PathBuf], options: &Options) -> Result<Loaded, Error> {
         roots[0].clone()
     };
     let mut diagnostics = Vec::new();
-    if let Ok(text) = std::fs::read_to_string(root.join("lingua.toml")) {
-        diagnostics.extend(check_toml(&text));
-    }
-    let mut requested: Vec<String> = Vec::new();
+    let mut requested: Vec<Requested> = Vec::new();
     for (given, path) in paths.iter().zip(&canon) {
-        let keys = if *path == root {
+        let files: Vec<Requested> = if *path == root {
             root_files(&root)
+                .into_iter()
+                .map(|key| {
+                    let file = format!("{key}.lf");
+                    let shown = if *given == Path::new(".") {
+                        PathBuf::from(file)
+                    } else {
+                        given.join(file)
+                    };
+                    (shown, key)
+                })
+                .collect()
         } else if path.is_file()
             && path.extension().is_some_and(|e| e == "lf")
             && path.parent() == Some(root.as_path())
         {
             path.file_stem()
-                .map(|s| vec![s.to_string_lossy().into_owned()])
+                .map(|s| vec![(given.clone(), s.to_string_lossy().into_owned())])
                 .unwrap_or_default()
         } else {
             diagnostics.push(
@@ -347,12 +362,25 @@ pub fn load(paths: &[PathBuf], options: &Options) -> Result<Loaded, Error> {
             );
             continue;
         };
-        for key in keys {
-            if !requested.contains(&key) {
-                requested.push(key);
+        for file in files {
+            if !requested.iter().any(|(_, key)| *key == file.1) {
+                requested.push(file);
             }
         }
     }
+    Ok((root, requested, diagnostics))
+}
+
+/// Resolves the source root and loads every requested module and its import closure.
+///
+/// # Errors
+/// A usage error: a path that does not exist, or paths that imply different roots.
+pub fn load(paths: &[PathBuf], options: &Options) -> Result<Loaded, Error> {
+    let (root, requested, mut diagnostics) = resolve(paths, options.source_root.as_deref())?;
+    if let Ok(text) = std::fs::read_to_string(root.join("lingua.toml")) {
+        diagnostics.splice(0..0, check_toml(&text));
+    }
+    let requested: Vec<String> = requested.into_iter().map(|(_, key)| key).collect();
     let mut loader = Loader {
         root: root.clone(),
         sources: Vec::new(),

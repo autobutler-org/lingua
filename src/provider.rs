@@ -9,7 +9,7 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 use crate::ast::{Decl, Field, Span, TypeExpr, Variant};
-use crate::lex::{Location, TokenKind};
+use crate::lex::Location;
 
 /// A comptime `Type`: one record or one sum. Each field type and payload is type text in the
 /// formatter's layout (docs/lingua1.md, Type text); names in it resolve at expansion.
@@ -36,72 +36,15 @@ const NOWHERE: Span = Span {
     end: Location { line: 1, column: 1 },
 };
 
-/// `text` in the formatter's layout when it is exactly one `type-expr`.
-// ponytail: a newline inside a bound's call is dropped, so a broken call prints on one line;
-// the formatter's broken layout is the upgrade once `lingua fmt` exists.
+/// `text` in the formatter's layout when it is exactly one `type-expr`: the `lingua fmt` printer.
+// ponytail: a newline inside a bound's call is dropped before printing, so a broken call prints
+// on one line; the cache reader takes one line per field, so it would need to read broken
+// layout first.
 #[must_use]
 pub fn type_text(text: &str) -> Option<String> {
     crate::parse::parse_type_text(text, NOWHERE)?;
-    let tokens = crate::lex::lex_source(text.as_bytes()).ok()?;
-    let lines = char_lines(text);
-    let spelling = |t: &crate::lex::Token| {
-        spanned(
-            &lines,
-            Span {
-                start: t.location,
-                end: t.end,
-            },
-        )
-    };
-    let operand = |k: Option<&TokenKind>| {
-        matches!(
-            k,
-            Some(
-                TokenKind::Identifier(_)
-                    | TokenKind::Integer(_)
-                    | TokenKind::String(_)
-                    | TokenKind::RightParen
-                    | TokenKind::RightBracket
-            )
-        )
-    };
-    let mut out = String::new();
-    // The previous two tokens, for a unary `-`
-    let (mut prev, mut before): (Option<&TokenKind>, Option<&TokenKind>) = (None, None);
-    for t in tokens
-        .iter()
-        .filter(|t| !matches!(t.kind, TokenKind::Newline | TokenKind::Eof))
-    {
-        let k = &t.kind;
-        let tight = match prev {
-            None
-            | Some(
-                TokenKind::LeftParen
-                | TokenKind::LeftBracket
-                | TokenKind::LessThan
-                | TokenKind::Dot,
-            ) => true,
-            Some(TokenKind::Minus) => !operand(before),
-            Some(_) => {
-                matches!(
-                    k,
-                    TokenKind::RightParen
-                        | TokenKind::RightBracket
-                        | TokenKind::GreaterThan
-                        | TokenKind::LessThan
-                        | TokenKind::Comma
-                        | TokenKind::Colon
-                        | TokenKind::Dot
-                ) || (*k == TokenKind::LeftParen && operand(prev))
-            }
-        };
-        if !tight {
-            out.push(' ');
-        }
-        out.push_str(&spelling(t));
-        (before, prev) = (prev, Some(k));
-    }
-    Some(out)
+    let ty = crate::parse::parse_type_text(&text.replace(['\r', '\n'], " "), NOWHERE)?;
+    Some(crate::lex::unlex(&crate::parse::unparse_type(&ty)))
 }
 
 /// `record_from_columns`: `(name, sql_type)` pairs to one record, or the `fail` message.
@@ -429,7 +372,7 @@ mod tests {
             ),
             (
                 "Int at least max(\r  a: 1,\r\n  b: 2,\n)",
-                "Int at least max(a: 1, b: 2,)",
+                "Int at least max(a: 1, b: 2)",
             ),
         ] {
             let record = record_from_fields(&texts(&[("x", text)])).unwrap();
