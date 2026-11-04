@@ -255,9 +255,21 @@ fn build_error(err: build::Error) -> ExitCode {
 }
 
 fn build_paths(paths: &[PathBuf], options: &Options) -> ExitCode {
-    let job = build::Job::new(paths.to_vec(), options.clone(), "lingua-out");
-    match job.run() {
-        build::Outcome::Wrote(_) => {
+    let mut runner = build::Runner::new();
+    runner.submit(build::Job::new(
+        paths.to_vec(),
+        options.clone(),
+        "lingua-out",
+    ));
+    let outcome = runner.run().into_iter().next();
+    match outcome {
+        None => {
+            eprintln!(
+                "error: lingua build submitted no job\nthis is a bug in lingua; please report it"
+            );
+            ExitCode::FAILURE
+        }
+        Some(build::Outcome::Wrote(_)) => {
             if !HOST_IS_LINUX_AMD64 {
                 eprintln!(
                     "note: ./lingua-out is a linux/amd64 executable; run it here with `docker run --rm --platform linux/amd64 -v \"$PWD\":/w -w /w debian:bookworm-slim ./lingua-out`"
@@ -265,8 +277,8 @@ fn build_paths(paths: &[PathBuf], options: &Options) -> ExitCode {
             }
             ExitCode::SUCCESS
         }
-        build::Outcome::Failed(err) => build_error(err),
-        build::Outcome::Unwritten { path, error } => {
+        Some(build::Outcome::Failed(err)) => build_error(err),
+        Some(build::Outcome::Unwritten { path, error }) => {
             let shown = if path == Path::new("lingua-out") {
                 "./lingua-out".to_owned()
             } else {

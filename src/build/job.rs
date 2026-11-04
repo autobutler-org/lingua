@@ -1,6 +1,6 @@
 //! One compilation of a package: the modules to check, and the file the executable is written to.
 //!
-//! `lingua build` runs one of these. A later runner accepts more than one and executes them.
+//! The runner accepts these and executes them. `lingua build` submits one.
 
 use std::path::{Path, PathBuf};
 
