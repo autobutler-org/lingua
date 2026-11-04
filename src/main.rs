@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
 use lingua::ast::dump;
@@ -255,23 +255,29 @@ fn build_error(err: build::Error) -> ExitCode {
 }
 
 fn build_paths(paths: &[PathBuf], options: &Options) -> ExitCode {
-    let image = match build::check(paths, options).and_then(|program| build::build_tir(&program)) {
-        Ok(image) => image,
-        Err(err) => return build_error(err),
-    };
-    if let Err(err) = build::write_output(std::path::Path::new("."), &image) {
-        eprintln!(
-            "error: cannot write `./lingua-out`: {err}
-check that the current directory is writable"
-        );
-        return ExitCode::FAILURE;
+    let job = build::Job::new(paths.to_vec(), options.clone(), "lingua-out");
+    match job.run() {
+        build::Outcome::Wrote(_) => {
+            if !HOST_IS_LINUX_AMD64 {
+                eprintln!(
+                    "note: ./lingua-out is a linux/amd64 executable; run it here with `docker run --rm --platform linux/amd64 -v \"$PWD\":/w -w /w debian:bookworm-slim ./lingua-out`"
+                );
+            }
+            ExitCode::SUCCESS
+        }
+        build::Outcome::Failed(err) => build_error(err),
+        build::Outcome::Unwritten { path, error } => {
+            let shown = if path == Path::new("lingua-out") {
+                "./lingua-out".to_owned()
+            } else {
+                path.display().to_string()
+            };
+            eprintln!(
+                "error: cannot write `{shown}`: {error}\ncheck that the current directory is writable"
+            );
+            ExitCode::FAILURE
+        }
     }
-    if !HOST_IS_LINUX_AMD64 {
-        eprintln!(
-            "note: ./lingua-out is a linux/amd64 executable; run it here with `docker run --rm --platform linux/amd64 -v \"$PWD\":/w -w /w debian:bookworm-slim ./lingua-out`"
-        );
-    }
-    ExitCode::SUCCESS
 }
 
 // Checks `path` as a build would and prints `dump` of the program
