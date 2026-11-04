@@ -3,6 +3,7 @@
 //! selection, encoding, and the ELF linker. The only target so far is static linux/amd64.
 
 pub mod arch;
+mod job;
 pub mod link;
 pub mod lir;
 #[cfg(test)]
@@ -17,8 +18,10 @@ pub mod target {
 use std::path::{Path, PathBuf};
 
 use crate::check::{self, Diagnostic};
+
 use crate::tir::TirProgram;
 use arch::amd64;
+pub use job::{Job, Outcome};
 use link::elf;
 use lir::LirProgram;
 use target::linux_amd64;
@@ -111,12 +114,28 @@ pub fn build_tir(program: &TirProgram) -> Result<Vec<u8>, Error> {
 /// # Errors
 /// The I/O error from writing, setting the mode, or renaming.
 pub fn write_output(dir: &Path, image: &[u8]) -> std::io::Result<PathBuf> {
-    let tmp = dir.join("lingua-out.tmp");
     let out = dir.join("lingua-out");
+    write_image(&out, image)?;
+    Ok(out)
+}
+
+/// Writes `image` to `path.tmp`, makes it executable, and renames it to `path`.
+/// A failed write leaves no partial binary. Creates `path`'s parent when it is missing.
+///
+/// # Errors
+/// The I/O error from creating the directory, writing, setting the mode, or renaming.
+fn write_image(path: &Path, image: &[u8]) -> std::io::Result<()> {
+    if let Some(parent) = path.parent()
+        && !parent.as_os_str().is_empty()
+    {
+        std::fs::create_dir_all(parent)?;
+    }
+    let mut tmp_name = path.as_os_str().to_owned();
+    tmp_name.push(".tmp");
+    let tmp = PathBuf::from(tmp_name);
     elf::write_executable(&tmp, image)
-        .and_then(|()| std::fs::rename(&tmp, &out))
+        .and_then(|()| std::fs::rename(&tmp, path))
         .inspect_err(|_| {
             let _ = std::fs::remove_file(&tmp);
-        })?;
-    Ok(out)
+        })
 }
