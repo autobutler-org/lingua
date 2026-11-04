@@ -10,6 +10,7 @@ pub mod lir;
 mod lir_eval;
 pub mod lower;
 pub mod prog;
+mod runner;
 pub mod runtime;
 pub mod target {
     pub mod linux_amd64;
@@ -24,6 +25,7 @@ use arch::amd64;
 pub use job::{Job, Outcome};
 use link::elf;
 use lir::LirProgram;
+pub use runner::Runner;
 use target::linux_amd64;
 
 /// Why a build wrote nothing.
