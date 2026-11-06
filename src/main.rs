@@ -39,6 +39,11 @@ flags for build:
   --profile debug|release
                       debug writes ./lingua-out; release writes ./lingua-out-release.
                       Name each once. Omit the flag for one debug job at ./lingua-out.
+  --serve             listen in this source root until `lingua build --stop`
+  --stop              stop the runner listening in this source root
+
+A build in a source root where `--serve` is listening submits its jobs there. With no
+runner, it builds in this process. A failed job does not stop the runner.
 
 Function examples run on the interpreter during check and build, then package examples; a
 failing one is a diagnostic. `const`, `comptime`, and comptime bounds fold on the same
@@ -165,6 +170,7 @@ fn with_flags(
     let mut paths = Vec::new();
     let mut profiles = Vec::new();
     let (mut refresh, mut offline) = (false, false);
+    let (mut serve, mut stop) = (false, false);
     let mut args = args.iter();
     while let Some(arg) = args.next() {
         match *arg {
@@ -195,6 +201,8 @@ fn with_flags(
                 },
                 None => return usage_error("`--profile` needs `debug` or `release`"),
             },
+            "--serve" if build => serve = true,
+            "--stop" if build => stop = true,
             flag if flag.starts_with('-') => {
                 return usage_error(&format!("unknown flag `{flag}` for {command}"));
             }
@@ -209,6 +217,15 @@ fn with_flags(
         (false, true) => Cache::Offline,
         (false, false) => Cache::Default,
     };
+    if serve && stop {
+        return usage_error("`--serve` and `--stop` cannot be used together; pick one");
+    }
+    if serve {
+        return serve_command(&paths, &options, &profiles);
+    }
+    if stop {
+        return stop_command(&paths, &options, &profiles);
+    }
     run(paths, options, profiles)
 }
 
@@ -280,6 +297,10 @@ fn build_error(err: build::Error) -> ExitCode {
             );
             ExitCode::FAILURE
         }
+        build::Error::Rendered(text) => {
+            eprint!("{text}");
+            ExitCode::FAILURE
+        }
     }
 }
 
@@ -292,25 +313,131 @@ fn shown_output(path: &Path) -> String {
     }
 }
 
+fn runner_flags(
+    which: &str,
+    paths: &[PathBuf],
+    options: &Options,
+    profiles: &[build::Profile],
+) -> Result<(), ExitCode> {
+    if !paths.is_empty() {
+        let message = if which == "--serve" {
+            "`--serve` waits for jobs; run `lingua build PATH` to submit one"
+        } else {
+            "`--stop` does not take a path"
+        };
+        return Err(usage_error(message));
+    }
+    if !profiles.is_empty() {
+        return Err(usage_error(&format!(
+            "`{which}` does not take `--profile`; the submitted job names its profile"
+        )));
+    }
+    if options.cache != Cache::Default {
+        return Err(usage_error(&format!(
+            "`{which}` does not take `--refresh` or `--offline`; the submitted job names the cache policy"
+        )));
+    }
+    Ok(())
+}
+
+fn source_root(options: &Options) -> Result<PathBuf, ExitCode> {
+    match check::resolve(&[], options.source_root.as_deref()) {
+        Ok((root, _, _)) => Ok(root),
+        Err(err) => Err(build_error(err.into())),
+    }
+}
+
+fn serve_exit(err: build::serve::ServeError) -> ExitCode {
+    match err {
+        build::serve::ServeError::Usage(message) => usage_error(&message),
+        build::serve::ServeError::Broken(message) => {
+            eprintln!("error: {message}");
+            ExitCode::FAILURE
+        }
+    }
+}
+
+fn serve_command(paths: &[PathBuf], options: &Options, profiles: &[build::Profile]) -> ExitCode {
+    if let Err(code) = runner_flags("--serve", paths, options, profiles) {
+        return code;
+    }
+    let root = match source_root(options) {
+        Ok(root) => root,
+        Err(code) => return code,
+    };
+    let listener = match build::serve::bind(&root) {
+        Ok(listener) => listener,
+        Err(err) => return serve_exit(err),
+    };
+    println!(
+        "listening for jobs at {}\n`lingua build` in this source root submits here. Stop with `lingua build --stop`.",
+        listener.path().display()
+    );
+    let _ = std::io::Write::flush(&mut std::io::stdout());
+    let mut runner = build::Runner::new();
+    match listener.run(&mut runner) {
+        Ok(()) => ExitCode::SUCCESS,
+        Err(err) => serve_exit(err),
+    }
+}
+
+fn stop_command(paths: &[PathBuf], options: &Options, profiles: &[build::Profile]) -> ExitCode {
+    if let Err(code) = runner_flags("--stop", paths, options, profiles) {
+        return code;
+    }
+    let root = match source_root(options) {
+        Ok(root) => root,
+        Err(code) => return code,
+    };
+    match build::serve::stop(&root) {
+        Ok(true) => ExitCode::SUCCESS,
+        Ok(false) => usage_error(&format!(
+            "no runner is listening in {}; start one with `lingua build --serve`",
+            root.display()
+        )),
+        Err(err) => serve_exit(err),
+    }
+}
+
+fn take_standing(
+    jobs: &[build::Job],
+) -> Result<Option<Vec<build::Outcome>>, build::serve::ServeError> {
+    let job = &jobs[0];
+    let Ok((root, _, _)) = check::resolve(&job.paths, job.options.source_root.as_deref()) else {
+        return Ok(None);
+    };
+    build::serve::submit(&root, jobs)
+}
+
 fn build_paths(paths: &[PathBuf], options: &Options, profiles: &[build::Profile]) -> ExitCode {
     let profiles = if profiles.is_empty() {
         vec![build::Profile::Debug]
     } else {
         profiles.to_vec()
     };
-    let mut runner = build::Runner::new();
-    let mut outputs = Vec::with_capacity(profiles.len());
-    for profile in profiles {
-        let output = PathBuf::from(profile.output_name());
-        outputs.push(output.clone());
-        runner.submit(build::Job::new(
-            paths.to_vec(),
-            options.clone(),
-            profile,
-            output,
-        ));
+    let jobs: Vec<build::Job> = profiles
+        .iter()
+        .map(|profile| {
+            build::Job::new(
+                paths.to_vec(),
+                options.clone(),
+                *profile,
+                profile.output_name(),
+            )
+        })
+        .collect();
+    let outputs: Vec<PathBuf> = jobs.iter().map(|job| job.output.clone()).collect();
+    match take_standing(&jobs) {
+        Ok(Some(outcomes)) => report_outcomes(&outputs, outcomes),
+        Ok(None) => {
+            let mut runner = build::Runner::new();
+            for job in jobs {
+                runner.submit(job);
+            }
+            report_outcomes(&outputs, runner.run())
+        }
+        Err(err) => serve_exit(err),
     }
-    report_outcomes(&outputs, runner.run())
 }
 
 fn report_outcomes(outputs: &[PathBuf], outcomes: Vec<build::Outcome>) -> ExitCode {

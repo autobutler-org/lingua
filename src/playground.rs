@@ -161,6 +161,7 @@ fn build_text(err: build::Error) -> String {
         build::Error::Internal(message) => format!(
             "error: {message}\nthis is a bug in lingua; please report it with the source that caused it\n"
         ),
+        build::Error::Rendered(text) => text,
     }
 }
 
