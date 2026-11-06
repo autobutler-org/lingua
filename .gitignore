@@ -13,3 +13,6 @@ devenv.local.nix
 # Claude Code local state (agent worktrees)
 /.claude/
 lingua-out
+
+# Standing runner socket
+.lingua/

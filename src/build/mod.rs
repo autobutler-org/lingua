@@ -12,6 +12,7 @@ pub mod lower;
 pub mod prog;
 mod runner;
 pub mod runtime;
+pub mod serve;
 pub mod target {
     pub mod linux_amd64;
 }
@@ -37,6 +38,8 @@ pub enum Error {
     Diagnostics(Vec<Diagnostic>),
     /// A bug in the backend.
     Internal(String),
+    /// Diagnostics a standing runner already rendered. Printed as the runner sent them.
+    Rendered(String),
 }
 
 impl From<check::Error> for Error {

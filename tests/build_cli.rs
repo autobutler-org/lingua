@@ -2,7 +2,8 @@
 //! host; running the executable is `tests/e2e.rs`'s job.
 
 use std::path::{Path, PathBuf};
-use std::process::{Command, Output};
+use std::process::{Child, Command, Output, Stdio};
+use std::time::{Duration, Instant};
 
 const HELLO: &str =
     "fn main() -> Nothing\n  pure\n\n  log(\"hello, world\")\n  return nothing\nend fn main\n";
@@ -127,6 +128,26 @@ fn usage_errors_say_what_to_do() {
             &["check", "--profile", "release"][..],
             "error: unknown flag `--profile` for check\n",
         ),
+        (
+            &["build", "--serve", "hello.lf"][..],
+            "error: `--serve` waits for jobs; run `lingua build PATH` to submit one\n",
+        ),
+        (
+            &["build", "--serve", "--profile", "debug"][..],
+            "error: `--serve` does not take `--profile`; the submitted job names its profile\n",
+        ),
+        (
+            &["build", "--serve", "--refresh"][..],
+            "error: `--serve` does not take `--refresh` or `--offline`; the submitted job names the cache policy\n",
+        ),
+        (
+            &["build", "--serve", "--stop"][..],
+            "error: `--serve` and `--stop` cannot be used together; pick one\n",
+        ),
+        (
+            &["check", "--serve"][..],
+            "error: unknown flag `--serve` for check\n",
+        ),
     ] {
         let output = lingua(&dir, args);
         assert_eq!(output.status.code(), Some(2), "{args:?}");
@@ -235,6 +256,121 @@ fn two_profiles_each_report_a_failed_check() {
     );
     assert!(!dir.join("lingua-out").exists());
     assert!(!dir.join("lingua-out-release").exists());
+}
+
+#[test]
+fn stop_without_a_runner_says_how_to_start_one() {
+    let dir = workdir("stop-absent");
+    let output = lingua(&dir, &["build", "--stop"]);
+    assert_eq!(output.status.code(), Some(2), "{}", stderr(&output));
+    let err = stderr(&output);
+    let root = dir.canonicalize().unwrap();
+    assert!(
+        err.contains(&format!("no runner is listening in {}", root.display())),
+        "{err}"
+    );
+    assert!(err.contains("lingua build --serve"), "{err}");
+}
+
+struct RemoveDir(PathBuf);
+
+impl Drop for RemoveDir {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_dir_all(&self.0);
+    }
+}
+
+struct KillChild(Option<Child>);
+
+impl Drop for KillChild {
+    fn drop(&mut self) {
+        if let Some(child) = self.0.as_mut() {
+            let _ = child.kill();
+            let _ = child.wait();
+        }
+    }
+}
+
+#[test]
+fn a_standing_runner_keeps_going_after_a_failed_job() {
+    let dir = PathBuf::from(format!("/tmp/lingua-serve-{}-cli", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    let _cleanup = RemoveDir(dir.clone());
+    std::fs::write(dir.join("hello.lf"), HELLO).unwrap();
+
+    let child = Command::new(env!("CARGO_BIN_EXE_lingua"))
+        .args(["build", "--serve"])
+        .current_dir(&dir)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+    let mut kill = KillChild(Some(child));
+    let child = kill.0.as_mut().unwrap();
+    let socket = dir.canonicalize().unwrap().join(".lingua/runner.sock");
+    let started = Instant::now();
+    while !socket.exists() {
+        match child.try_wait() {
+            Ok(Some(status)) => panic!("runner exited early: {status}"),
+            Ok(None) => {
+                assert!(
+                    started.elapsed() <= Duration::from_secs(5),
+                    "runner did not listen at {}",
+                    socket.display()
+                );
+                std::thread::sleep(Duration::from_millis(20));
+            }
+            Err(err) => panic!("wait: {err}"),
+        }
+    }
+
+    let built = lingua(&dir, &["build", "hello.lf"]);
+    assert_eq!(built.status.code(), Some(0), "{}", stderr(&built));
+    let image = std::fs::read(dir.join("lingua-out")).unwrap();
+    assert_eq!(&image[..4], b"\x7fELF");
+
+    std::fs::write(
+        dir.join("count.lf"),
+        "fn main() -> Nothing\n  pure\n\n  let n: Text = 1\n  return nothing\nend fn main\n",
+    )
+    .unwrap();
+    let failed = lingua(&dir, &["build", "count.lf"]);
+    assert_eq!(failed.status.code(), Some(1), "{}", stderr(&failed));
+    assert_eq!(
+        stderr(&failed),
+        "L020: expected `Text`, found an integer literal\n  --> count.lf:4:17\n   |\n 4 |   let n: Text = 1\n   |                 ^\n"
+    );
+    assert_eq!(std::fs::read(dir.join("lingua-out")).unwrap(), image);
+
+    let again = lingua(&dir, &["build", "hello.lf"]);
+    assert_eq!(again.status.code(), Some(0), "{}", stderr(&again));
+    assert_eq!(
+        &std::fs::read(dir.join("lingua-out")).unwrap()[..4],
+        b"\x7fELF"
+    );
+
+    let stopped = lingua(&dir, &["build", "--stop"]);
+    assert_eq!(stopped.status.code(), Some(0), "{}", stderr(&stopped));
+    let started = Instant::now();
+    loop {
+        match child.try_wait() {
+            Ok(Some(status)) => {
+                assert!(status.success(), "{status}");
+                break;
+            }
+            Ok(None) => {
+                assert!(
+                    started.elapsed() <= Duration::from_secs(5),
+                    "runner did not exit after --stop"
+                );
+                std::thread::sleep(Duration::from_millis(20));
+            }
+            Err(err) => panic!("wait: {err}"),
+        }
+    }
+    assert!(!socket.exists());
+    kill.0 = None;
 }
 
 // The first line where `got` and `want` differ, 1-based, with both versions of it
