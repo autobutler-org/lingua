@@ -2,7 +2,7 @@
 
 use std::path::PathBuf;
 
-use lingua::build::{Error, Job, Outcome, Runner};
+use lingua::build::{Error, Job, Outcome, Profile, Runner};
 use lingua::check::Options;
 
 const HELLO: &str =
@@ -28,7 +28,7 @@ fn a_job_writes_its_own_output() {
     let dir = workdir("own-output");
     let source = hello(&dir);
     let output = dir.join("bin").join("hello");
-    let outcome = Job::new(vec![source], Options::default(), &output).run();
+    let outcome = Job::new(vec![source], Options::default(), Profile::Debug, &output).run();
     assert_eq!(outcome, Outcome::Wrote(output.clone()));
     let image = std::fs::read(&output).unwrap();
     assert_eq!(&image[..4], b"\x7fELF");
@@ -46,7 +46,7 @@ fn a_failed_job_writes_nothing() {
     )
     .unwrap();
     let output = dir.join("count-out");
-    let outcome = Job::new(vec![source], Options::default(), &output).run();
+    let outcome = Job::new(vec![source], Options::default(), Profile::Debug, &output).run();
     assert!(
         matches!(outcome, Outcome::Failed(Error::Diagnostics(ref diagnostics)) if diagnostics.iter().any(|d| d.code == "L020"))
     );
@@ -60,8 +60,14 @@ fn two_jobs_keep_their_own_artifacts() {
     let source = hello(&dir);
     let first = dir.join("first");
     let second = dir.join("second");
-    let one = Job::new(vec![source.clone()], Options::default(), &first).run();
-    let two = Job::new(vec![source], Options::default(), &second).run();
+    let one = Job::new(
+        vec![source.clone()],
+        Options::default(),
+        Profile::Debug,
+        &first,
+    )
+    .run();
+    let two = Job::new(vec![source], Options::default(), Profile::Debug, &second).run();
     assert_eq!(one, Outcome::Wrote(first.clone()));
     assert_eq!(two, Outcome::Wrote(second.clone()));
     assert_eq!(
@@ -84,8 +90,18 @@ fn the_runner_keeps_submission_order_when_the_second_job_finishes_first() {
     let good_out = good_dir.join("out");
     let bad_out = bad_dir.join("out");
     let mut runner = Runner::with_workers(2);
-    runner.submit(Job::new(vec![good], Options::default(), &good_out));
-    runner.submit(Job::new(vec![bad], Options::default(), &bad_out));
+    runner.submit(Job::new(
+        vec![good],
+        Options::default(),
+        Profile::Debug,
+        &good_out,
+    ));
+    runner.submit(Job::new(
+        vec![bad],
+        Options::default(),
+        Profile::Debug,
+        &bad_out,
+    ));
     let outcomes = runner.run();
     assert_eq!(outcomes.len(), 2);
     assert_eq!(outcomes[0], Outcome::Wrote(good_out));
@@ -103,8 +119,18 @@ fn two_jobs_of_one_package_both_write() {
     let first = dir.join("first");
     let second = dir.join("second");
     let mut runner = Runner::with_workers(2);
-    runner.submit(Job::new(vec![source.clone()], Options::default(), &first));
-    runner.submit(Job::new(vec![source], Options::default(), &second));
+    runner.submit(Job::new(
+        vec![source.clone()],
+        Options::default(),
+        Profile::Debug,
+        &first,
+    ));
+    runner.submit(Job::new(
+        vec![source],
+        Options::default(),
+        Profile::Debug,
+        &second,
+    ));
     let outcomes = runner.run();
     assert_eq!(
         outcomes,
@@ -116,5 +142,38 @@ fn two_jobs_of_one_package_both_write() {
     assert_eq!(
         std::fs::read(first).unwrap(),
         std::fs::read(second).unwrap()
+    );
+}
+
+#[test]
+fn debug_and_release_of_one_package_write_the_same_image() {
+    let dir = workdir("profiles");
+    let source = hello(&dir);
+    let debug_out = dir.join(Profile::Debug.output_name());
+    let release_out = dir.join(Profile::Release.output_name());
+    let mut runner = Runner::with_workers(2);
+    runner.submit(Job::new(
+        vec![source.clone()],
+        Options::default(),
+        Profile::Debug,
+        &debug_out,
+    ));
+    runner.submit(Job::new(
+        vec![source],
+        Options::default(),
+        Profile::Release,
+        &release_out,
+    ));
+    let outcomes = runner.run();
+    assert_eq!(
+        outcomes,
+        vec![
+            Outcome::Wrote(debug_out.clone()),
+            Outcome::Wrote(release_out.clone())
+        ]
+    );
+    assert_eq!(
+        std::fs::read(debug_out).unwrap(),
+        std::fs::read(release_out).unwrap()
     );
 }

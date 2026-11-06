@@ -35,6 +35,11 @@ flags for check, expand, pack, and build:
   --refresh           run every provider effect again and replace the provider cache
   --offline           run no provider effect; a type missing from the cache is L071
 
+flags for build:
+  --profile debug|release
+                      debug writes ./lingua-out; release writes ./lingua-out-release.
+                      Name each once. Omit the flag for one debug job at ./lingua-out.
+
 Function examples run on the interpreter during check and build, then package examples; a
 failing one is a diagnostic. `const`, `comptime`, and comptime bounds fold on the same
 interpreter. A generative type (`type Name` whose body starts with an effect) and each
@@ -75,12 +80,15 @@ fn main() -> ExitCode {
             usage_error("--explain needs a code, e.g. `lingua check --explain L031`")
         }
         ["check", rest @ ..] => {
-            with_flags("check", rest, false, |paths, options| {
-                match check::check(&paths, &options) {
+            with_flags(
+                "check",
+                rest,
+                false,
+                |paths, options, _profiles| match check::check(&paths, &options) {
                     Ok(_) => ExitCode::SUCCESS,
                     Err(err) => build_error(err.into()),
-                }
-            })
+                },
+            )
         }
         ["fmt", rest @ ..] => lingua::fmt::command(rest),
         ["expand", rest @ ..] => {
@@ -88,7 +96,7 @@ fn main() -> ExitCode {
                 "expand",
                 rest,
                 false,
-                |paths, options| match check::expand(&paths, &options) {
+                |paths, options, _profiles| match check::expand(&paths, &options) {
                     Ok((text, diagnostics)) => {
                         print!("{text}");
                         if diagnostics.is_empty() {
@@ -102,8 +110,11 @@ fn main() -> ExitCode {
             )
         }
         ["pack", rest @ ..] => {
-            with_flags("pack", rest, false, |paths, options| {
-                match check::pack(&paths, &options) {
+            with_flags(
+                "pack",
+                rest,
+                false,
+                |paths, options, _profiles| match check::pack(&paths, &options) {
                     Ok((out, clean)) => {
                         match std::io::Write::write_all(&mut std::io::stdout(), &out) {
                             Ok(()) if clean => ExitCode::SUCCESS,
@@ -111,11 +122,11 @@ fn main() -> ExitCode {
                         }
                     }
                     Err(err) => build_error(err.into()),
-                }
-            })
+                },
+            )
         }
-        ["build", rest @ ..] => with_flags("build", rest, true, |paths, options| {
-            build_paths(&paths, &options)
+        ["build", rest @ ..] => with_flags("build", rest, true, |paths, options, profiles| {
+            build_paths(&paths, &options, &profiles)
         }),
         ["tir", path] => dump_program(path, |program| Ok(dump_tir(program))),
         ["tir"] => usage_error("tir needs a path, e.g. `lingua tir tests/e2e/hello.lf`"),
@@ -143,14 +154,16 @@ fn usage_error(message: &str) -> ExitCode {
 }
 
 // Parses `--source-root PATH`, `--refresh`, `--offline`, and (build only) `--dynamic`
+// and `--profile`.
 fn with_flags(
     command: &str,
     args: &[&str],
     build: bool,
-    run: impl FnOnce(Vec<PathBuf>, Options) -> ExitCode,
+    run: impl FnOnce(Vec<PathBuf>, Options, Vec<build::Profile>) -> ExitCode,
 ) -> ExitCode {
     let mut options = Options::default();
     let mut paths = Vec::new();
+    let mut profiles = Vec::new();
     let (mut refresh, mut offline) = (false, false);
     let mut args = args.iter();
     while let Some(arg) = args.next() {
@@ -166,6 +179,22 @@ fn with_flags(
                     "`--dynamic` is not implemented yet; drop it to build a static linux/amd64 executable",
                 );
             }
+            "--profile" if build => match args.next() {
+                Some(name) => match build::Profile::parse(name) {
+                    Some(profile) if profiles.contains(&profile) => {
+                        return usage_error(&format!(
+                            "`--profile {name}` was given twice; name each profile once"
+                        ));
+                    }
+                    Some(profile) => profiles.push(profile),
+                    None => {
+                        return usage_error(&format!(
+                            "`--profile {name}` is not a profile; use `debug` or `release`"
+                        ));
+                    }
+                },
+                None => return usage_error("`--profile` needs `debug` or `release`"),
+            },
             flag if flag.starts_with('-') => {
                 return usage_error(&format!("unknown flag `{flag}` for {command}"));
             }
@@ -180,7 +209,7 @@ fn with_flags(
         (false, true) => Cache::Offline,
         (false, false) => Cache::Default,
     };
-    run(paths, options)
+    run(paths, options, profiles)
 }
 
 fn read(path: &str) -> Option<Vec<u8>> {
@@ -254,41 +283,90 @@ fn build_error(err: build::Error) -> ExitCode {
     }
 }
 
-fn build_paths(paths: &[PathBuf], options: &Options) -> ExitCode {
+fn shown_output(path: &Path) -> String {
+    let text = path.display().to_string();
+    if path.is_relative() && !text.starts_with('.') {
+        format!("./{text}")
+    } else {
+        text
+    }
+}
+
+fn build_paths(paths: &[PathBuf], options: &Options, profiles: &[build::Profile]) -> ExitCode {
+    let profiles = if profiles.is_empty() {
+        vec![build::Profile::Debug]
+    } else {
+        profiles.to_vec()
+    };
     let mut runner = build::Runner::new();
-    runner.submit(build::Job::new(
-        paths.to_vec(),
-        options.clone(),
-        "lingua-out",
-    ));
-    let outcome = runner.run().into_iter().next();
-    match outcome {
-        None => {
-            eprintln!(
-                "error: lingua build submitted no job\nthis is a bug in lingua; please report it"
-            );
-            ExitCode::FAILURE
-        }
-        Some(build::Outcome::Wrote(_)) => {
-            if !HOST_IS_LINUX_AMD64 {
-                eprintln!(
-                    "note: ./lingua-out is a linux/amd64 executable; run it here with `docker run --rm --platform linux/amd64 -v \"$PWD\":/w -w /w debian:bookworm-slim ./lingua-out`"
-                );
+    let mut outputs = Vec::with_capacity(profiles.len());
+    for profile in profiles {
+        let output = PathBuf::from(profile.output_name());
+        outputs.push(output.clone());
+        runner.submit(build::Job::new(
+            paths.to_vec(),
+            options.clone(),
+            profile,
+            output,
+        ));
+    }
+    report_outcomes(&outputs, runner.run())
+}
+
+fn report_outcomes(outputs: &[PathBuf], outcomes: Vec<build::Outcome>) -> ExitCode {
+    if outcomes.is_empty() {
+        eprintln!(
+            "error: lingua build submitted no job\nthis is a bug in lingua; please report it"
+        );
+        return ExitCode::FAILURE;
+    }
+    if outputs.len() != outcomes.len() {
+        eprintln!(
+            "error: lingua build lost a job outcome\nthis is a bug in lingua; please report it"
+        );
+        return ExitCode::FAILURE;
+    }
+    let many = outcomes.len() > 1;
+    // 0 success, 1 a job failed, 2 usage. Usage outranks a diagnostic.
+    let mut worst = 0u8;
+    let mut reported_usage = false;
+    for (output, outcome) in outputs.iter().zip(outcomes) {
+        match outcome {
+            build::Outcome::Wrote(path) => {
+                if !HOST_IS_LINUX_AMD64 {
+                    let shown = shown_output(&path);
+                    eprintln!(
+                        "note: {shown} is a linux/amd64 executable; run it here with `docker run --rm --platform linux/amd64 -v \"$PWD\":/w -w /w debian:bookworm-slim {shown}`"
+                    );
+                }
             }
-            ExitCode::SUCCESS
+            build::Outcome::Failed(build::Error::Usage(message)) => {
+                if !reported_usage {
+                    let _ = usage_error(&message);
+                    reported_usage = true;
+                }
+                worst = 2;
+            }
+            build::Outcome::Failed(err) => {
+                if many {
+                    eprintln!("{}:", shown_output(output));
+                }
+                let _ = build_error(err);
+                worst = worst.max(1);
+            }
+            build::Outcome::Unwritten { path, error } => {
+                let shown = shown_output(&path);
+                eprintln!(
+                    "error: cannot write `{shown}`: {error}\ncheck that the current directory is writable"
+                );
+                worst = worst.max(1);
+            }
         }
-        Some(build::Outcome::Failed(err)) => build_error(err),
-        Some(build::Outcome::Unwritten { path, error }) => {
-            let shown = if path == Path::new("lingua-out") {
-                "./lingua-out".to_owned()
-            } else {
-                path.display().to_string()
-            };
-            eprintln!(
-                "error: cannot write `{shown}`: {error}\ncheck that the current directory is writable"
-            );
-            ExitCode::FAILURE
-        }
+    }
+    match worst {
+        0 => ExitCode::SUCCESS,
+        2 => ExitCode::from(2),
+        _ => ExitCode::FAILURE,
     }
 }
 

@@ -2056,7 +2056,7 @@ The lingua1 toolchain is `check`, `fmt`, `pack`, `expand`, and `build`. There is
 |---|---|
 | 0 | The command succeeded. `--explain` of a known code also exits 0. A built binary is not this table: its own `assert` / `fail` exits 1, and its own overflow exits 1, using the shapes in [Value errors and exceptions](#value-errors-and-exceptions). |
 | 1 | One or more Lingua diagnostics, or `fmt --check` would change a file. |
-| 2 | Usage error: unknown flag, `--explain` of an unknown code, path does not exist, `pack` given a directory, `--refresh` together with `--offline`. This is not a Lingua diagnostic and has no `L` code. |
+| 2 | Usage error: unknown flag, `--explain` of an unknown code, path does not exist, `pack` given a directory, `--refresh` together with `--offline`, `--profile` other than `debug` or `release`, or the same profile twice. This is not a Lingua diagnostic and has no `L` code. |
 
 ```text
 lingua --version
@@ -2068,7 +2068,7 @@ lingua check --explain L031
 lingua fmt [--check] [--source-root PATH] [PATH ...]
 lingua pack [--source-root PATH] [--refresh | --offline] FILE
 lingua expand [--source-root PATH] [--refresh | --offline] [PATH ...]
-lingua build [--source-root PATH] [--dynamic] [--refresh | --offline] [PATH ...]
+lingua build [--source-root PATH] [--dynamic] [--profile debug] [--profile release] [--refresh | --offline] [PATH ...]
 ```
 
 `--version` prints `lingua1` and nothing else.
@@ -2077,7 +2077,7 @@ lingua build [--source-root PATH] [--dynamic] [--refresh | --offline] [PATH ...]
 
 `check`, `expand`, `pack`, and the check inside `build` share one cache policy. Default: reuse a declaration already present in `{source_root}/provided/<module>.lf`; otherwise run the effect and write that declaration. `--offline` runs no provider effect and emits one `L071` per generated declaration that is absent, including a `pure` generative type. `--refresh` runs the effects again and replaces the cache. `--refresh` and `--offline` together are exit 2. `check` does not rewrite source `.lf` files.
 
-`expand` runs the same fixed point as `check`, including that cache policy, and does not require examples to succeed. It then prints the expanded type text to stdout, then each declaration that holds a macro splice, with the spliced tree in place of the call, as source that parses again. `build` runs `check` and emits a binary only when `check` exits 0. The Lingua runtime is linked in, and the result never needs a shared Lingua library. On Linux the default is a static executable with no dynamic linker. `--dynamic` makes a Linux binary that loads `libc.so.6` through the system dynamic linker and calls it instead of making raw system calls. darwin binaries always load `libSystem`, so `--dynamic` there changes nothing. The output path is `./lingua-out`. Static versus dynamic is a flag, not syntax. A runtime residue that calls a resource operation (`open_orders`) is `L072` and produces no binary. Foreign shared libraries are out of scope. `build` does not re-run examples as native code.
+`expand` runs the same fixed point as `check`, including that cache policy, and does not require examples to succeed. It then prints the expanded type text to stdout, then each declaration that holds a macro splice, with the spliced tree in place of the call, as source that parses again. `build` runs `check` and emits a binary only when `check` exits 0. The Lingua runtime is linked in, and the result never needs a shared Lingua library. On Linux the default is a static executable with no dynamic linker. `--dynamic` makes a Linux binary that loads `libc.so.6` through the system dynamic linker and calls it instead of making raw system calls. darwin binaries always load `libSystem`, so `--dynamic` there changes nothing. The output path of the default job is `./lingua-out`. Omitting `--profile` is `--profile debug`, and that job writes `./lingua-out`. `--profile release` writes `./lingua-out-release`. Passing both submits both jobs; the two images match until a later change makes release differ. `check` does not read the profile. Static versus dynamic is a flag, not syntax. A runtime residue that calls a resource operation (`open_orders`) is `L072` and produces no binary. Foreign shared libraries are out of scope. `build` does not re-run examples as native code.
 
 **Entry.** The process starts at a file-level function:
 

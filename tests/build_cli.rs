@@ -111,6 +111,22 @@ fn usage_errors_say_what_to_do() {
             &["build", "--refresh", "--offline"][..],
             "error: --refresh and --offline cannot be used together; pick one\n",
         ),
+        (
+            &["build", "--profile"][..],
+            "error: `--profile` needs `debug` or `release`\n",
+        ),
+        (
+            &["build", "--profile", "fast"][..],
+            "error: `--profile fast` is not a profile; use `debug` or `release`\n",
+        ),
+        (
+            &["build", "--profile", "debug", "--profile", "debug"][..],
+            "error: `--profile debug` was given twice; name each profile once\n",
+        ),
+        (
+            &["check", "--profile", "release"][..],
+            "error: unknown flag `--profile` for check\n",
+        ),
     ] {
         let output = lingua(&dir, args);
         assert_eq!(output.status.code(), Some(2), "{args:?}");
@@ -118,6 +134,107 @@ fn usage_errors_say_what_to_do() {
         assert!(stderr(&output).contains("usage: lingua"), "{args:?}");
     }
     assert!(!dir.join("lingua-out").exists());
+}
+
+#[test]
+fn named_debug_profile_still_writes_lingua_out() {
+    let dir = workdir("profile-debug");
+    std::fs::write(dir.join("hello.lf"), HELLO).unwrap();
+    let output = lingua(&dir, &["build", "--profile", "debug", "hello.lf"]);
+    assert_eq!(output.status.code(), Some(0), "{}", stderr(&output));
+    assert_eq!(
+        &std::fs::read(dir.join("lingua-out")).unwrap()[..4],
+        b"\x7fELF"
+    );
+    assert!(!dir.join("lingua-out-release").exists());
+}
+
+#[test]
+fn release_alone_writes_lingua_out_release() {
+    let dir = workdir("profile-release");
+    std::fs::write(dir.join("hello.lf"), HELLO).unwrap();
+    let output = lingua(&dir, &["build", "--profile", "release", "hello.lf"]);
+    assert_eq!(output.status.code(), Some(0), "{}", stderr(&output));
+    let image = std::fs::read(dir.join("lingua-out-release")).unwrap();
+    assert_eq!(&image[..4], b"\x7fELF");
+    assert!(!dir.join("lingua-out").exists());
+    assert!(!dir.join("lingua-out-release.tmp").exists());
+    if cfg!(all(target_os = "linux", target_arch = "x86_64")) {
+        assert_eq!(stderr(&output), "");
+    } else {
+        let err = stderr(&output);
+        assert!(
+            err.contains("note: ./lingua-out-release is a linux/amd64"),
+            "{err}"
+        );
+        assert!(
+            !err.contains("note: ./lingua-out is a linux/amd64"),
+            "{err}"
+        );
+    }
+}
+
+#[test]
+fn both_profiles_write_their_own_files() {
+    let dir = workdir("profile-both");
+    std::fs::write(dir.join("hello.lf"), HELLO).unwrap();
+    let output = lingua(
+        &dir,
+        &[
+            "build",
+            "--profile",
+            "release",
+            "--profile",
+            "debug",
+            "hello.lf",
+        ],
+    );
+    assert_eq!(output.status.code(), Some(0), "{}", stderr(&output));
+    let debug = std::fs::read(dir.join("lingua-out")).unwrap();
+    let release = std::fs::read(dir.join("lingua-out-release")).unwrap();
+    assert_eq!(&debug[..4], b"\x7fELF");
+    assert_eq!(debug, release);
+    assert!(!dir.join("lingua-out.tmp").exists());
+    assert!(!dir.join("lingua-out-release.tmp").exists());
+    if cfg!(all(target_os = "linux", target_arch = "x86_64")) {
+        assert_eq!(stderr(&output), "");
+    } else {
+        let err = stderr(&output);
+        assert!(err.contains("note: ./lingua-out is a linux/amd64"), "{err}");
+        assert!(
+            err.contains("note: ./lingua-out-release is a linux/amd64"),
+            "{err}"
+        );
+    }
+}
+
+#[test]
+fn two_profiles_each_report_a_failed_check() {
+    let dir = workdir("profile-failed");
+    std::fs::write(
+        dir.join("count.lf"),
+        "fn main() -> Nothing\n  pure\n\n  let n: Text = 1\n  return nothing\nend fn main\n",
+    )
+    .unwrap();
+    let output = lingua(
+        &dir,
+        &[
+            "build",
+            "--profile",
+            "debug",
+            "--profile",
+            "release",
+            "count.lf",
+        ],
+    );
+    assert_eq!(output.status.code(), Some(1));
+    let diagnostic = "L020: expected `Text`, found an integer literal\n  --> count.lf:4:17\n   |\n 4 |   let n: Text = 1\n   |                 ^\n";
+    assert_eq!(
+        stderr(&output),
+        format!("./lingua-out:\n{diagnostic}./lingua-out-release:\n{diagnostic}")
+    );
+    assert!(!dir.join("lingua-out").exists());
+    assert!(!dir.join("lingua-out-release").exists());
 }
 
 // The first line where `got` and `want` differ, 1-based, with both versions of it

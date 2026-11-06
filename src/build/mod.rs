@@ -22,7 +22,7 @@ use crate::check::{self, Diagnostic};
 
 use crate::tir::TirProgram;
 use arch::amd64;
-pub use job::{Job, Outcome};
+pub use job::{Job, Outcome, Profile};
 use link::elf;
 use lir::LirProgram;
 pub use runner::Runner;
